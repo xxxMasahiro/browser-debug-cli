@@ -6,6 +6,8 @@
   "required": ["baseUrl"],
   "properties": {
     "baseUrl": { "type": "string" },
+    "schemaVersion": { "type": "string" },
+    "name": { "type": "string" },
     "scope": { "type": "object" },
     "seeds": { "type": "array", "items": { "type": "string" } },
     "expectedRoutes": { "type": "array", "items": { "type": "string" } },

@@ -66,6 +66,11 @@ const schemas = Object.freeze({
       evidence: { type: 'object' },
       artifacts: { type: 'array' },
       repro: { type: 'array' },
+      priority: { type: 'string' },
+      impact: { type: 'string' },
+      recommendation: { type: 'string' },
+      fix_candidates: { type: 'array' },
+      implementation_notes: { type: 'object' },
       owner_decision_required: { type: 'boolean' }
     },
     additionalProperties: true
@@ -78,6 +83,8 @@ const schemas = Object.freeze({
     required: ['baseUrl'],
     properties: {
       baseUrl: { type: 'string' },
+      schemaVersion: { type: 'string' },
+      name: { type: 'string' },
       scope: { type: 'object' },
       seeds: { type: 'array', items: { type: 'string' } },
       expectedRoutes: { type: 'array', items: { type: 'string' } },
@@ -101,6 +108,8 @@ const schemas = Object.freeze({
       review: { type: 'object' },
       findings: { type: 'array', items: { $ref: 'finding.schema.json' } },
       metrics: { type: 'object' },
+      action_plan: { type: 'object' },
+      review_advisory: { type: 'object' },
       environment: { type: 'object' },
       coverage: { type: 'object' }
     },

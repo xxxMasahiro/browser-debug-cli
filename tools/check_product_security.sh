@@ -10,6 +10,9 @@ failed=0
 
 product_require_nonempty_file "$ROOT" docs/workflow/SECURITY.md || failed=1
 product_require_nonempty_file "$ROOT" ops/SECURITY_MANIFEST.tsv || failed=1
+product_require_nonempty_file "$ROOT" .codex-plugin/plugin.json || failed=1
+product_require_nonempty_file "$ROOT" .mcp.json || failed=1
+product_require_nonempty_file "$ROOT" skills/browser-debug-review/SKILL.md || failed=1
 
 while IFS= read -r -d '' file; do
   rel="$(product_rel "$ROOT" "$file")"
@@ -56,6 +59,20 @@ scan_runtime_pattern 'launchPersistentContext|userDataDir|storageState' 'browser
 scan_runtime_pattern 'createServer|listen\(|WebSocket|EventSource' 'external control channel'
 scan_runtime_pattern 'node:child_process|child_process|execFile|spawn\(' 'arbitrary shell execution' 'src/daemon\.js:'
 scan_runtime_pattern 'npm publish|gh repo|curl |wget ' 'publication or external transfer'
+
+if ! grep -q 'browser-debug-mcp' "$ROOT/.mcp.json"; then
+  printf 'plugin MCP configuration must reference browser-debug-mcp\n' >&2
+  failed=1
+fi
+
+if grep -RInE 'createServer|listen\(|WebSocket|EventSource|curl |wget |npm publish|launchPersistentContext|userDataDir|storageState' \
+  "$ROOT/.codex-plugin" "$ROOT/.mcp.json" "$ROOT/skills/browser-debug-review/SKILL.md" >/tmp/browser-debug-plugin-security.$$ 2>/dev/null; then
+  while IFS= read -r line; do
+    printf 'forbidden plugin metadata pattern: %s\n' "${line#$ROOT/}" >&2
+  done </tmp/browser-debug-plugin-security.$$
+  failed=1
+fi
+rm -f /tmp/browser-debug-plugin-security.$$
 
 [[ "$failed" -eq 0 ]] || {
   printf 'Product security check failed.\n' >&2

@@ -39,6 +39,36 @@ export const MCP_TOOLS = Object.freeze([
     }
   },
   {
+    name: 'browser_debug_target_init',
+    description: 'Create a local target manifest artifact for manifest-driven review.',
+    inputSchema: {
+      type: 'object',
+      required: ['url'],
+      additionalProperties: false,
+      properties: {
+        url: { type: 'string' },
+        name: { type: 'string' },
+        viewport: { type: 'string' },
+        maxRoutes: { type: 'number' },
+        timeout: { type: 'string' }
+      }
+    }
+  },
+  {
+    name: 'browser_debug_review_target',
+    description: 'Run a deterministic local browser review for a target manifest.',
+    inputSchema: {
+      type: 'object',
+      required: ['target'],
+      additionalProperties: false,
+      properties: {
+        target: { type: 'string' },
+        report: { type: 'boolean' },
+        timeout: { type: 'string' }
+      }
+    }
+  },
+  {
     name: 'browser_debug_schema_list',
     description: 'List machine-readable Browser Debug CLI schemas.',
     inputSchema: { type: 'object', additionalProperties: false, properties: {} }
@@ -121,6 +151,19 @@ function toolToCliArgs(name, args) {
   }
   if (name === 'browser_debug_review') {
     return withCommonOptions(['review', '--url', args.url], args);
+  }
+  if (name === 'browser_debug_target_init') {
+    const output = withCommonOptions(['target', 'init', '--url', args.url], args);
+    if (args.name) {
+      output.splice(-1, 0, '--name', String(args.name));
+    }
+    if (args.maxRoutes !== undefined) {
+      output.splice(-1, 0, '--max-routes', String(args.maxRoutes));
+    }
+    return output;
+  }
+  if (name === 'browser_debug_review_target') {
+    return withCommonOptions(['review', '--target', args.target], args);
   }
   if (name === 'browser_debug_schema_list') {
     return ['schema', 'list', '--json'];

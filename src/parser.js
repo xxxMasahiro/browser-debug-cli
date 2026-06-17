@@ -5,6 +5,7 @@ const VALUE_OPTIONS = new Set([
   'daemon',
   'input',
   'mask',
+  'max-routes',
   'mock',
   'name',
   'region',
@@ -57,6 +58,8 @@ export function parseCliArgs(argv) {
       return parseSupervise(args, globals);
     case 'daemon':
       return parseDaemon(args, globals);
+    case 'target':
+      return parseTarget(args, globals);
     case 'session':
       return parseSession(args, globals);
     case 'act':
@@ -281,6 +284,50 @@ function parseSpec(args, globals) {
     });
   }
   return parseRequiredOptions('spec export', args.slice(1), globals, ['session']);
+}
+
+function parseTarget(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: 'target' } };
+  }
+  const subcommand = args[0];
+  if (!subcommand) {
+    return parseError('target', globals.json, {
+      code: 'MISSING_SUBCOMMAND',
+      message: 'target requires a subcommand.',
+      details: { subcommands: ['init'] }
+    });
+  }
+  if (subcommand !== 'init') {
+    return parseError('target', globals.json, {
+      code: 'UNKNOWN_SUBCOMMAND',
+      message: `Unknown target subcommand: ${subcommand}`,
+      details: { subcommands: ['init'] }
+    });
+  }
+  const parsed = parseOptions('target init', args.slice(1), globals.json);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  if (parsed.positionals.length > 0) {
+    return parseError('target init', globals.json, {
+      code: 'UNEXPECTED_ARGUMENT',
+      message: 'target init does not accept positional arguments.',
+      details: { argument: parsed.positionals[0] }
+    });
+  }
+  if (!parsed.options.url) {
+    return parseError('target init', globals.json, {
+      code: 'MISSING_REQUIRED_OPTION',
+      message: 'target init requires --url <url>.',
+      details: { option: 'url' }
+    });
+  }
+  const urlError = validateUrl(parsed.options.url);
+  if (urlError) {
+    return parseError('target init', globals.json, urlError);
+  }
+  return { ok: true, command: 'target init', json: globals.json, options: parsed.options };
 }
 
 function parseReview(args, globals) {

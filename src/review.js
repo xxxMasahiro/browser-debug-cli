@@ -170,6 +170,13 @@ export async function runSingleUrlReview(options = {}, context = {}) {
       findings.push(...mockResult.findings.map((finding, index) => withFindingId(id, finding, findings.length + index + 1)));
       warnings.push(...mockResult.warnings);
     }
+    const actionPlan = buildActionPlan(findings);
+    const reviewAdvisory = buildReviewAdvisory({
+      findings,
+      layout,
+      screenshotArtifact,
+      mockMetrics: mockResult?.metrics ?? null
+    });
 
     const review = redact({
       schema_version: SCHEMA_VERSION,
@@ -194,6 +201,8 @@ export async function runSingleUrlReview(options = {}, context = {}) {
       review,
       findings: findings.slice(0, DEFAULT_FINDINGS_LIMIT),
       metrics,
+      action_plan: actionPlan,
+      review_advisory: reviewAdvisory,
       environment: {
         browser: {
           engine: 'chromium',
@@ -288,10 +297,12 @@ export async function runTargetReview(options = {}, context = {}) {
     enqueueRoute(queue, discovered, seed, 'seed', target);
   }
 
-  while (queue.length > 0 && visited.length < routeBudget) {
+  let processedRoutes = 0;
+  while (queue.length > 0 && processedRoutes < routeBudget) {
     const route = queue.shift();
+    processedRoutes += 1;
     for (const viewport of target.viewportMatrix) {
-      const childId = `${id}-r${visited.length + 1}-${viewport.name}`;
+      const childId = `${id}-r${processedRoutes}-${viewport.name}`;
       const result = await runSingleUrlReview({
         ...options,
         target: undefined,
@@ -347,6 +358,8 @@ export async function runTargetReview(options = {}, context = {}) {
     description: 'Structured site review coverage JSON.'
   }));
 
+  const actionPlan = buildActionPlan(findings, { coverage });
+  const reviewAdvisory = buildTargetReviewAdvisory({ findings, coverage });
   const data = redact({
     review: {
       schema_version: SCHEMA_VERSION,
@@ -368,6 +381,8 @@ export async function runTargetReview(options = {}, context = {}) {
       failed_routes: failed.length,
       expected_missing_routes: expectedMissing.length
     }),
+    action_plan: actionPlan,
+    review_advisory: reviewAdvisory,
     environment: {
       artifact_root: artifactRootInput,
       viewports: target.viewportMatrix
@@ -381,6 +396,16 @@ export async function runTargetReview(options = {}, context = {}) {
     path: reviewRel,
     description: 'Structured site review JSON.'
   }));
+
+  if (options.report) {
+    const reportRel = artifactRelPath(artifactRootInput, 'reports', `${id}.md`);
+    await writeTextArtifact(root, ['reports', `${id}.md`], renderReviewReport(data, artifacts));
+    artifacts.push(artifactObject({
+      type: 'report',
+      path: reportRel,
+      description: 'Markdown site review report.'
+    }));
+  }
 
   return {
     status: 'ok',
@@ -955,10 +980,300 @@ function createFindings({ id, url, viewport, observation, layout, screenshotArti
 }
 
 function withFindingId(reviewId, finding, index) {
+  const enriched = enrichFinding(finding);
   return {
     id: `${reviewId}-finding-${String(index).padStart(3, '0')}`,
     owner_decision_required: false,
-    ...finding
+    ...enriched
+  };
+}
+
+function enrichFinding(finding) {
+  const guidance = guidanceForFinding(finding);
+  return {
+    ...finding,
+    priority: finding.priority ?? priorityForSeverity(finding.severity),
+    impact: finding.impact ?? guidance.impact,
+    recommendation: finding.recommendation ?? guidance.recommendation,
+    fix_candidates: finding.fix_candidates ?? guidance.fix_candidates,
+    implementation_notes: finding.implementation_notes ?? guidance.implementation_notes
+  };
+}
+
+function priorityForSeverity(severity) {
+  return {
+    critical: 'P0',
+    high: 'P1',
+    medium: 'P2',
+    low: 'P3',
+    info: 'P4'
+  }[severity] ?? 'P4';
+}
+
+function buildActionPlan(findings, { coverage = null } = {}) {
+  const actionable = [...findings]
+    .filter((finding) => finding.category !== 'evidence_quality' || finding.severity !== 'info')
+    .sort(compareFindingPriority);
+  const highest = actionable[0]?.severity ?? 'info';
+  const gate = releaseGateForFindings(actionable);
+  return {
+    status: gate.status,
+    release_gate: gate,
+    highest_severity: highest,
+    total_actionable_findings: actionable.length,
+    next_actions: actionable.slice(0, 10).map((finding) => ({
+      priority: finding.priority,
+      severity: finding.severity,
+      category: finding.category,
+      route: finding.route,
+      selector: finding.selector,
+      message: finding.message,
+      recommendation: finding.recommendation,
+      fix_candidates: finding.fix_candidates,
+      repro: finding.repro
+    })),
+    coverage: coverage ? {
+      discovered_routes: coverage.routes.discovered.length,
+      visited_routes: coverage.routes.visited.length,
+      failed_routes: coverage.routes.failed.length,
+      expected_missing_routes: coverage.routes.expected_missing.length,
+      viewports: coverage.viewports.map((viewport) => viewport.name)
+    } : null
+  };
+}
+
+function buildReviewAdvisory({ findings, layout, screenshotArtifact, mockMetrics }) {
+  const categories = new Set(findings.map((finding) => finding.category));
+  const signals = [];
+  if (categories.has('browser_health')) {
+    signals.push('Runtime errors or failed requests should be resolved before judging visual quality.');
+  }
+  if (categories.has('layout_integrity')) {
+    signals.push('Layout evidence indicates visible overflow, clipping, or empty-render risk.');
+  }
+  if (categories.has('accessibility_basics')) {
+    signals.push('Basic accessibility issues are likely to affect both usability and automated navigation.');
+  }
+  if (categories.has('interaction_quality')) {
+    signals.push('Interactive target evidence suggests some controls may be hard to use reliably.');
+  }
+  if (mockMetrics?.status === 'different') {
+    signals.push('The screenshot and mock metrics differ beyond the configured local threshold.');
+  }
+  if (!screenshotArtifact) {
+    signals.push('Visual judgment is limited because no screenshot artifact was captured.');
+  }
+  if (layout?.page?.visible_text_length < 20) {
+    signals.push('The page has very little visible text, so empty-state or loading-state intent should be checked.');
+  }
+  return {
+    reviewer: 'local_heuristic',
+    status: signals.length > 0 ? 'needs_attention' : 'no_local_visual_blockers',
+    confidence: 'medium',
+    human_like_scope: 'layout, interaction, accessibility, browser health, and mock-metric signals only',
+    visual_assessment: signals,
+    implementation_focus: summarizeImplementationFocus(findings),
+    limitations: [
+      'This is not a model or human aesthetic judgment.',
+      'Screenshots, DOM, console, and network evidence remain local.',
+      'Subjective design approval still requires an approved human or model review layer.'
+    ]
+  };
+}
+
+function buildTargetReviewAdvisory({ findings, coverage }) {
+  const routeFailures = coverage.routes.failed.length;
+  const expectedMissing = coverage.routes.expected_missing.length;
+  const signals = [];
+  if (routeFailures > 0) {
+    signals.push(`${routeFailures} route viewport review attempts failed.`);
+  }
+  if (expectedMissing > 0) {
+    signals.push(`${expectedMissing} expected routes were not discovered.`);
+  }
+  if (findings.length > 0) {
+    signals.push('At least one visited route produced review findings.');
+  }
+  return {
+    reviewer: 'local_heuristic',
+    status: signals.length > 0 ? 'needs_attention' : 'coverage_passed_without_local_findings',
+    confidence: 'medium',
+    human_like_scope: 'route coverage and deterministic local review signals only',
+    visual_assessment: signals,
+    implementation_focus: summarizeImplementationFocus(findings),
+    limitations: [
+      'Route discovery depends on same-origin anchors and navigation action candidates.',
+      'Mutating, destructive, input-required, and external actions are not executed by default.',
+      'Subjective design approval still requires an approved human or model review layer.'
+    ]
+  };
+}
+
+function summarizeImplementationFocus(findings) {
+  const focus = new Set();
+  for (const finding of findings) {
+    for (const key of ['html', 'css', 'javascript', 'test']) {
+      if (finding.implementation_notes?.[key]?.length) {
+        focus.add(key);
+      }
+    }
+  }
+  return [...focus];
+}
+
+function compareFindingPriority(left, right) {
+  const severityRank = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  return (severityRank[left.severity] ?? 5) - (severityRank[right.severity] ?? 5)
+    || String(left.category).localeCompare(String(right.category));
+}
+
+function releaseGateForFindings(findings) {
+  if (findings.some((finding) => finding.severity === 'critical')) {
+    return {
+      status: 'blocked',
+      reason: 'critical_findings_present',
+      recommendation: 'Fix critical findings before treating the page as review-ready.'
+    };
+  }
+  if (findings.some((finding) => finding.severity === 'high')) {
+    return {
+      status: 'blocked',
+      reason: 'high_severity_findings_present',
+      recommendation: 'Resolve high-severity runtime or page-health findings before visual sign-off.'
+    };
+  }
+  if (findings.some((finding) => finding.severity === 'medium')) {
+    return {
+      status: 'needs_fix_or_owner_review',
+      reason: 'medium_findings_present',
+      recommendation: 'Fix deterministic issues and ask the owner to judge heuristic findings.'
+    };
+  }
+  if (findings.length > 0) {
+    return {
+      status: 'pass_with_notes',
+      reason: 'low_or_info_findings_present',
+      recommendation: 'Review low-severity findings when polishing the experience.'
+    };
+  }
+  return {
+    status: 'pass',
+    reason: 'no_actionable_local_findings',
+    recommendation: 'No configured local review rules found issues in this run.'
+  };
+}
+
+function guidanceForFinding(finding) {
+  const message = String(finding.message ?? '').toLowerCase();
+  if (finding.category === 'browser_health') {
+    return {
+      impact: 'Runtime or network failures can make the page unreliable before UI quality is judged.',
+      recommendation: 'Repair the underlying runtime, response, or network failure and rerun the same review.',
+      fix_candidates: [
+        'Inspect the console or failed request evidence attached to this finding.',
+        'Add or update a focused regression test for the failing route or asset.'
+      ],
+      implementation_notes: {
+        html: [],
+        css: [],
+        javascript: ['Trace the failing script, route handler, or asset request from the evidence URL.'],
+        test: ['Cover the route with a browser smoke or unit-level regression after the fix.']
+      }
+    };
+  }
+  if (finding.category === 'layout_integrity' && message.includes('horizontal overflow')) {
+    return {
+      impact: 'Horizontal overflow often hides content on smaller viewports and causes accidental side scrolling.',
+      recommendation: 'Constrain wide elements to their container and verify responsive behavior at the failing viewport.',
+      fix_candidates: [
+        'Use max-width: 100% or responsive grid constraints on the overflowing element.',
+        'Check fixed pixel widths, absolute positioning, and long unbroken text.'
+      ],
+      implementation_notes: {
+        html: [],
+        css: ['Audit fixed widths, min-width, grid tracks, and overflow rules near the failing selector.'],
+        javascript: [],
+        test: ['Keep the failing viewport in the target manifest viewportMatrix.']
+      }
+    };
+  }
+  if (finding.category === 'layout_integrity' && message.includes('clipped')) {
+    return {
+      impact: 'Clipped text makes labels and content hard to read and can hide important state.',
+      recommendation: 'Allow text wrapping, resize the container, or intentionally mark the region as scrollable.',
+      fix_candidates: [
+        'Remove overly small fixed height or width constraints.',
+        'Use overflow behavior that matches the intended interaction.'
+      ],
+      implementation_notes: {
+        html: [],
+        css: ['Inspect white-space, overflow, line-height, width, and height around the selector.'],
+        javascript: [],
+        test: ['Add a fixture or visual check for the affected text state.']
+      }
+    };
+  }
+  if (finding.category === 'accessibility_basics') {
+    return {
+      impact: 'Missing labels or duplicate IDs can break keyboard, screen reader, and agent-driven interaction.',
+      recommendation: 'Fix semantic names and DOM identity before relying on automated interaction or review.',
+      fix_candidates: [
+        'Add visible text, aria-label, aria-labelledby, or a proper label element.',
+        'Ensure every id is unique in the rendered document.'
+      ],
+      implementation_notes: {
+        html: ['Prefer semantic labels and unique IDs in the owner component.'],
+        css: [],
+        javascript: [],
+        test: ['Assert accessible names for important controls.']
+      }
+    };
+  }
+  if (finding.category === 'interaction_quality') {
+    return {
+      impact: 'Small or unclear controls reduce interaction reliability for humans and automation.',
+      recommendation: 'Increase target size and verify focus, hover, and touch ergonomics.',
+      fix_candidates: [
+        'Use a stable minimum control size and padding.',
+        'Keep icon-only controls named with aria-label or visible text.'
+      ],
+      implementation_notes: {
+        html: ['Ensure interactive controls expose clear names.'],
+        css: ['Increase hit area and preserve visible focus states.'],
+        javascript: [],
+        test: ['Exercise the control through the action or review workflow.']
+      }
+    };
+  }
+  if (finding.category === 'mock_fidelity') {
+    return {
+      impact: 'Mock drift can indicate an implementation mismatch or an outdated design reference.',
+      recommendation: 'Compare the screenshot artifact with the mock and decide whether code or design should change.',
+      fix_candidates: [
+        'If implementation is wrong, adjust layout, spacing, typography, or state rendering.',
+        'If the mock is outdated, update the approved baseline.'
+      ],
+      implementation_notes: {
+        html: [],
+        css: ['Check layout, spacing, color, and typography differences manually from artifacts.'],
+        javascript: ['Confirm the rendered state matches the intended route and data state.'],
+        test: ['Keep the mock path workspace-relative and rerun with the same viewport.']
+      }
+    };
+  }
+  return {
+    impact: 'Evidence quality affects how confidently this run can guide development decisions.',
+    recommendation: 'Capture the missing evidence or rerun with the recommended options when visual review is needed.',
+    fix_candidates: [
+      'Rerun with --screenshot for visual evidence.',
+      'Use a target manifest when multiple routes or viewports matter.'
+    ],
+    implementation_notes: {
+      html: [],
+      css: [],
+      javascript: [],
+      test: ['Preserve review artifacts for developer handoff until the issue is resolved.']
+    }
   };
 }
 
@@ -1162,9 +1477,29 @@ function renderReviewReport(data, artifacts) {
     `- Final URL: ${data.review.final_url ?? data.review.target?.base_url ?? 'n/a'}`,
     `- Findings: ${data.findings.length}`,
     '',
-    '## Findings',
+    '## Action Plan',
+    '',
+    `- Gate: ${data.action_plan?.release_gate?.status ?? 'unknown'}`,
+    `- Recommendation: ${data.action_plan?.release_gate?.recommendation ?? 'Review structured JSON output.'}`,
     ''
   ];
+  if (data.action_plan?.next_actions?.length) {
+    for (const action of data.action_plan.next_actions) {
+      lines.push(`- ${action.priority} ${action.severity.toUpperCase()} ${action.category}: ${action.recommendation}`);
+    }
+    lines.push('');
+  }
+  if (data.review_advisory?.visual_assessment?.length) {
+    lines.push('## Local Review Advisory', '');
+    for (const signal of data.review_advisory.visual_assessment) {
+      lines.push(`- ${signal}`);
+    }
+    lines.push('');
+  }
+  lines.push(
+    '## Findings',
+    ''
+  );
   if (data.findings.length === 0) {
     lines.push('No configured rule violations were observed.', '');
   } else {
@@ -1175,6 +1510,9 @@ function renderReviewReport(data, artifacts) {
       }
       if (finding.repro?.length) {
         lines.push(`  Repro: ${finding.repro.join(' ')}`);
+      }
+      if (finding.recommendation) {
+        lines.push(`  Recommendation: ${finding.recommendation}`);
       }
     }
     lines.push('');

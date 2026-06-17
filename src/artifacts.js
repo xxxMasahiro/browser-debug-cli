@@ -11,6 +11,7 @@ const ARTIFACT_DIRS = [
   'reports',
   'specs',
   'daemons',
+  'targets',
   'reviews',
   'layouts',
   'diffs',

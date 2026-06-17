@@ -18,6 +18,7 @@ test('runtime and tests avoid caller-specific implementation literals', async ()
     'src/review.js',
     'src/mcp.js',
     'src/api.js',
+    'src/target.js',
     'src/sessions.js',
     'src/supervisor.js',
     '.github/workflows/ci.yml',
@@ -68,6 +69,10 @@ test('package keeps a standard local Node CLI surface', async () => {
   assert.equal(pkg.bin['browser-debug-mcp'], './bin/browser-debug-mcp.js');
   assert.equal(pkg.exports['.'], './src/api.js');
   assert.equal(pkg.exports['./schemas/*'], './schemas/*.schema.json');
+  assert.ok(pkg.files.includes('.codex-plugin/'));
+  assert.ok(pkg.files.includes('.mcp.json'));
+  assert.ok(pkg.files.includes('templates/'));
+  assert.ok(pkg.files.includes('skills/browser-debug-review/SKILL.md'));
   assert.ok(pkg.scripts.test);
   assert.ok(pkg.scripts['test:browser']);
   assert.ok(pkg.scripts['test:pack']);
@@ -80,7 +85,8 @@ test('package keeps a standard local Node CLI surface', async () => {
 test('review platform keeps local-first and manifest-driven boundaries', async () => {
   const review = await readText('src/review.js');
   const mcp = await readText('src/mcp.js');
-  const combined = `${review}\n${mcp}`;
+  const target = await readText('src/target.js');
+  const combined = `${review}\n${mcp}\n${target}`;
 
   assert.doesNotMatch(combined, /127\.0\.0\.1:517[34]|Control Center|FrameCue|ai-driven-development-lesson/);
   assert.doesNotMatch(combined, /launchPersistentContext|userDataDir|storageState/);
@@ -88,8 +94,25 @@ test('review platform keeps local-first and manifest-driven boundaries', async (
   assert.doesNotMatch(combined, /node:child_process|child_process|execFile|spawn\(/);
   assert.match(review, /normalizeTargetManifest/);
   assert.match(review, /classifyActionCandidate/);
+  assert.match(target, /createTargetManifest/);
   assert.match(mcp, /tools\/list/);
   assert.match(mcp, /tools\/call/);
+});
+
+test('plugin metadata keeps local stdio MCP boundaries', async () => {
+  const plugin = JSON.parse(await readText('.codex-plugin/plugin.json'));
+  const mcp = JSON.parse(await readText('.mcp.json'));
+  const skill = await readText('skills/browser-debug-review/SKILL.md');
+
+  assert.equal(plugin.name, 'browser-debug-cli');
+  assert.equal(plugin.license, 'UNLICENSED');
+  assert.equal(plugin.mcpServers, './.mcp.json');
+  assert.equal(plugin.skills, './skills/');
+  assert.equal(mcp.mcpServers['browser-debug-cli'].command, 'node');
+  assert.deepEqual(mcp.mcpServers['browser-debug-cli'].args, ['./bin/browser-debug-mcp.js']);
+  assert.doesNotMatch(JSON.stringify(mcp), /http|https|WebSocket|listen|curl|wget|token|password/i);
+  assert.match(skill, /browser-debug review --target/);
+  assert.match(skill, /upload artifacts|external upload/i);
 });
 
 test('CI workflow stays generic and release-safe', async () => {

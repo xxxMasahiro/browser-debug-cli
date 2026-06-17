@@ -9,6 +9,7 @@ import { runObserve } from '../src/observe.js';
 import { parseCliArgs } from '../src/parser.js';
 import { redact, redactUrl } from '../src/redaction.js';
 import { classifyActionCandidate, normalizeTargetManifest } from '../src/review.js';
+import { createTargetManifest } from '../src/target.js';
 
 const fixedNow = '2026-06-17T00:00:00.000Z';
 
@@ -178,6 +179,15 @@ test('schema commands expose machine-readable contracts', async () => {
 });
 
 test('target manifests and action candidates use generic review abstractions', () => {
+  const template = createTargetManifest({
+    url: 'https://example.test/app',
+    name: 'Example App',
+    'max-routes': '12'
+  });
+  assert.equal(template.name, 'Example App');
+  assert.equal(template.budgets.maxRoutes, 12);
+  assert.deepEqual(template.viewportMatrix, ['desktop', 'mobile']);
+
   const normalized = normalizeTargetManifest({
     baseUrl: 'https://example.test/app',
     seeds: ['/app#overview'],
@@ -196,9 +206,58 @@ test('target manifests and action candidates use generic review abstractions', (
   assert.equal(classifyActionCandidate({ tag: 'button', text: 'Open settings' }, 'https://example.test/app'), 'state_revealing');
 });
 
+test('target init writes a reusable local target manifest artifact', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-target-init-'));
+  await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
+
+  const parsed = parseCliArgs([
+    'target',
+    'init',
+    '--url',
+    'https://example.test/app',
+    '--name',
+    'Example App',
+    '--max-routes',
+    '8',
+    '--json'
+  ]);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'target init');
+  assert.equal(parsed.options['max-routes'], '8');
+
+  const result = await executeCli([
+    'target',
+    'init',
+    '--url',
+    'https://example.test/app',
+    '--name',
+    'Example App',
+    '--max-routes',
+    '8',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'target-fixed'
+  });
+
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'target init');
+  assert.equal(body.data.target_manifest.name, 'Example App');
+  assert.equal(body.data.target_manifest.budgets.maxRoutes, 8);
+  assert.equal(body.data.boundary.external_upload, false);
+  const artifact = body.artifacts.find((candidate) => candidate.type === 'target_manifest');
+  assert.ok(artifact);
+  const manifest = JSON.parse(await readFile(path.join(cwd, artifact.path), 'utf8'));
+  assert.equal(manifest.baseUrl, 'https://example.test/app');
+});
+
 test('MCP adapter exposes a local allowlisted tool surface', async () => {
   const listed = await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_target_init'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review_target'), true);
   assert.equal(listed.result.tools.some((tool) => /shell|cleanup/i.test(tool.name)), false);
 
   const schema = await handleMcpRequest({
@@ -212,6 +271,20 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   }, { now: fixedNow });
   assert.equal(schema.result.structuredContent.command, 'schema get');
   assert.equal(schema.result.structuredContent.status, 'ok');
+
+  const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-mcp-target-'));
+  await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
+  const target = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 3,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_target_init',
+      arguments: { url: 'https://example.test/app', maxRoutes: 4 }
+    }
+  }, { cwd, now: fixedNow, createId: () => 'target-mcp' });
+  assert.equal(target.result.structuredContent.command, 'target init');
+  assert.equal(target.result.structuredContent.data.target_manifest.budgets.maxRoutes, 4);
 });
 
 test('daemon commands parse and return deterministic JSON envelopes', async () => {

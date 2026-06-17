@@ -7,6 +7,7 @@ import { parseCliArgs } from './parser.js';
 import { runReview } from './review.js';
 import { schemaListResult, schemaResult } from './schema-registry.js';
 import { runSupervisor } from './supervisor.js';
+import { runTargetInit } from './target.js';
 import {
   buildReport,
   closeSession,
@@ -102,6 +103,10 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'daemon stop') {
       return runtimeResult(parsed.command, await (context.daemonStopRunner ?? stopDaemon)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'target init') {
+      return runtimeResult(parsed.command, await (context.targetInitRunner ?? runTargetInit)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'session start') {
@@ -315,6 +320,19 @@ function usageText(topic) {
     ].join('\n');
   }
 
+  if (topic === 'target') {
+    return [
+      `Usage: ${CLI_NAME} target init --url <url> [--name <name>] [--viewport <name-or-size>] [--max-routes <n>] [--json]`,
+      '',
+      'Options:',
+      '  --url <url>              Absolute http, https, or file URL to seed.',
+      '  --name <name>            Human-readable manifest name.',
+      '  --viewport <name|WxH>    Optional single viewport; defaults to desktop and mobile.',
+      '  --max-routes <n>         Route discovery budget for generated manifests.',
+      `  --artifact-root <path>   Local artifact root. Default: ${DEFAULT_ARTIFACT_ROOT}`
+    ].join('\n');
+  }
+
   if (topic === 'schema') {
     return [
       `Usage: ${CLI_NAME} schema list [--json]`,
@@ -340,6 +358,7 @@ function usageText(topic) {
     '  daemon start --url <url> --json',
     '  daemon status --daemon <id> --json',
     '  daemon stop --daemon <id> --json',
+    '  target init --url <url> --json',
     '  session start [--url <url>]',
     '  session close --session <id>',
     '  act --session <id> --action <json>',

@@ -8,6 +8,8 @@
     "review": { "type": "object" },
     "findings": { "type": "array", "items": { "$ref": "finding.schema.json" } },
     "metrics": { "type": "object" },
+    "action_plan": { "type": "object" },
+    "review_advisory": { "type": "object" },
     "environment": { "type": "object" },
     "coverage": { "type": "object" }
   },

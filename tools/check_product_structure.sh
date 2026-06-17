@@ -23,6 +23,8 @@ require_dir() {
 for rel in \
   AGENTS.MD \
   CHANGELOG.md \
+  .codex-plugin/plugin.json \
+  .mcp.json \
   .github/workflows/ci.yml \
   package.json \
   package-lock.json \
@@ -46,6 +48,8 @@ for rel in \
   src/schema-registry.js \
   src/sessions.js \
   src/supervisor.js \
+  src/target.js \
+  templates/review-target-manifest.json \
   tests/architecture.test.js \
   tests/cli.test.js \
   tests/browser-smoke.test.js \
@@ -73,6 +77,7 @@ for rel in \
   ops/SECURITY_MANIFEST.tsv \
   ops/EVIDENCE_DETAIL_MANIFEST.tsv \
   skills/product-development-workflow/SKILL.md \
+  skills/browser-debug-review/SKILL.md \
   skills/product-doc-sync/SKILL.md \
   skills/product-security/SKILL.md \
   skills/product-test/SKILL.md \
@@ -91,7 +96,7 @@ for rel in \
   require_nonempty "$rel"
 done
 
-for rel in .github .github/workflows bin schemas src tests docs/product docs/workflow docs/design-system docs/memory ops skills tools; do
+for rel in .codex-plugin .github .github/workflows bin schemas src templates tests docs/product docs/workflow docs/design-system docs/memory ops skills tools; do
   require_dir "$rel"
 done
 

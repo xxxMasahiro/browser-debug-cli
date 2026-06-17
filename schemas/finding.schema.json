@@ -20,6 +20,11 @@
     "evidence": { "type": "object" },
     "artifacts": { "type": "array" },
     "repro": { "type": "array" },
+    "priority": { "type": "string" },
+    "impact": { "type": "string" },
+    "recommendation": { "type": "string" },
+    "fix_candidates": { "type": "array" },
+    "implementation_notes": { "type": "object" },
     "owner_decision_required": { "type": "boolean" }
   },
   "additionalProperties": true

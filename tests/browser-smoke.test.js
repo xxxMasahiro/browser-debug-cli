@@ -337,10 +337,14 @@ test('review reports deterministic layout and browser-health findings', { skip: 
   assert.equal(body.command, 'review');
   assert.equal(body.status, 'ok');
   assert.equal(body.data.review.mode, 'single_url');
+  assert.equal(body.data.action_plan.release_gate.status, 'blocked');
+  assert.equal(body.data.review_advisory.status, 'needs_attention');
   assert.ok(body.data.findings.some((finding) => finding.category === 'browser_health'));
   assert.ok(body.data.findings.some((finding) => finding.category === 'layout_integrity'));
   assert.ok(body.data.findings.some((finding) => finding.category === 'accessibility_basics'));
   assert.ok(body.data.findings.some((finding) => finding.category === 'mock_fidelity'));
+  assert.ok(body.data.findings.every((finding) => finding.priority));
+  assert.ok(body.data.findings.some((finding) => finding.recommendation));
 
   for (const type of ['review', 'layout', 'screenshot', 'report', 'mock_metrics']) {
     const artifact = body.artifacts.find((candidate) => candidate.type === type);
@@ -386,6 +390,7 @@ test('target review discovers same-origin routes and records coverage', { skip: 
     'review',
     '--target',
     '@target.json',
+    '--report',
     '--timeout',
     '10000',
     '--json'
@@ -401,6 +406,11 @@ test('target review discovers same-origin routes and records coverage', { skip: 
   const coverage = body.artifacts.find((artifact) => artifact.type === 'coverage');
   assert.ok(coverage);
   await access(path.join(cwd, coverage.path));
+  assert.equal(body.data.action_plan.coverage.discovered_routes >= 2, true);
+  assert.equal(body.data.review_advisory.reviewer, 'local_heuristic');
+  const report = body.artifacts.find((artifact) => artifact.type === 'report');
+  assert.ok(report);
+  await access(path.join(cwd, report.path));
 });
 
 async function runAction(cwd, sessionId, action) {
