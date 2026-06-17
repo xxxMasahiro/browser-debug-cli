@@ -33,8 +33,8 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Do not replace final visual review; the tool should help operate and capture evidence, while humans approve product-level decisions when needed.
 - Do not bypass authentication or collect credentials.
 - Do not upload artifacts to external services by default.
-- Do not implement runtime browser automation without explicit implementation approval.
-- Do not create public repositories, remotes, CI, or npm publication paths as part of package/runtime design.
+- Do not add runtime features that cross into background daemons, authentication, profile reuse, external upload, or credential handling without explicit implementation approval and security documentation.
+- Do not create public repositories, remotes, remote CI execution, or npm publication paths as part of package/runtime design.
 
 ## Success Criteria
 
@@ -68,7 +68,8 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Headed and DevTools mode regression tests verify Playwright launch-mode wiring without requiring a GUI display.
 - Architecture regression tests check for generic runtime boundaries, shared page evidence helpers, and local Node CLI packaging.
 - Local package dry-run verification confirms the npm package file set without publishing.
-- Release readiness notes track the unreleased status, public-release blockers, and no-publish boundaries.
+- Local CI manifest checks validate the GitHub Actions workflow definition without remote execution.
+- Release readiness notes and `npm run release:check` track the unreleased status, public-release blockers, and no-publish boundaries.
 
 ## Open Decisions
 

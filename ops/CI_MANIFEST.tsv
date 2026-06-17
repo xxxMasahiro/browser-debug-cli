@@ -1,0 +1,4 @@
+# ci_id	required_mode	contexts	provider	path	job_id	command_id	evidence_source	description
+github_actions_node	optional	all	github_actions	.github/workflows/ci.yml	node	npm_test	product.ci.github_actions	GitHub Actions no-browser test and package dry-run job.
+github_actions_browser	optional	all	github_actions	.github/workflows/ci.yml	browser-smoke	npm_run_test_browser	product.ci.github_actions	GitHub Actions browser smoke job with explicit Chromium installation.
+product_ci_manifest	optional	all	local	ops/CI_MANIFEST.tsv	local	check_product_ci	product.ci.github_actions	Product-local CI manifest validation without remote execution.

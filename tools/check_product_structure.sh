@@ -23,6 +23,7 @@ require_dir() {
 for rel in \
   AGENTS.MD \
   CHANGELOG.md \
+  .github/workflows/ci.yml \
   package.json \
   package-lock.json \
   bin/browser-debug.js \
@@ -48,6 +49,7 @@ for rel in \
   docs/memory/README.md \
   ops/STAGE_MANIFEST.tsv \
   ops/TEST_PLAN_MANIFEST.tsv \
+  ops/CI_MANIFEST.tsv \
   ops/DESIGN_SYSTEM_MANIFEST.tsv \
   ops/DASHBOARD_MANIFEST.tsv \
   ops/PRODUCT_MANIFEST.tsv \
@@ -67,6 +69,7 @@ for rel in \
   tools/check_product_structure.sh \
   tools/check_product_docs.sh \
   tools/check_product_security.sh \
+  tools/check_product_ci.sh \
   tools/check_product_design_system.sh \
   tools/test_product_repository.sh \
   tools/lib/product_common.sh \
@@ -74,7 +77,7 @@ for rel in \
   require_nonempty "$rel"
 done
 
-for rel in src tests docs/product docs/workflow docs/design-system docs/memory ops skills tools; do
+for rel in .github .github/workflows src tests docs/product docs/workflow docs/design-system docs/memory ops skills tools; do
   require_dir "$rel"
 done
 
@@ -88,6 +91,7 @@ done
 for rel in \
   ops/STAGE_MANIFEST.tsv \
   ops/TEST_PLAN_MANIFEST.tsv \
+  ops/CI_MANIFEST.tsv \
   ops/DESIGN_SYSTEM_MANIFEST.tsv \
   ops/DASHBOARD_MANIFEST.tsv \
   ops/PRODUCT_MANIFEST.tsv \

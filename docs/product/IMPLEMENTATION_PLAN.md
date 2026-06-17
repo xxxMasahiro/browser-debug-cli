@@ -49,9 +49,10 @@
 
 ### Phase 3: CI
 
-- Add `.github/workflows/` and `ops/CI_MANIFEST.tsv`.
-- Run local checks before push.
-- Confirm GitHub Actions status.
+- Add `.github/workflows/` and `ops/CI_MANIFEST.tsv`. Completed locally.
+- Add product-local CI manifest validation without remote execution. Completed with `tools/check_product_ci.sh`.
+- Run local checks before push. Completed locally.
+- Confirm GitHub Actions status after a remote repository and push exist.
 
 ### Phase 4: npm Package Design and Local CLI Scaffold
 
@@ -61,6 +62,7 @@
 - Keep the package private and `UNLICENSED` until public release naming and licensing are approved.
 - Add package metadata, test commands, browser smoke commands, and distribution file declarations. Completed for the local MVP slice.
 - Add local package dry-run verification without publishing. Completed with `npm run test:pack` and aggregate product-gate wiring.
+- Add a local release-readiness command without publishing. Completed with `npm run release:check`.
 - Preserve the Phase 2a design baseline unless the user approves a design change.
 
 ### Phase 5: MVP Runtime
@@ -85,14 +87,16 @@
 ## Verification Method
 
 - `./tools/product-gate`
+- `./tools/check_product_ci.sh`
 - `npm test`
 - `npm run test:browser`
 - `npm run test:pack`
+- `npm run release:check`
 - lesson-side `product-scaffold-check` with this repository path.
 - lesson-side `product-repository-authority status` with this repository path.
 - `check_workflow_pair_sync.sh --repo <this-repo>`.
 - Current local runtime checks include command parser tests, JSON error tests, `doctor` tests, headed/devtools launch-mode tests, session/report/spec tests, redaction tests, architecture regressions for generic runtime boundaries and shared evidence helpers, Playwright browser smoke tests with screenshots, traces, click/form/keyboard/scroll/wait actions, supervised ordered actions, local package dry-run verification, Control Center observation, and aggregate product-gate execution.
-- Later release work should add CI coverage, real headed visual checks where a display is available, public package naming, license selection, and npm publication after approval.
+- Later release work should run remote CI after GitHub repository creation and push, add real headed visual checks where a display is available, choose public package naming and license, and publish to npm after approval.
 
 ## Recovery Path
 
@@ -106,6 +110,6 @@
 - Ask before new runtime phases that add background browser daemons, authentication, external upload, profile reuse, or credential handling.
 - Ask before new dependency installation or network use.
 - Ask before commit, push, branch deletion, or remote changes.
-- Ask before `gh repo create` or any public GitHub action.
+- Ask before `gh repo create`, remote setup, push, or any public GitHub action.
 - Ask before npm publish.
 - Ask before external uploads, OAuth, webhooks, credential storage, or destructive cleanup.

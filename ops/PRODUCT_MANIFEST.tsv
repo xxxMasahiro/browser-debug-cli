@@ -3,6 +3,8 @@ product.entrypoint	required	all	all	README.md	entrypoint	file_exists	workflow	Pr
 product.package	optional	all	all	package.json	custom	file_nonempty	workflow	Node package metadata for the local CLI.
 product.package_lock	optional	all	all	package-lock.json	custom	file_nonempty	workflow	Locked npm dependency graph for the local CLI.
 product.changelog	optional	all	all	CHANGELOG.md	doc	file_nonempty	workflow	Local unreleased changelog and release status notes.
+product.ci_workflow	optional	all	all	.github/workflows/ci.yml	ci	file_nonempty	workflow	Local GitHub Actions workflow definition; not executed until a remote exists.
+product.ci_manifest	optional	all	all	ops/CI_MANIFEST.tsv	ops	file_nonempty	workflow	CI authority manifest for product-local workflow checks.
 product.cli_bin	optional	all	all	bin/browser-debug.js	source	file_nonempty	workflow	Local browser-debug executable entrypoint.
 product.source	required	all	all	src/cli.js	source	file_nonempty	workflow	CLI runtime entrypoint.
 product.page_evidence	optional	all	all	src/page-evidence.js	source	file_nonempty	workflow	Reusable page observation and event evidence helpers.
@@ -16,3 +18,4 @@ product.requirements	required	all	all	docs/product/REQUIREMENTS.md	doc	file_none
 product.specification	required	all	all	docs/product/SPECIFICATION.md	doc	file_nonempty	workflow	Canonical specification.
 product.plan	required	all	all	docs/product/IMPLEMENTATION_PLAN.md	doc	file_nonempty	workflow	Canonical implementation plan.
 product.release_policy	optional	all	all	docs/workflow/RELEASE.md	doc	file_nonempty	workflow	Local release readiness checklist and publication blockers.
+product.ci_check	optional	all	all	tools/check_product_ci.sh	custom	file_nonempty	workflow	Product-local CI workflow validation without remote execution.

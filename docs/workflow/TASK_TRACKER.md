@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Phase 5 local MVP runtime implementation is complete after Phase 1 and Phase 2a. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, and product-gate evidence has been recorded locally.
+Phase 5 local MVP runtime implementation is complete after Phase 1 and Phase 2a. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally.
 
 This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and HANDOFF workflow-state pair synchronized whenever task state changes.
 
@@ -46,6 +46,9 @@ This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and H
 - [x] Added local release readiness notes in `CHANGELOG.md` and `docs/workflow/RELEASE.md`.
 - [x] Added browser smoke coverage for supervised ordered actions in one ephemeral context.
 - [x] Added architecture regression coverage for generic runtime boundaries, shared evidence helpers, and local Node CLI packaging.
+- [x] Added local GitHub Actions CI configuration and `ops/CI_MANIFEST.tsv`.
+- [x] Added `tools/check_product_ci.sh` and wired it into product-local aggregate checks.
+- [x] Added `npm run release:check` for local release-readiness verification without publishing.
 - [x] Verified the running Dashboard Control Center at `http://127.0.0.1:5173/` with screenshot and trace capture.
 - [x] Confirmed `http://127.0.0.1:5174/` was not listening during verification.
 - [x] Re-ran product-local `./tools/product-gate`, `npm test`, `npm run test:browser`, and `git diff --check`.
@@ -60,13 +63,13 @@ No remaining local MVP implementation work is currently planned.
 - [ ] If approved later, implement background browser daemon supervision.
 - [ ] If approved later, run real headed visual regression checks in an environment with a display.
 - [ ] If approved later, create the public GitHub repository with `gh`.
-- [ ] If approved later, add CI manifests and GitHub Actions.
 - [ ] If approved later, choose the public package name and license.
-- [ ] If approved later, publish or prepare npm release flow.
+- [ ] If approved later, create the remote repository, push, and observe remote GitHub Actions execution.
+- [ ] If approved later, publish the npm package after release checklist, CI, package name, license, and credential handling are complete.
 
 ## Next Step
 
-Ask for explicit approval before background browser daemon supervision, trace capture expansion, authentication automation, external upload, existing-browser-profile reuse, credential storage, GitHub repository creation, remote setup, push, CI, or npm publication.
+Ask for explicit approval before background browser daemon supervision, trace capture expansion, authentication automation, external upload, existing-browser-profile reuse, credential storage, GitHub repository creation, remote setup, push, remote CI execution, public package naming, license changes, or npm publication.
 
 ## Stop Conditions
 

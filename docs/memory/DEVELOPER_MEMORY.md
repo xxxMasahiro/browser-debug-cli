@@ -14,7 +14,7 @@
 
 ## Current Development Boundary
 
-Phase 5 local MVP runtime is implemented. Local Git is initialized, the initial scaffold commit exists, package code exists, Playwright-backed observation works locally, and product-gate evidence has been recorded locally. No GitHub repository, remote, push, CI workflow, npm publication, OAuth/login automation, external upload, existing-browser-profile reuse, or credential storage has been created.
+Phase 5 local MVP runtime is implemented. Local Git is initialized, the initial scaffold commit exists, package code exists, Playwright-backed observation works locally, local GitHub Actions CI configuration is present, and product-gate evidence has been recorded locally. No GitHub repository, remote, push, remote CI workflow execution, npm publication, OAuth/login automation, external upload, existing-browser-profile reuse, or credential storage has been created.
 
 ## Phase 2a Package/Runtime Design
 
@@ -37,4 +37,4 @@ Current design baseline:
 - Artifact root: ignored `.browser-debug/`.
 - Default browser behavior: ephemeral Chromium context per observation/action.
 - Verification: `npm test`, `npm run test:browser`, `npm run test:pack`, `./tools/product-gate`, and local Dashboard Control Center observation. Coverage includes headed/devtools launch-mode checks, architecture regressions for generic runtime boundaries and shared helpers, observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, supervised ordered actions, reports, spec export, and local package dry-run verification.
-- Release readiness: `CHANGELOG.md` and `docs/workflow/RELEASE.md` exist, but public package naming, license changes, GitHub publication, CI, and npm publication remain approval-bound.
+- Release readiness: `CHANGELOG.md`, `.github/workflows/ci.yml`, `ops/CI_MANIFEST.tsv`, and `docs/workflow/RELEASE.md` exist, but public package naming, license changes, GitHub publication, remote CI execution, and npm publication remain approval-bound.

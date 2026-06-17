@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Browser Debug CLI is not released. The repository has local MVP runtime coverage and local package dry-run verification only.
+Browser Debug CLI is not released. The repository has local MVP runtime coverage, local GitHub Actions CI configuration, CI manifest validation, and local package dry-run verification only.
 
 ## Local Release Readiness Checks
 
@@ -12,6 +12,8 @@ Run these checks before any public release work is proposed:
 npm test
 npm run test:browser
 npm run test:pack
+npm run release:check
+./tools/check_product_ci.sh
 ./tools/product-gate
 ```
 
@@ -26,7 +28,7 @@ npm pack --dry-run --json --cache .tmp/npm-cache
 - Confirm the public npm package name and optional scope.
 - Choose a release license and replace `UNLICENSED` only after approval.
 - Create the public GitHub repository only after approval.
-- Add CI only after approval.
+- Run GitHub Actions remotely only after a remote repository and push are approved.
 - Confirm npm account, token handling, and publication method only after approval.
 - Do not upload traces, screenshots, session files, cookies, storage state, credentials, or `.browser-debug/` artifacts.
 
@@ -35,5 +37,5 @@ npm pack --dry-run --json --cache .tmp/npm-cache
 - No `npm publish`.
 - No `gh repo create`.
 - No remote setup or push.
-- No GitHub Actions workflow execution.
+- No GitHub Actions workflow execution on a remote provider.
 - No OAuth, login automation, webhook setup, external upload, or credential storage.

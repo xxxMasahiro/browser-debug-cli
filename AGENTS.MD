@@ -80,4 +80,4 @@ This repository is the product workspace for Browser Debug CLI.
 
 ## Current Phase
 
-Phase 5 local MVP runtime is implemented: local Git is initialized, the initial scaffold commit exists, package metadata and the `browser-debug` CLI exist, Playwright-backed one-shot observation works with ephemeral contexts, local `.browser-debug/` artifacts are ignored, and focused local/browser tests pass. No GitHub repository, remote, push, CI workflow, npm publication, OAuth, external upload, existing-browser-profile reuse, or persistent credential storage has been created.
+Phase 5 local MVP runtime is implemented: local Git is initialized, the initial scaffold commit exists, package metadata and the `browser-debug` CLI exist, Playwright-backed one-shot observation works with ephemeral contexts, local `.browser-debug/` artifacts are ignored, focused local/browser tests pass, and local GitHub Actions CI configuration is validated without remote execution. No GitHub repository, remote, push, remote CI workflow execution, npm publication, OAuth, external upload, existing-browser-profile reuse, or persistent credential storage has been created.

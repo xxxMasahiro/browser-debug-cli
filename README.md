@@ -25,9 +25,10 @@ node ./bin/browser-debug.js supervise --url http://127.0.0.1:3000/ --actions '[{
 npm test
 npm run test:browser
 npm run test:pack
+npm run release:check
 ```
 
-Artifacts are written under ignored `.browser-debug/` directories. Trace artifacts can contain page content and must remain local. `supervise` keeps one ephemeral browser context alive only for that CLI process and closes it before exit. `npm test` runs deterministic no-browser tests; `npm run test:browser` launches local Chromium for smoke coverage; `npm run test:pack` runs a local dry-run package check without publishing.
+Artifacts are written under ignored `.browser-debug/` directories. Trace artifacts can contain page content and must remain local. `supervise` keeps one ephemeral browser context alive only for that CLI process and closes it before exit. `npm test` runs deterministic no-browser tests; `npm run test:browser` launches local Chromium for smoke coverage; `npm run test:pack` runs a local dry-run package check without publishing; `npm run release:check` combines no-browser and package checks without publishing.
 
 ## Canonical Documents
 
@@ -41,7 +42,8 @@ Artifacts are written under ignored `.browser-debug/` directories. Trace artifac
 
 ```bash
 ./tools/product-gate
+./tools/check_product_ci.sh
 ```
 
-GitHub, CI, npm publication, and release automation are planned in later phases.
+GitHub Actions CI is defined locally in `.github/workflows/ci.yml` and validated by `ops/CI_MANIFEST.tsv`; it has not been executed remotely because no public repository or remote has been created.
 Release status and publication blockers are tracked in `CHANGELOG.md` and `docs/workflow/RELEASE.md`.

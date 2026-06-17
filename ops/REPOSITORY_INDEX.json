@@ -24,11 +24,16 @@
     "manifest": {
       "label": "Manifest",
       "description": "Machine-readable product authority file"
+    },
+    "ci_config": {
+      "label": "CI config",
+      "description": "Local CI configuration and manifest"
     }
   },
   "files": [
     { "path": "AGENTS.MD", "role": "agent_entry" },
     { "path": "CHANGELOG.md", "role": "workflow_doc" },
+    { "path": ".github/workflows/ci.yml", "role": "ci_config" },
     { "path": "package.json", "role": "manifest" },
     { "path": "package-lock.json", "role": "manifest" },
     { "path": "bin/browser-debug.js", "role": "manifest" },
@@ -46,6 +51,7 @@
     { "path": "docs/workflow/TASK_TRACKER.md", "role": "workflow_doc" },
     { "path": "docs/workflow/HANDOFF.md", "role": "workflow_doc" },
     { "path": "docs/workflow/RELEASE.md", "role": "workflow_doc" },
+    { "path": "ops/CI_MANIFEST.tsv", "role": "ci_config" },
     { "path": "ops/PRODUCT_MANIFEST.tsv", "role": "manifest" }
   ]
 }

@@ -2,7 +2,7 @@
 
 ## Current State
 
-Browser Debug CLI has completed Phase 1, Phase 2a package/runtime design verification, and the Phase 5 local MVP runtime slice. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, and product-gate evidence has been recorded locally.
+Browser Debug CLI has completed Phase 1, Phase 2a package/runtime design verification, and the Phase 5 local MVP runtime slice. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally.
 
 This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and TASK_TRACKER workflow-state pair synchronized whenever task state changes.
 
@@ -43,6 +43,9 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 - `CHANGELOG.md` and `docs/workflow/RELEASE.md` now track unreleased local changes and publication blockers.
 - `npm run test:browser` covers supervised ordered actions in one ephemeral context.
 - `npm test` includes architecture regressions for generic runtime boundaries, shared evidence helpers, and local Node CLI packaging.
+- Local GitHub Actions CI configuration is present under `.github/workflows/ci.yml`.
+- `ops/CI_MANIFEST.tsv` and `tools/check_product_ci.sh` validate CI configuration without remote execution.
+- `npm run release:check` provides local release-readiness verification without publishing.
 - `observe --trace` is implemented and writes local Playwright trace zip artifacts with a page-content warning.
 - Dashboard Control Center `http://127.0.0.1:5173/` was observed successfully with screenshot and trace artifacts.
 - FrameCue Control Center `http://127.0.0.1:5174/` was not listening during verification.
@@ -50,7 +53,7 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 
 ## Next Step
 
-Ask for explicit approval before background browser daemon supervision, authentication automation, external upload, existing-browser-profile reuse, credential storage, GitHub repository creation, remote setup, push, CI, license change, public package naming, or npm publication. No remaining local MVP implementation work is currently planned; the next useful non-code check is real headed visual verification in an environment with a display.
+Ask for explicit approval before background browser daemon supervision, authentication automation, external upload, existing-browser-profile reuse, credential storage, GitHub repository creation, remote setup, push, remote CI execution, license change, public package naming, or npm publication. No remaining local MVP implementation work is currently planned; the next useful non-code check is real headed visual verification in an environment with a display.
 
 ## Restart Notes
 
