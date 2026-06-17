@@ -216,8 +216,8 @@ function usageText(topic) {
       'Options:',
       '  --url <url>              Absolute http, https, or file URL to inspect.',
       `  --artifact-root <path>   Local artifact root. Default: ${DEFAULT_ARTIFACT_ROOT}`,
-      '  --headed                 Planned headed browser mode.',
-      '  --devtools               Planned headed browser mode with DevTools.',
+      '  --headed                 Run the observation in a visible browser.',
+      '  --devtools               Run the observation in a visible browser with DevTools.',
       '  --screenshot             Capture a full-page screenshot.',
       '  --trace                  Capture a local Playwright trace zip.'
     ].join('\n');

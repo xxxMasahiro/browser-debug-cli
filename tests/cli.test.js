@@ -4,6 +4,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { executeCli } from '../src/cli.js';
+import { runObserve } from '../src/observe.js';
 import { parseCliArgs } from '../src/parser.js';
 import { redact, redactUrl } from '../src/redaction.js';
 
@@ -155,3 +156,94 @@ test('redaction removes common secrets and sensitive query params', () => {
     nested: 'Bearer [REDACTED]'
   });
 });
+
+test('headed and devtools observe modes set Playwright launch options', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-modes-'));
+  await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
+  const launches = [];
+  const browserType = createFakeBrowserType(launches);
+
+  const headed = await runObserve(
+    { url: 'file:///tmp/browser-debug-headed.html', headed: true },
+    { cwd, now: fixedNow, createId: () => 'observation-headed', browserType }
+  );
+  assert.equal(headed.status, 'ok');
+  assert.deepEqual(launches[0], { headless: false, devtools: false });
+  assert.equal(headed.data.browser.headless, false);
+  assert.equal(headed.data.browser.devtools, false);
+  assert.equal(headed.data.browser.ephemeral_context, true);
+
+  const devtools = await runObserve(
+    { url: 'file:///tmp/browser-debug-devtools.html', devtools: true },
+    { cwd, now: fixedNow, createId: () => 'observation-devtools', browserType }
+  );
+  assert.equal(devtools.status, 'ok');
+  assert.deepEqual(launches[1], { headless: false, devtools: true });
+  assert.equal(devtools.data.browser.headless, false);
+  assert.equal(devtools.data.browser.devtools, true);
+
+  const observation = JSON.parse(
+    await readFile(path.join(cwd, '.browser-debug', 'observations', 'observation-devtools.json'), 'utf8')
+  );
+  assert.equal(observation.browser.devtools, true);
+});
+
+function createFakeBrowserType(launches) {
+  return {
+    async launch(options) {
+      launches.push(options);
+      return createFakeBrowser();
+    }
+  };
+}
+
+function createFakeBrowser() {
+  return {
+    async newContext() {
+      return {
+        tracing: {
+          async start() {},
+          async stop() {}
+        },
+        async newPage() {
+          return createFakePage();
+        },
+        async close() {}
+      };
+    },
+    async close() {}
+  };
+}
+
+function createFakePage() {
+  let currentUrl = 'about:blank';
+  return {
+    on() {},
+    async goto(url) {
+      currentUrl = url;
+      return {
+        status: () => 200,
+        ok: () => true,
+        url: () => url
+      };
+    },
+    async waitForLoadState() {},
+    async evaluate() {
+      return {
+        url: currentUrl,
+        title: 'Mode Fixture',
+        ready_state: 'complete',
+        language: 'en',
+        viewport: { width: 1280, height: 720 },
+        visible_text: 'Mode Fixture',
+        headings: [],
+        action_candidates: [],
+        forms: []
+      };
+    },
+    url() {
+      return currentUrl;
+    },
+    async screenshot() {}
+  };
+}

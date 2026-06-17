@@ -49,11 +49,15 @@ Implemented behavior:
 - `observe --url <url> --json` validates absolute `http`, `https`, or `file` URLs, launches an ephemeral Chromium context, captures structured page state, writes a local observation artifact, and closes the context.
 - `observe --screenshot` writes a local screenshot artifact.
 - `observe --trace` writes a local Playwright trace zip and emits a warning because traces can contain page content.
+- `observe --headed` launches a visible browser mode when the host environment supports it.
+- `observe --devtools` launches visible browser mode with DevTools enabled when the host environment supports it.
 - `session start --url <url>` creates local session metadata and can attach the first observation.
 - `act --session <id> --action <json>` supports simple local actions such as `navigate`, `observe`, `screenshot`, `click`, `fill`, `select`, `press`, `scroll`, and `wait` using an ephemeral page visit. Scroll actions use deterministic page scrolling from the requested deltas.
 - `report --session <id>` writes a Markdown report.
 - `spec export --session <id>` writes a JSON action/spec export.
-- `npm test` runs deterministic no-browser tests, and `npm run test:browser` runs Playwright smoke tests for observation, screenshots/traces, click actions, form controls, keyboard input, scroll, wait, reports, and spec export.
+- `npm test` runs deterministic no-browser tests, including headed/devtools launch-mode regression through an injected Playwright browser type. `npm run test:browser` runs Playwright smoke tests for observation, screenshots/traces, click actions, form controls, keyboard input, scroll, wait, reports, and spec export.
+- `npm run test:pack` runs `npm pack --dry-run --json` with an ignored local npm cache to verify the package file set without publishing.
+- `CHANGELOG.md` and `docs/workflow/RELEASE.md` track unreleased local changes, release blockers, local readiness checks, and no-publish boundaries.
 
 The package is marked `private` and `UNLICENSED` until public release naming, licensing, CI, and npm publication are approved.
 
@@ -135,6 +139,8 @@ The repository should move through these phases:
 - Phase 4: npm package metadata and CLI packaging implementation.
 - Phase 5: MVP Playwright implementation.
 - Phase 6: release and npm publish flow.
+
+The current repository only implements local release readiness documentation and dry-run package verification. It does not execute public release actions.
 
 ## Out of Scope for Phase 0
 

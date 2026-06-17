@@ -60,6 +60,7 @@
 - Use ESM modules and Node.js 20 or newer. Completed.
 - Keep the package private and `UNLICENSED` until public release naming and licensing are approved.
 - Add package metadata, test commands, browser smoke commands, and distribution file declarations. Completed for the local MVP slice.
+- Add local package dry-run verification without publishing. Completed with `npm run test:pack` and aggregate product-gate wiring.
 - Preserve the Phase 2a design baseline unless the user approves a design change.
 
 ### Phase 5: MVP Runtime
@@ -70,11 +71,13 @@
 - Implement session start and simple actions. Completed for file-backed local session metadata and ephemeral action execution.
 - Implement artifact directory handling. Completed for sessions, observations, screenshots, traces, reports, and spec exports under `.browser-debug/`.
 - Add focused tests for command parsing, observation output, action coverage, and safety boundaries. Completed with `npm test` and `npm run test:browser`.
+- Add headed/devtools launch-mode regression coverage. Completed with deterministic no-GUI tests in `npm test`.
 - Keep long-running browser supervision, authentication automation, and external upload for later approved phases.
 
 ### Phase 6: Release
 
-- Add release notes and changelog.
+- Add release notes and changelog. Completed locally with `CHANGELOG.md`.
+- Add release readiness checklist and publication blockers. Completed locally with `docs/workflow/RELEASE.md`.
 - Confirm npm account and publishing method.
 - Publish only after CI and release checklist pass.
 
@@ -83,11 +86,12 @@
 - `./tools/product-gate`
 - `npm test`
 - `npm run test:browser`
+- `npm run test:pack`
 - lesson-side `product-scaffold-check` with this repository path.
 - lesson-side `product-repository-authority status` with this repository path.
 - `check_workflow_pair_sync.sh --repo <this-repo>`.
-- Current local runtime checks include command parser tests, JSON error tests, `doctor` tests, session/report/spec tests, redaction tests, Playwright browser smoke tests with screenshots, traces, click/form/keyboard/scroll/wait actions, Control Center observation, and aggregate product-gate execution.
-- Later release work should add CI coverage, headed-mode regression checks, and release packaging checks.
+- Current local runtime checks include command parser tests, JSON error tests, `doctor` tests, headed/devtools launch-mode tests, session/report/spec tests, redaction tests, Playwright browser smoke tests with screenshots, traces, click/form/keyboard/scroll/wait actions, local package dry-run verification, Control Center observation, and aggregate product-gate execution.
+- Later release work should add CI coverage, real headed visual checks where a display is available, public package naming, license selection, and npm publication after approval.
 
 ## Recovery Path
 

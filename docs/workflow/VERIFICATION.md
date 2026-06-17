@@ -9,6 +9,7 @@ Current verification checks repository structure, document synchronization, secu
 ```bash
 npm test
 npm run test:browser
+npm run test:pack
 ./tools/check_product_structure.sh
 ./tools/check_product_docs.sh
 ./tools/check_product_security.sh
@@ -17,7 +18,7 @@ npm run test:browser
 ./tools/product-gate
 ```
 
-`./tools/test_product_repository.sh` and `./tools/product-gate` run `npm test` when `package.json` is present. `npm run test:browser` is intentionally separate because it launches local Chromium.
+`./tools/test_product_repository.sh` and `./tools/product-gate` run `npm test` and `npm run test:pack` when `package.json` is present. `npm run test:browser` is intentionally separate because it launches local Chromium.
 
 ## Lesson-Side Commands
 
@@ -31,13 +32,17 @@ From `/home/masahiro/projects/ai-driven-development-lesson`:
 
 ## Current Runtime Checks
 
-The current implementation includes command parser tests, deterministic JSON error tests, `doctor` tests, session/report/spec tests, redaction tests, and Playwright smoke tests for local file observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, and spec export. Manual local checks can use:
+The current implementation includes command parser tests, deterministic JSON error tests, `doctor` tests, headed/devtools launch-mode tests, session/report/spec tests, redaction tests, local package dry-run verification, and Playwright smoke tests for local file observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, and spec export. Manual local checks can use:
 
 ```bash
 node ./bin/browser-debug.js observe --url http://127.0.0.1:5173/ --screenshot --trace --timeout 15000 --json
 ```
 
 For this session, `http://127.0.0.1:5173/` was observed successfully with screenshot and trace artifacts, and `http://127.0.0.1:5174/` was not listening.
+
+## Release Readiness Checks
+
+`CHANGELOG.md` and `docs/workflow/RELEASE.md` are local release-readiness documents. They do not authorize publish actions. Public GitHub repository creation, CI setup, npm credentials, license changes, and `npm publish` remain approval-bound.
 
 ## Phase 2a Design Checks
 

@@ -28,6 +28,7 @@
   },
   "files": [
     { "path": "AGENTS.MD", "role": "agent_entry" },
+    { "path": "CHANGELOG.md", "role": "workflow_doc" },
     { "path": "package.json", "role": "manifest" },
     { "path": "package-lock.json", "role": "manifest" },
     { "path": "bin/browser-debug.js", "role": "manifest" },
@@ -41,6 +42,7 @@
     { "path": "docs/product/IMPLEMENTATION_PLAN.md", "role": "product_doc" },
     { "path": "docs/workflow/TASK_TRACKER.md", "role": "workflow_doc" },
     { "path": "docs/workflow/HANDOFF.md", "role": "workflow_doc" },
+    { "path": "docs/workflow/RELEASE.md", "role": "workflow_doc" },
     { "path": "ops/PRODUCT_MANIFEST.tsv", "role": "manifest" }
   ]
 }

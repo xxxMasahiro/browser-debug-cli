@@ -2,6 +2,7 @@
 product.entrypoint	required	all	all	README.md	entrypoint	file_exists	workflow	Product human entrypoint.
 product.package	optional	all	all	package.json	custom	file_nonempty	workflow	Node package metadata for the local CLI.
 product.package_lock	optional	all	all	package-lock.json	custom	file_nonempty	workflow	Locked npm dependency graph for the local CLI.
+product.changelog	optional	all	all	CHANGELOG.md	doc	file_nonempty	workflow	Local unreleased changelog and release status notes.
 product.cli_bin	optional	all	all	bin/browser-debug.js	source	file_nonempty	workflow	Local browser-debug executable entrypoint.
 product.source	required	all	all	src/cli.js	source	file_nonempty	workflow	CLI runtime entrypoint.
 product.observe	optional	all	all	src/observe.js	source	file_nonempty	workflow	Playwright-backed one-shot observation runtime.
@@ -11,3 +12,4 @@ product.browser_smoke	optional	all	all	tests/browser-smoke.test.js	test	file_non
 product.requirements	required	all	all	docs/product/REQUIREMENTS.md	doc	file_nonempty	workflow	Canonical requirements.
 product.specification	required	all	all	docs/product/SPECIFICATION.md	doc	file_nonempty	workflow	Canonical specification.
 product.plan	required	all	all	docs/product/IMPLEMENTATION_PLAN.md	doc	file_nonempty	workflow	Canonical implementation plan.
+product.release_policy	optional	all	all	docs/workflow/RELEASE.md	doc	file_nonempty	workflow	Local release readiness checklist and publication blockers.

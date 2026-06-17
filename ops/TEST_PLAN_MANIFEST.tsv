@@ -5,4 +5,5 @@ security	optional	all	all	check_product_security	product.security.secrets	securi
 design	optional	all	all	check_product_design_system	product.design_system.sources	workflow	Validate product-local design-system placeholder files.
 cli_no_browser	optional	all	all	npm_test	product.runtime.no_browser	workflow	Run no-browser CLI parser, JSON output, and doctor tests.
 browser_smoke	optional	all	all	npm_run_test_browser	product.runtime.browser_smoke	workflow	Run Playwright browser smoke tests for observe and session actions.
+package_dry_run	optional	all	all	npm_run_test_pack	product.runtime.package_dry_run	workflow	Run npm package dry-run to verify the local package file set without publishing.
 aggregate	optional	all	all	test_product_repository	product.gates.tests	workflow	Run product-local aggregate checks.

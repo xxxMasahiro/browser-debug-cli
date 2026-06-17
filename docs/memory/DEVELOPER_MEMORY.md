@@ -36,4 +36,5 @@ Current design baseline:
 - Implemented commands: `doctor`, `observe`, `session start`, `session close`, `act`, `report`, and `spec export`.
 - Artifact root: ignored `.browser-debug/`.
 - Default browser behavior: ephemeral Chromium context per observation/action.
-- Verification: `npm test`, `npm run test:browser`, `./tools/product-gate`, and local Dashboard Control Center observation. Browser smoke coverage includes observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, and spec export.
+- Verification: `npm test`, `npm run test:browser`, `npm run test:pack`, `./tools/product-gate`, and local Dashboard Control Center observation. Coverage includes headed/devtools launch-mode checks, observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, spec export, and local package dry-run verification.
+- Release readiness: `CHANGELOG.md` and `docs/workflow/RELEASE.md` exist, but public package naming, license changes, GitHub publication, CI, and npm publication remain approval-bound.

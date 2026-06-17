@@ -40,6 +40,9 @@ This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and H
 - [x] Implemented `session start`, `session close`, simple `act`, `report`, and `spec export`.
 - [x] Added browser smoke tests for local file observation and click actions.
 - [x] Strengthened browser smoke coverage for form controls, keyboard input, deterministic scroll, wait actions, screenshots, reports, and spec export.
+- [x] Added deterministic headed/devtools launch-mode regression coverage without requiring a GUI display.
+- [x] Added `npm run test:pack` local package dry-run verification and aggregate gate wiring.
+- [x] Added local release readiness notes in `CHANGELOG.md` and `docs/workflow/RELEASE.md`.
 - [x] Verified the running Dashboard Control Center at `http://127.0.0.1:5173/` with screenshot and trace capture.
 - [x] Confirmed `http://127.0.0.1:5174/` was not listening during verification.
 - [x] Re-ran product-local `./tools/product-gate`, `npm test`, `npm run test:browser`, and `git diff --check`.
@@ -48,9 +51,10 @@ This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and H
 ## Remaining Work
 
 - [ ] If approved later, implement long-running browser supervision.
-- [ ] If approved later, implement headed/devtools regression checks.
+- [ ] If approved later, run real headed visual regression checks in an environment with a display.
 - [ ] If approved later, create the public GitHub repository with `gh`.
 - [ ] If approved later, add CI manifests and GitHub Actions.
+- [ ] If approved later, choose the public package name and license.
 - [ ] If approved later, publish or prepare npm release flow.
 
 ## Next Step

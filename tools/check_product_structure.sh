@@ -22,6 +22,7 @@ require_dir() {
 
 for rel in \
   AGENTS.MD \
+  CHANGELOG.md \
   package.json \
   package-lock.json \
   bin/browser-debug.js \
@@ -38,6 +39,7 @@ for rel in \
   docs/design-system/components.json \
   docs/workflow/TASK_TRACKER.md \
   docs/workflow/HANDOFF.md \
+  docs/workflow/RELEASE.md \
   docs/workflow/SECURITY.md \
   docs/workflow/VERIFICATION.md \
   docs/memory/README.md \

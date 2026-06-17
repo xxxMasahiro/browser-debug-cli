@@ -63,6 +63,9 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - `session start`, `act`, `report`, and `spec export` operate on local `.browser-debug/` session metadata.
 - Page text, console messages, URLs, action data, and generated reports are treated as untrusted data and pass through basic secret redaction.
 - Browser smoke tests verify local file observation, click actions, form controls, keyboard input, deterministic scroll, screenshots, reports, and spec export without using external services.
+- Headed and DevTools mode regression tests verify Playwright launch-mode wiring without requiring a GUI display.
+- Local package dry-run verification confirms the npm package file set without publishing.
+- Release readiness notes track the unreleased status, public-release blockers, and no-publish boundaries.
 
 ## Open Decisions
 

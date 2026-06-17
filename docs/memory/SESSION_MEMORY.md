@@ -40,7 +40,10 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - Implemented `session start`, `session close`, simple `act`, `report`, and `spec export` using file-backed local session metadata.
 - Added `npm run test:browser` for real Playwright smoke coverage.
 - Strengthened browser smoke coverage for form controls, keyboard input, deterministic scroll, wait actions, screenshots, reports, and spec export.
+- Added deterministic headed/devtools launch-mode regression coverage without requiring a GUI display.
+- Added `npm run test:pack` local package dry-run verification using an ignored local npm cache.
+- Added `CHANGELOG.md` and `docs/workflow/RELEASE.md` for local release readiness without publishing.
 - Verification passed with `npm test`, `npm run test:browser`, `node ./bin/browser-debug.js doctor --json`, Dashboard Control Center observation at `http://127.0.0.1:5173/`, screenshot review, and trace artifact existence checks.
 - `http://127.0.0.1:5174/` was not listening during verification.
 - Final checks also passed with `./tools/product-gate`, `git diff --check`, lesson-side product scaffold check, lesson-side product repository authority status, and lesson-side workflow-pair sync check.
-- Next approval-bound work: GitHub repository creation, remote setup, push, CI, npm publication, long-running browser supervision, existing-browser-profile reuse, OAuth/login automation, external upload, or credential storage.
+- Next approval-bound work: GitHub repository creation, remote setup, push, CI, public package naming, license changes, npm publication, long-running browser supervision, existing-browser-profile reuse, OAuth/login automation, external upload, or credential storage.
