@@ -3,4 +3,6 @@ structure	optional	all	all	check_product_structure	product.gates.structure	workf
 docs	optional	all	all	check_product_docs	product.docs.sync	workflow	Validate canonical product documents and workflow pair.
 security	optional	all	all	check_product_security	product.security.secrets	security	Validate local security policy and secret-like data guard.
 design	optional	all	all	check_product_design_system	product.design_system.sources	workflow	Validate product-local design-system placeholder files.
+cli_no_browser	optional	all	all	npm_test	product.runtime.no_browser	workflow	Run no-browser CLI parser, JSON output, and doctor tests.
+browser_smoke	optional	all	all	npm_run_test_browser	product.runtime.browser_smoke	workflow	Run Playwright browser smoke tests for observe and session actions.
 aggregate	optional	all	all	test_product_repository	product.gates.tests	workflow	Run product-local aggregate checks.

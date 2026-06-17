@@ -15,4 +15,11 @@ Run scaffold checks only:
 
 ## Later Phases
 
-Add command tests, Playwright smoke tests, artifact redaction tests, headed-mode checks, and CI checks as implementation starts.
+Run:
+
+```bash
+npm test
+npm run test:browser
+```
+
+Add headed-mode checks and CI checks in later approved phases.

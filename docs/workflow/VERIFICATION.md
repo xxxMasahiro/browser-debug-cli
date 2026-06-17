@@ -2,11 +2,13 @@
 
 ## Verification Scope
 
-Phase 0 verification checks repository structure, document synchronization, security defaults, and design-system placeholders. It does not launch a browser.
+Current verification checks repository structure, document synchronization, security defaults, design-system placeholders, product operation mode, local MVP runtime behavior, and browser smoke coverage.
 
 ## Product-Local Commands
 
 ```bash
+npm test
+npm run test:browser
 ./tools/check_product_structure.sh
 ./tools/check_product_docs.sh
 ./tools/check_product_security.sh
@@ -14,6 +16,8 @@ Phase 0 verification checks repository structure, document synchronization, secu
 ./tools/test_product_repository.sh
 ./tools/product-gate
 ```
+
+`./tools/test_product_repository.sh` and `./tools/product-gate` run `npm test` when `package.json` is present. `npm run test:browser` is intentionally separate because it launches local Chromium.
 
 ## Lesson-Side Commands
 
@@ -25,6 +29,19 @@ From `/home/masahiro/projects/ai-driven-development-lesson`:
 ./tools/check_workflow_pair_sync.sh --repo /home/masahiro/projects/agent-toolbox/browser-debug-cli
 ```
 
-## Later Runtime Checks
+## Current Runtime Checks
 
-After implementation starts, add command tests, Playwright smoke tests, artifact redaction tests, headed-mode checks, and CI coverage.
+The current implementation includes command parser tests, deterministic JSON error tests, `doctor` tests, session/report/spec tests, redaction tests, and Playwright smoke tests for local file observation, screenshot/trace artifacts, and click actions. Manual local checks can use:
+
+```bash
+node ./bin/browser-debug.js observe --url http://127.0.0.1:5173/ --screenshot --trace --timeout 15000 --json
+```
+
+For this session, `http://127.0.0.1:5173/` was observed successfully with screenshot and trace artifacts, and `http://127.0.0.1:5174/` was not listening.
+
+## Phase 2a Design Checks
+
+- Product documents describe the same CLI binary, package baseline, JSON contract, artifact root, and safety defaults.
+- `TASK_TRACKER.md` and `HANDOFF.md` agree on the current phase and next approval boundary.
+- No GitHub remote, CI workflow, or npm publication path is added in the local MVP phase.
+- Playwright visual checks are required after browser-runtime behavior changes when a suitable local target is available.

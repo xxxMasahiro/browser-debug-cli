@@ -22,6 +22,14 @@ require_dir() {
 
 for rel in \
   AGENTS.MD \
+  package.json \
+  package-lock.json \
+  bin/browser-debug.js \
+  src/cli.js \
+  src/observe.js \
+  src/sessions.js \
+  tests/cli.test.js \
+  tests/browser-smoke.test.js \
   docs/product/REQUIREMENTS.md \
   docs/product/SPECIFICATION.md \
   docs/product/IMPLEMENTATION_PLAN.md \

@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Phase 1 is complete: Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, and product-gate evidence has been recorded locally.
+Phase 5 local MVP runtime implementation is complete after Phase 1 and Phase 2a. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, and product-gate evidence has been recorded locally.
 
 This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and HANDOFF workflow-state pair synchronized whenever task state changes.
 
@@ -22,16 +22,39 @@ This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and H
 - [x] Initialized local Git and renamed the initial branch to `main`.
 - [x] Created the first scaffold commit.
 - [x] Recorded product-gate evidence under `.git/product-gate-evidence/`.
+- [x] Started Phase 2a package/runtime design without GitHub creation, dependency installation, browser launch, CI, or npm publication.
+- [x] Selected `browser-debug` as the working CLI binary name.
+- [x] Recorded the Node.js 20+, ESM, local-first, ephemeral-context design baseline.
+- [x] Defined the first implementation slice as `doctor`, command parsing, deterministic JSON errors, and focused tests.
+- [x] Defined the first Playwright slice as one-shot `observe --url <url> --json` with artifact-safe local output.
+- [x] Ran `./tools/product-gate` for Phase 2a design verification.
+- [x] Added private local `package.json` with the `browser-debug` executable.
+- [x] Implemented no-browser CLI parsing, deterministic JSON envelopes, and `doctor`.
+- [x] Added focused `node:test` coverage for `doctor`, missing commands, `observe` validation, planned stubs, and session parsing.
+- [x] Updated product manifests and aggregate product-gate wiring to include `npm test`.
+- [x] Verified `npm test`, `./tools/product-gate`, `git diff --check`, `doctor --json`, and the no-browser `observe` stub.
+- [x] Installed the Playwright runtime dependency.
+- [x] Implemented Playwright-backed `observe --url <url> --json` with ephemeral Chromium contexts.
+- [x] Implemented local artifact handling for observations, screenshots, sessions, reports, and spec exports under ignored `.browser-debug/`.
+- [x] Implemented `observe --trace` with local Playwright trace zip artifacts and trace-content warnings.
+- [x] Implemented `session start`, `session close`, simple `act`, `report`, and `spec export`.
+- [x] Added browser smoke tests for local file observation and click actions.
+- [x] Verified the running Dashboard Control Center at `http://127.0.0.1:5173/` with screenshot and trace capture.
+- [x] Confirmed `http://127.0.0.1:5174/` was not listening during verification.
+- [x] Re-ran product-local `./tools/product-gate`, `npm test`, `npm run test:browser`, and `git diff --check`.
+- [x] Re-ran lesson-side product scaffold, product repository authority, and workflow-pair checks successfully.
 
 ## Remaining Work
 
+- [ ] If approved later, implement long-running browser supervision.
+- [ ] If approved later, implement headed/devtools regression checks.
 - [ ] If approved later, create the public GitHub repository with `gh`.
 - [ ] If approved later, add CI manifests and GitHub Actions.
-- [ ] If approved later, add npm package metadata and runtime CLI implementation.
+- [ ] If approved later, publish or prepare npm release flow.
 
 ## Next Step
 
-Stop at the Phase 1 boundary. The next approval-bound step is Phase 2: public GitHub repository creation with `gh`, or a separate approval to begin npm/package/runtime design. Push, remote setup, GitHub repository creation, dependencies, and CI remain out of scope until explicitly approved.
+Ask for explicit approval before long-running browser supervision, trace capture expansion, authentication automation, external upload, existing-browser-profile reuse, credential storage, GitHub repository creation, remote setup, push, CI, or npm publication.
 
 ## Stop Conditions
 
@@ -39,3 +62,4 @@ Stop at the Phase 1 boundary. The next approval-bound step is Phase 2: public Gi
 - GitHub public repository creation is requested without explicit approval.
 - npm publish is requested before CI and release planning exist.
 - Any secret, cookie, storage state, or credential-like data appears in repository files.
+- A design change would require existing browser profile reuse, credential storage, OAuth, webhooks, external upload, or arbitrary shell execution without a security plan and approval.

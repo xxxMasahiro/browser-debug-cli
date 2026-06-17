@@ -15,11 +15,13 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 
 - Provide a standalone CLI that can be used from any repository.
 - Use Playwright as the browser automation layer.
+- Provide a Node.js package layout with a stable local CLI binary before public release work starts.
 - Support fast headless observation for routine debugging.
 - Support headed browser and DevTools workflows for visual quality, animations, hover, focus, scroll, and final interaction checks.
 - Return structured page observations suitable for AI decision making.
 - Provide explicit action candidates instead of requiring raw DOM scraping.
 - Record reproducible artifacts such as screenshots, traces, console messages, network summaries, and issue reports.
+- Keep JSON output deterministic enough for agents, scripts, and regression tests to consume.
 - Keep secrets, cookies, storage state, and existing browser profiles out of committed artifacts.
 - Keep the design agent-independent: Codex, other agents, scripts, or humans should all be able to use the same CLI.
 - Prepare for OSS distribution through local Git, GitHub publication with `gh`, CI, and npm packaging in later phases.
@@ -30,19 +32,41 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Do not replace final visual review; the tool should help operate and capture evidence, while humans approve product-level decisions when needed.
 - Do not bypass authentication or collect credentials.
 - Do not upload artifacts to external services by default.
-- Do not implement runtime browser automation during Phase 0.
+- Do not implement runtime browser automation without explicit implementation approval.
+- Do not create public repositories, remotes, CI, or npm publication paths as part of package/runtime design.
 
 ## Success Criteria
 
 - The repository has the standard product scaffold expected by the lesson workflow.
 - The initial five documents are synchronized and describe the same product direction.
 - Product-local checks can validate structure, document sync, security, and design-system placeholders.
-- The next phase can safely start local Git setup without changing the runtime scope.
+- Package/runtime design records the CLI shape, artifact boundaries, safety defaults, and focused verification plan before implementation begins.
+- The first no-browser implementation slice provides local package metadata, the `browser-debug` executable, `doctor`, command parsing, deterministic JSON errors, and focused tests without launching a browser.
+- The local MVP runtime provides Playwright-backed one-shot observation, local screenshots/traces/observation artifacts, session metadata, simple actions, report export, spec export, redaction tests, and browser smoke tests.
+
+## Phase 2a Package and Runtime Design Criteria
+
+- The working CLI binary is `browser-debug`.
+- The package uses Node.js 20 or newer and ESM modules.
+- The default runtime mode is local-first, headless, and artifact-safe.
+- The first implementation slice is `doctor` plus a no-browser command parser and JSON output contract.
+- The first Playwright slice is a one-shot `observe --url <url> --json` command using an ephemeral browser context.
+- The default artifact root is `.browser-debug/`, which must stay ignored and must not contain cookies, storage state, credentials, or raw secrets.
+- Long-running browser supervision is opt-in after the one-shot observation flow is working.
+
+## Current Local MVP Criteria
+
+- `doctor --json` verifies Node.js, ESM configuration, artifact ignore policy, and Playwright package availability.
+- `observe --url <url> --json` launches an ephemeral Chromium context, captures structured page data, closes the browser context, and writes an observation artifact.
+- `observe --screenshot` writes a local screenshot artifact without committing it.
+- `observe --trace` writes a local Playwright trace artifact and warns that traces can contain page content.
+- `session start`, `act`, `report`, and `spec export` operate on local `.browser-debug/` session metadata.
+- Page text, console messages, URLs, action data, and generated reports are treated as untrusted data and pass through basic secret redaction.
+- Browser smoke tests verify local file observation and a click action without using external services.
 
 ## Open Decisions
 
-- CLI package name and npm scope.
-- Exact command names and JSON schema details.
-- Whether the long-running browser supervisor is always enabled or opt-in.
+- Final public npm package name and npm scope.
+- Exact JSON schema versioning details.
 - Default artifact retention policy.
 - Release license and contribution policy.

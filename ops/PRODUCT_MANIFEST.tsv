@@ -1,7 +1,13 @@
 # authority_id	required_mode	contexts	product_types	path	path_role	validation_rule	dashboard_group	description
 product.entrypoint	required	all	all	README.md	entrypoint	file_exists	workflow	Product human entrypoint.
-product.source	required	all	all	src/index.txt	source	file_nonempty	workflow	Phase 0 source placeholder until CLI runtime is implemented.
-product.test	required	all	all	tests/test.txt	test	file_nonempty	workflow	Phase 0 test placeholder until executable tests are implemented.
+product.package	optional	all	all	package.json	custom	file_nonempty	workflow	Node package metadata for the local CLI.
+product.package_lock	optional	all	all	package-lock.json	custom	file_nonempty	workflow	Locked npm dependency graph for the local CLI.
+product.cli_bin	optional	all	all	bin/browser-debug.js	source	file_nonempty	workflow	Local browser-debug executable entrypoint.
+product.source	required	all	all	src/cli.js	source	file_nonempty	workflow	CLI runtime entrypoint.
+product.observe	optional	all	all	src/observe.js	source	file_nonempty	workflow	Playwright-backed one-shot observation runtime.
+product.sessions	optional	all	all	src/sessions.js	source	file_nonempty	workflow	Local session, action, report, and spec runtime.
+product.test	required	all	all	tests/cli.test.js	test	file_nonempty	workflow	No-browser CLI parser, JSON output, and doctor tests.
+product.browser_smoke	optional	all	all	tests/browser-smoke.test.js	test	file_nonempty	workflow	Optional Playwright browser smoke tests.
 product.requirements	required	all	all	docs/product/REQUIREMENTS.md	doc	file_nonempty	workflow	Canonical requirements.
 product.specification	required	all	all	docs/product/SPECIFICATION.md	doc	file_nonempty	workflow	Canonical specification.
 product.plan	required	all	all	docs/product/IMPLEMENTATION_PLAN.md	doc	file_nonempty	workflow	Canonical implementation plan.
