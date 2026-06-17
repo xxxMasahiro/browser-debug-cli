@@ -1,0 +1,37 @@
+{
+  "name": "browser-debug-cli",
+  "version": "0.0.0",
+  "description": "Local-first Playwright browser debugging and UI review tools for Codex.",
+  "author": {
+    "name": "Browser Debug CLI Maintainers"
+  },
+  "repository": "https://github.com/xxxMasahiro/browser-debug-cli",
+  "license": "UNLICENSED",
+  "keywords": [
+    "playwright",
+    "browser-debugging",
+    "ui-review",
+    "mcp",
+    "cli"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Browser Debug CLI",
+    "shortDescription": "Run local browser observation and UI review from Codex.",
+    "longDescription": "Browser Debug CLI provides local-first Playwright observation, target-manifest review, deterministic findings, action plans, and a stdio MCP adapter without external upload or browser profile reuse.",
+    "developerName": "Browser Debug CLI Maintainers",
+    "category": "Developer Tools",
+    "capabilities": [
+      "MCP",
+      "CLI",
+      "Local Review"
+    ],
+    "defaultPrompt": [
+      "Review this local app with Browser Debug CLI.",
+      "Create a target manifest for this app.",
+      "Inspect UI findings and suggest fixes."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

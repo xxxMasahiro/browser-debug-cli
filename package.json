@@ -23,9 +23,13 @@
     "release:check": "npm test && npm run test:pack"
   },
   "files": [
+    ".codex-plugin/",
+    ".mcp.json",
     "bin/",
     "src/",
     "schemas/",
+    "templates/",
+    "skills/browser-debug-review/SKILL.md",
     "README.md",
     "CHANGELOG.md",
     "docs/workflow/SECURITY.md",

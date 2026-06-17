@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "browser-debug-target",
+  "baseUrl": "https://example.test/",
+  "scope": {
+    "sameOrigin": true,
+    "include": [],
+    "exclude": []
+  },
+  "seeds": [
+    "https://example.test/"
+  ],
+  "expectedRoutes": [],
+  "viewportMatrix": [
+    "desktop",
+    "mobile"
+  ],
+  "actionPolicy": {
+    "allow": [
+      "navigation",
+      "state_revealing"
+    ]
+  },
+  "budgets": {
+    "maxRoutes": 50
+  },
+  "artifacts": {
+    "screenshots": true
+  },
+  "masks": [],
+  "regions": [],
+  "appHints": {
+    "reviewGoal": "full_app_first_pass",
+    "notes": []
+  }
+}

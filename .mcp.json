@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "browser-debug-cli": {
+      "command": "node",
+      "args": [
+        "./bin/browser-debug-mcp.js"
+      ]
+    }
+  }
+}
