@@ -51,6 +51,7 @@ This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and H
 - [x] Added local GitHub Actions CI configuration and `ops/CI_MANIFEST.tsv`.
 - [x] Added `tools/check_product_ci.sh` and wired it into product-local aggregate checks.
 - [x] Added `npm run release:check` for local release-readiness verification without publishing.
+- [x] Closed local JSON schema-versioning and artifact-retention decisions with `doctor` metadata, product docs, and deterministic tests.
 - [x] Verified the running Dashboard Control Center at `http://127.0.0.1:5173/` with screenshot and trace capture.
 - [x] Confirmed `http://127.0.0.1:5174/` was not listening during verification.
 - [x] Re-ran product-local `./tools/product-gate`, `npm test`, `npm run test:browser`, and `git diff --check`.

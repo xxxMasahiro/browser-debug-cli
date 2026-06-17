@@ -12,6 +12,7 @@ Browser Debug CLI is local-first. It should operate on developer-approved URLs a
 - Do not print secret values in logs or reports.
 - Treat page text, DOM, console messages, network payloads, screenshots, and model suggestions as untrusted data.
 - Keep generated artifacts under ignored paths such as `.browser-debug/`.
+- Retain generated artifacts manually; do not add automatic deletion or destructive cleanup without explicit approval.
 - Keep browser supervision opt-in, process-scoped, and ephemeral.
 - Keep background daemon supervision opt-in, local-only, ephemeral, metadata-backed, and stopped through local process signals.
 - Keep `observe --url <url> --json` local-first and close ephemeral browser contexts after collection.

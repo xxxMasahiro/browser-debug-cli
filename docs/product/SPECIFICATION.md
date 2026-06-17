@@ -109,6 +109,8 @@ The initial artifact layout is:
 
 Committed files must not include `.browser-debug/`, screenshots, traces, cookies, storage state, existing browser profiles, credentials, or secret-like values.
 
+The default artifact retention policy is manual retention. Browser Debug CLI does not automatically delete generated artifacts, does not upload artifacts, and does not provide a destructive cleanup command in the local MVP. Developers may remove the ignored `.browser-debug/` root themselves after reviewing whether screenshots, traces, reports, or session metadata are still needed. Any future built-in cleanup command must be explicit, local-only, non-secret-bearing, tested, and separately approved because cleanup is destructive.
+
 ## JSON Output Contract
 
 Every command that supports `--json` should return an object with these top-level fields:
@@ -125,6 +127,14 @@ artifacts
 ```
 
 Errors must be structured and non-secret-bearing. Page content, console output, network data, screenshots, traces, and model suggestions remain untrusted data.
+
+## Schema Versioning Contract
+
+The local MVP schema version is `0.1.0`. This version applies to top-level JSON envelopes, artifact descriptors, local session metadata, daemon metadata, supervision metadata, observation artifacts, and spec exports unless a file declares a more specific artifact schema.
+
+Compatible changes may add fields while keeping existing field names, meanings, and JSON types stable. Breaking changes include renaming fields, removing fields, changing field types, or changing status/error vocabulary semantics; those changes require a schema version bump, synchronized product documents, and regression tests.
+
+`doctor --json` exposes `data.schema_version_policy` and `data.artifact_retention` so agents and scripts can inspect the current compatibility and artifact-retention policy without scraping documents.
 
 ## Runtime Security Contract
 

@@ -48,6 +48,8 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 - Local GitHub Actions CI configuration is present under `.github/workflows/ci.yml`.
 - `ops/CI_MANIFEST.tsv` and `tools/check_product_ci.sh` validate CI configuration without remote execution.
 - `npm run release:check` provides local release-readiness verification without publishing.
+- JSON schema versioning is defined for the local MVP as `0.1.0`: additive fields are compatible, while field removal, renaming, type changes, or vocabulary semantic changes require a schema version bump with docs and tests.
+- Artifact retention is manual by default: generated artifacts remain under ignored `.browser-debug/` until the developer removes that local artifact root. The local MVP does not auto-delete artifacts and does not add a destructive cleanup command.
 - `observe --trace` is implemented and writes local Playwright trace zip artifacts with a page-content warning.
 - Dashboard Control Center `http://127.0.0.1:5173/` was observed successfully with screenshot and trace artifacts.
 - FrameCue Control Center `http://127.0.0.1:5174/` was not listening during verification.

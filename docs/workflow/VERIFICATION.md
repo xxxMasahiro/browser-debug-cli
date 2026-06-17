@@ -34,7 +34,7 @@ From `/home/masahiro/projects/ai-driven-development-lesson`:
 
 ## Current Runtime Checks
 
-The current implementation includes command parser tests, deterministic JSON error tests, `doctor` tests, headed/devtools launch-mode tests, session/report/spec tests, daemon parser tests, redaction tests, architecture regressions for generic runtime boundaries, shared evidence helpers, and local daemon boundaries, local package dry-run verification, and Playwright smoke tests for local file observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, spec export, process-scoped supervision, and daemon start/status/stop. Manual local checks can use:
+The current implementation includes command parser tests, deterministic JSON error tests, `doctor` tests for environment, schema-versioning, and artifact-retention metadata, headed/devtools launch-mode tests, session/report/spec tests, daemon parser tests, redaction tests, architecture regressions for generic runtime boundaries, shared evidence helpers, and local daemon boundaries, local package dry-run verification, and Playwright smoke tests for local file observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, spec export, process-scoped supervision, and daemon start/status/stop. Manual local checks can use:
 
 ```bash
 node ./bin/browser-debug.js observe --url http://127.0.0.1:3000/ --screenshot --trace --timeout 15000 --json

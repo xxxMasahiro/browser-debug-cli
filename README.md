@@ -31,7 +31,7 @@ npm run test:pack
 npm run release:check
 ```
 
-Artifacts are written under ignored `.browser-debug/` directories. Trace artifacts can contain page content and must remain local. `supervise` keeps one ephemeral browser context alive only for that CLI process and closes it before exit. `daemon start` keeps a local ephemeral browser worker alive until `daemon stop` and controls it only through local process signals and metadata. `npm test` runs deterministic no-browser tests; `npm run test:browser` launches local Chromium for smoke coverage; `npm run test:pack` runs a local dry-run package check without publishing; `npm run release:check` combines no-browser and package checks without publishing.
+Artifacts are written under ignored `.browser-debug/` directories and are retained until the developer manually removes that local artifact root. Trace artifacts can contain page content and must remain local. `supervise` keeps one ephemeral browser context alive only for that CLI process and closes it before exit. `daemon start` keeps a local ephemeral browser worker alive until `daemon stop` and controls it only through local process signals and metadata. `npm test` runs deterministic no-browser tests; `npm run test:browser` launches local Chromium for smoke coverage; `npm run test:pack` runs a local dry-run package check without publishing; `npm run release:check` combines no-browser and package checks without publishing.
 
 ## Canonical Documents
 

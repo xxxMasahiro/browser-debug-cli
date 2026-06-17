@@ -18,6 +18,7 @@ All notable local development changes are tracked here before public release.
 - Added architecture regressions for generic runtime boundaries, shared page evidence helpers, and local Node CLI packaging.
 - Added local GitHub Actions CI configuration and `ops/CI_MANIFEST.tsv` with a product-local CI validation check.
 - Added `npm run release:check` for local release-readiness verification without publishing.
+- Added explicit JSON schema-versioning and manual artifact-retention policy metadata to `doctor`.
 
 ## Release Status
 

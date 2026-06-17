@@ -73,9 +73,12 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Local CI manifest checks validate the GitHub Actions workflow definition without remote execution.
 - Release readiness notes and `npm run release:check` track the unreleased status, public-release blockers, and no-publish boundaries.
 
+## Closed Local Decisions
+
+- JSON envelopes, artifact descriptors, and local metadata use schema version `0.1.0` for the local MVP. Additive fields may be added while existing fields keep their meaning and type. Renaming, removing, or changing the type of existing fields requires a schema version bump with updated docs and tests.
+- Generated artifacts are retained manually under the ignored `.browser-debug/` artifact root. The CLI does not auto-delete artifacts and does not provide a destructive cleanup command in the local MVP.
+
 ## Open Decisions
 
 - Final public npm package name and npm scope.
-- Exact JSON schema versioning details.
-- Default artifact retention policy.
 - Release license and contribution policy.

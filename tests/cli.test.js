@@ -26,6 +26,10 @@ test('doctor returns the JSON envelope without launching a browser', async () =>
   assert.equal(body.status, 'ok');
   assert.equal(body.observed_at, fixedNow);
   assert.equal(body.data.runtime.minimum_node_major, 20);
+  assert.equal(body.data.schema_version_policy.current, '0.1.0');
+  assert.equal(body.data.schema_version_policy.stage, 'mvp-pre-1.0');
+  assert.equal(body.data.artifact_retention.mode, 'manual');
+  assert.equal(body.data.artifact_retention.automatic_cleanup, false);
   assert.equal(body.artifacts.length, 0);
   assert.deepEqual(body.errors, []);
   assert.equal(body.warnings[0].code, 'PLAYWRIGHT_NOT_INSTALLED');

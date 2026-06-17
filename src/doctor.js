@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  ARTIFACT_RETENTION_POLICY,
   DEFAULT_ARTIFACT_ROOT,
-  MIN_NODE_MAJOR
+  MIN_NODE_MAJOR,
+  SCHEMA_VERSION_POLICY
 } from './constants.js';
 
 export async function runDoctor({
@@ -86,6 +88,20 @@ export async function runDoctor({
     details: {}
   });
 
+  checks.push({
+    id: 'schema.version_policy',
+    status: 'pass',
+    summary: `JSON envelopes use schema version ${SCHEMA_VERSION_POLICY.current}.`,
+    details: SCHEMA_VERSION_POLICY
+  });
+
+  checks.push({
+    id: 'artifact_retention.manual',
+    status: 'pass',
+    summary: 'Artifacts are retained until the developer manually removes the ignored artifact root.',
+    details: ARTIFACT_RETENTION_POLICY
+  });
+
   return {
     status: errors.length > 0 ? 'error' : 'ok',
     data: {
@@ -96,6 +112,8 @@ export async function runDoctor({
         platform
       },
       artifact_root: DEFAULT_ARTIFACT_ROOT,
+      artifact_retention: ARTIFACT_RETENTION_POLICY,
+      schema_version_policy: SCHEMA_VERSION_POLICY,
       checks
     },
     warnings,

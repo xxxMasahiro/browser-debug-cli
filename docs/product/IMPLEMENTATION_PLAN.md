@@ -76,6 +76,7 @@
 - Implement artifact directory handling. Completed for sessions, observations, screenshots, traces, reports, and spec exports under `.browser-debug/`.
 - Add focused tests for command parsing, observation output, action coverage, and safety boundaries. Completed with `npm test` and `npm run test:browser`.
 - Add headed/devtools launch-mode regression coverage. Completed with deterministic no-GUI tests in `npm test`.
+- Define JSON schema versioning details and the default artifact retention policy. Completed with `doctor` metadata, product docs, and deterministic tests.
 - Keep authentication automation, external daemon control channels, profile reuse, credential handling, and external upload for later approved phases.
 
 ### Phase 6: Release
@@ -96,7 +97,7 @@
 - lesson-side `product-scaffold-check` with this repository path.
 - lesson-side `product-repository-authority status` with this repository path.
 - `check_workflow_pair_sync.sh --repo <this-repo>`.
-- Current local runtime checks include command parser tests, JSON error tests, `doctor` tests, headed/devtools launch-mode tests, session/report/spec tests, daemon parser tests, redaction tests, architecture regressions for generic runtime boundaries, shared page evidence helpers, and local daemon boundaries, Playwright browser smoke tests with screenshots, traces, click/form/keyboard/scroll/wait actions, supervised ordered actions, daemon start/status/stop, local package dry-run verification, Control Center observation, and aggregate product-gate execution.
+- Current local runtime checks include command parser tests, JSON error tests, `doctor` schema/retention metadata tests, headed/devtools launch-mode tests, session/report/spec tests, daemon parser tests, redaction tests, architecture regressions for generic runtime boundaries, shared page evidence helpers, and local daemon boundaries, Playwright browser smoke tests with screenshots, traces, click/form/keyboard/scroll/wait actions, supervised ordered actions, daemon start/status/stop, local package dry-run verification, Control Center observation, and aggregate product-gate execution.
 - Later release work should run remote CI after GitHub repository creation and push, add real headed visual checks where a display is available, choose public package naming and license, and publish to npm after approval.
 
 ## Recovery Path
