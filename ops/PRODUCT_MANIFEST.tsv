@@ -5,8 +5,11 @@ product.package_lock	optional	all	all	package-lock.json	custom	file_nonempty	wor
 product.changelog	optional	all	all	CHANGELOG.md	doc	file_nonempty	workflow	Local unreleased changelog and release status notes.
 product.cli_bin	optional	all	all	bin/browser-debug.js	source	file_nonempty	workflow	Local browser-debug executable entrypoint.
 product.source	required	all	all	src/cli.js	source	file_nonempty	workflow	CLI runtime entrypoint.
+product.page_evidence	optional	all	all	src/page-evidence.js	source	file_nonempty	workflow	Reusable page observation and event evidence helpers.
 product.observe	optional	all	all	src/observe.js	source	file_nonempty	workflow	Playwright-backed one-shot observation runtime.
 product.sessions	optional	all	all	src/sessions.js	source	file_nonempty	workflow	Local session, action, report, and spec runtime.
+product.supervisor	optional	all	all	src/supervisor.js	source	file_nonempty	workflow	Process-scoped supervised ephemeral browser runtime.
+product.architecture_test	optional	all	all	tests/architecture.test.js	test	file_nonempty	workflow	Architecture regression tests for reusable and generic runtime boundaries.
 product.test	required	all	all	tests/cli.test.js	test	file_nonempty	workflow	No-browser CLI parser, JSON output, and doctor tests.
 product.browser_smoke	optional	all	all	tests/browser-smoke.test.js	test	file_nonempty	workflow	Optional Playwright browser smoke tests.
 product.requirements	required	all	all	docs/product/REQUIREMENTS.md	doc	file_nonempty	workflow	Canonical requirements.

@@ -26,7 +26,7 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 - Phase 2a uses Node.js 20 or newer, ESM modules, local-first execution, and ephemeral browser contexts by default.
 - The first implementation slice should be `doctor`, command parsing, deterministic JSON errors, and focused tests.
 - The first Playwright slice should be one-shot `observe --url <url> --json` with artifacts under ignored `.browser-debug/`.
-- Long-running browser supervision remains opt-in and later than one-shot observation.
+- Process-scoped browser supervision is opt-in and implemented after one-shot observation.
 - Phase 2a design verification passed with `./tools/product-gate`.
 - The repository now has private local package metadata, `bin/browser-debug.js`, ESM source modules, and `tests/cli.test.js`.
 - `doctor`, command parsing, deterministic JSON errors, and planned no-browser stubs are implemented.
@@ -35,11 +35,14 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 - Local verification passed with `npm test`, `./tools/product-gate`, `git diff --check`, `doctor --json`, and the no-browser `observe` stub.
 - Playwright is installed as a runtime dependency.
 - `session start`, `session close`, simple `act`, `report`, and `spec export` are implemented with local file-backed session metadata.
+- `supervise --url <url> --actions <json-array>` is implemented for process-scoped ephemeral browser supervision and closes before CLI exit.
 - `npm run test:browser` passed for local file observation and click action smoke coverage.
 - `npm run test:browser` now covers local file observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, and spec export.
 - `npm test` now covers headed/devtools launch-mode wiring through a deterministic injected browser type.
 - `npm run test:pack` verifies the local npm package file set with `npm pack --dry-run --json` and an ignored local npm cache.
 - `CHANGELOG.md` and `docs/workflow/RELEASE.md` now track unreleased local changes and publication blockers.
+- `npm run test:browser` covers supervised ordered actions in one ephemeral context.
+- `npm test` includes architecture regressions for generic runtime boundaries, shared evidence helpers, and local Node CLI packaging.
 - `observe --trace` is implemented and writes local Playwright trace zip artifacts with a page-content warning.
 - Dashboard Control Center `http://127.0.0.1:5173/` was observed successfully with screenshot and trace artifacts.
 - FrameCue Control Center `http://127.0.0.1:5174/` was not listening during verification.
@@ -47,7 +50,7 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 
 ## Next Step
 
-Ask for explicit approval before long-running browser supervision, authentication automation, external upload, existing-browser-profile reuse, credential storage, GitHub repository creation, remote setup, push, CI, license change, public package naming, or npm publication. If local runtime work continues, the next useful slice is real headed visual checks in an environment with a display.
+Ask for explicit approval before background browser daemon supervision, authentication automation, external upload, existing-browser-profile reuse, credential storage, GitHub repository creation, remote setup, push, CI, license change, public package naming, or npm publication. No remaining local MVP implementation work is currently planned; the next useful non-code check is real headed visual verification in an environment with a display.
 
 ## Restart Notes
 

@@ -14,7 +14,7 @@ test('observe captures a local file page with Playwright', { skip: !runBrowserSm
   await writeFile(fixture, [
     '<!doctype html>',
     '<html lang="en">',
-    '<head><title>Browser Debug Smoke</title></head>',
+    '<head><title>Observation Smoke</title></head>',
     '<body>',
     '<h1>Smoke Page</h1>',
     '<button id="primary" onclick="document.getElementById(\'result\').textContent = \'Clicked\'">Primary Action</button>',
@@ -40,7 +40,7 @@ test('observe captures a local file page with Playwright', { skip: !runBrowserSm
   const body = JSON.parse(result.stdout);
   assert.equal(body.command, 'observe');
   assert.equal(body.status, 'ok');
-  assert.equal(body.data.title, 'Browser Debug Smoke');
+  assert.equal(body.data.title, 'Observation Smoke');
   assert.match(body.data.page.visible_text, /Smoke Page/);
   assert.equal(body.data.browser.ephemeral_context, true);
   assert.ok(body.data.page.action_candidates.some((candidate) => candidate.selector === '#primary'));
@@ -68,7 +68,7 @@ test('session action can click and observe the changed page', { skip: !runBrowse
   await writeFile(fixture, [
     '<!doctype html>',
     '<html lang="en">',
-    '<head><title>Browser Debug Session Smoke</title></head>',
+    '<head><title>Session Smoke</title></head>',
     '<body>',
     '<h1>Session Smoke Page</h1>',
     '<button id="primary" onclick="document.getElementById(\'result\').textContent = \'Clicked\'">Primary Action</button>',
@@ -114,7 +114,7 @@ test('session actions cover form controls and exported evidence', { skip: !runBr
   await writeFile(fixture, [
     '<!doctype html>',
     '<html lang="en">',
-    '<head><title>Browser Debug Action Smoke</title></head>',
+    '<head><title>Action Smoke</title></head>',
     '<body style="min-height: 2200px">',
     '<h1>Action Smoke Page</h1>',
     '<label>Name <input id="name" oninput="document.getElementById(\'name-result\').textContent = `Filled ${this.value}`"></label>',
@@ -139,8 +139,8 @@ test('session actions cover form controls and exported evidence', { skip: !runBr
   assert.equal(started.exitCode, 0);
   const sessionId = JSON.parse(started.stdout).data.session.id;
 
-  const filled = await runAction(cwd, sessionId, { type: 'fill', selector: '#name', value: 'Ada' });
-  assert.match(await observationText(cwd, filled), /Filled Ada/);
+  const filled = await runAction(cwd, sessionId, { type: 'fill', selector: '#name', value: 'Example User' });
+  assert.match(await observationText(cwd, filled), /Filled Example User/);
 
   const selected = await runAction(cwd, sessionId, { type: 'select', selector: '#mode', value: 'beta' });
   assert.match(await observationText(cwd, selected), /Mode beta/);
@@ -178,6 +178,65 @@ test('session actions cover form controls and exported evidence', { skip: !runBr
   const specArtifact = specBody.artifacts.find((artifact) => artifact.type === 'spec');
   assert.ok(specArtifact);
   await access(path.join(cwd, specArtifact.path));
+});
+
+test('supervise keeps one ephemeral context for ordered actions', { skip: !runBrowserSmoke }, async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-supervise-smoke-'));
+  await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
+  const fixture = path.join(cwd, 'fixture.html');
+  await writeFile(fixture, [
+    '<!doctype html>',
+    '<html lang="en">',
+    '<head><title>Supervision Smoke</title></head>',
+    '<body>',
+    '<h1>Supervise Smoke Page</h1>',
+    '<label>Name <input id="name" oninput="document.getElementById(\'result\').textContent = `Name ${this.value}`"></label>',
+    '<button id="primary" onclick="document.getElementById(\'clicked\').textContent = document.getElementById(\'name\').value">Apply</button>',
+    '<p id="result">Name pending</p>',
+    '<p id="clicked">Click pending</p>',
+    '</body>',
+    '</html>'
+  ].join('\n'), 'utf8');
+
+  const result = await executeCli([
+    'supervise',
+    '--url',
+    `file://${fixture}`,
+    '--actions',
+    JSON.stringify([
+      { type: 'fill', selector: '#name', value: 'Example User' },
+      { type: 'click', selector: '#primary' },
+      { type: 'observe' }
+    ]),
+    '--screenshot',
+    '--trace',
+    '--timeout',
+    '10000',
+    '--json'
+  ], { cwd });
+
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'supervise');
+  assert.equal(body.status, 'ok');
+  assert.equal(body.data.supervision.mode, 'supervised_ephemeral_context');
+  assert.equal(body.data.supervision.browser.existing_profile_reused, false);
+  assert.equal(body.data.supervision.action_history.length, 3);
+  assert.match(body.data.final_observation.page.visible_text, /Name Example User/);
+  assert.match(body.data.final_observation.page.visible_text, /Example User/);
+
+  const observations = body.artifacts.filter((artifact) => artifact.type === 'observation');
+  const screenshot = body.artifacts.find((artifact) => artifact.type === 'screenshot');
+  const trace = body.artifacts.find((artifact) => artifact.type === 'trace');
+  const supervision = body.artifacts.find((artifact) => artifact.type === 'supervision');
+  assert.equal(observations.length, 4);
+  assert.ok(screenshot);
+  assert.ok(trace);
+  assert.ok(supervision);
+  await access(path.join(cwd, observations.at(-1).path));
+  await access(path.join(cwd, screenshot.path));
+  await access(path.join(cwd, trace.path));
+  await access(path.join(cwd, supervision.path));
 });
 
 async function runAction(cwd, sessionId, action) {

@@ -5,14 +5,18 @@ import {
   artifactObject,
   artifactRelPath,
   createArtifactId,
-  ensureArtifactRoot,
-  writeJsonArtifact
+  ensureArtifactRoot
 } from './artifacts.js';
-import { redact, redactUrl, truncateText } from './redaction.js';
+import {
+  attachPageObservers,
+  collectPageState as collectPageStateFromPage,
+  createPageEventBuffers,
+  waitForNetworkIdle,
+  writePageObservation
+} from './page-evidence.js';
+import { redact, truncateText } from './redaction.js';
 
 const DEFAULT_TIMEOUT_MS = 15000;
-const MAX_CONSOLE_MESSAGES = 30;
-const MAX_FAILED_REQUESTS = 30;
 const SUPPORTED_PROTOCOLS = new Set(['http:', 'https:', 'file:']);
 
 export async function runObserve(options = {}, context = {}) {
@@ -73,84 +77,41 @@ export async function runObserve(options = {}, context = {}) {
     }
 
     const page = await browserContext.newPage();
-    const consoleMessages = [];
-    const failedRequests = [];
-
-    page.on('console', (message) => {
-      if (consoleMessages.length >= MAX_CONSOLE_MESSAGES) {
-        return;
-      }
-      consoleMessages.push({
-        type: message.type(),
-        text: truncateText(message.text(), 1000),
-        location: redact(message.location())
-      });
-    });
-
-    page.on('requestfailed', (request) => {
-      if (failedRequests.length >= MAX_FAILED_REQUESTS) {
-        return;
-      }
-      failedRequests.push({
-        url: redactUrl(request.url()),
-        method: request.method(),
-        failure: truncateText(request.failure()?.errorText ?? 'request failed', 500)
-      });
-    });
+    const pageEvents = createPageEventBuffers();
+    attachPageObservers(page, pageEvents);
 
     const response = await page.goto(options.url, { waitUntil: 'domcontentloaded', timeout });
-    try {
-      await page.waitForLoadState('networkidle', { timeout: Math.min(3000, timeout) });
-    } catch {
-      warnings.push({
-        code: 'NETWORK_IDLE_TIMEOUT',
-        message: 'The page did not reach networkidle before the short observation wait ended.',
-        details: { timeout_ms: Math.min(3000, timeout) }
-      });
-    }
+    await waitForNetworkIdle(page, timeout, warnings);
 
     for (const action of context.actions ?? []) {
       await performPageAction(page, action, timeout);
     }
 
-    const pageState = await collectPageState(page);
-    const finalUrl = page.url();
-    const observation = redact({
+    const observationResult = await writePageObservation({
+      root,
+      artifactRoot: artifactRootInput,
       id,
-      observed_at: now.toISOString(),
-      input_url: redactUrl(options.url),
-      final_url: redactUrl(finalUrl),
-      title: pageState.title,
-      response: response
-        ? {
-            status: response.status(),
-            ok: response.ok(),
-            url: redactUrl(response.url())
-          }
-        : null,
+      now,
+      page,
+      inputUrl: options.url,
+      response,
       browser: {
         engine: 'chromium',
         headless,
         devtools: Boolean(options.devtools),
         ephemeral_context: true
       },
-      page: pageState,
-      console: { messages: consoleMessages },
-      network: { failed_requests: failedRequests },
-      action_results: (context.actions ?? []).map((action) => ({
+      consoleMessages: pageEvents.consoleMessages,
+      failedRequests: pageEvents.failedRequests,
+      actionResults: (context.actions ?? []).map((action) => ({
         type: action.type,
         selector: action.selector ? truncateText(action.selector, 500) : undefined,
         status: 'applied'
-      }))
-    });
-
-    const observationRel = artifactRelPath(artifactRootInput, 'observations', `${id}.json`);
-    await writeJsonArtifact(root, ['observations', `${id}.json`], observation);
-    artifacts.push(artifactObject({
-      type: 'observation',
-      path: observationRel,
+      })),
       description: 'Structured page observation JSON.'
-    }));
+    });
+    const observation = observationResult.data;
+    artifacts.push(observationResult.artifact);
 
     if (options.screenshot || context.forceScreenshot) {
       const screenshotRel = artifactRelPath(artifactRootInput, 'screenshots', `${id}.png`);
@@ -231,7 +192,7 @@ export function validateUrl(value) {
   }
 }
 
-function normalizeTimeout(value) {
+export function normalizeTimeout(value) {
   if (value === undefined) {
     return DEFAULT_TIMEOUT_MS;
   }
@@ -271,7 +232,7 @@ function classifyObserveError(error) {
   return 'OBSERVE_FAILED';
 }
 
-async function performPageAction(page, action, timeout) {
+export async function performPageAction(page, action, timeout) {
   switch (action.type) {
     case 'click':
       await page.locator(required(action.selector, 'selector')).first().click({ timeout });
@@ -312,117 +273,4 @@ function required(value, key) {
   return value;
 }
 
-async function collectPageState(page) {
-  const state = await page.evaluate(() => {
-    const trim = (value, max = 500) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
-    const isVisible = (element) => {
-      const style = window.getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
-    };
-    const cssEscape = (value) => {
-      if (window.CSS?.escape) {
-        return window.CSS.escape(value);
-      }
-      return String(value).replace(/["\\]/g, '\\$&');
-    };
-      const selectorFor = (element) => {
-        if (element.id) {
-          return `#${cssEscape(element.id)}`;
-        }
-      const testId = element.getAttribute('data-testid');
-      if (testId) {
-        return `[data-testid="${cssEscape(testId)}"]`;
-      }
-      const dataTest = element.getAttribute('data-test');
-      if (dataTest) {
-        return `[data-test="${cssEscape(dataTest)}"]`;
-      }
-      const aria = element.getAttribute('aria-label');
-      if (aria) {
-        return `${element.tagName.toLowerCase()}[aria-label="${cssEscape(aria)}"]`;
-      }
-      const name = element.getAttribute('name');
-      if (name) {
-        return `${element.tagName.toLowerCase()}[name="${cssEscape(name)}"]`;
-      }
-      const segments = [];
-      let current = element;
-      while (current && current.nodeType === Node.ELEMENT_NODE && current !== document.documentElement) {
-        let segment = current.tagName.toLowerCase();
-        if (current.id) {
-          segment += `#${cssEscape(current.id)}`;
-          segments.unshift(segment);
-          break;
-        }
-        const parent = current.parentElement;
-        if (!parent) {
-          segments.unshift(segment);
-          break;
-        }
-        const siblings = [...parent.children].filter((child) => child.tagName === current.tagName);
-        if (siblings.length > 1) {
-          segment += `:nth-of-type(${siblings.indexOf(current) + 1})`;
-        }
-        segments.unshift(segment);
-        current = parent;
-      }
-      return segments.join(' > ');
-    };
-    const candidates = [...document.querySelectorAll('a, button, input, select, textarea, [role="button"], [role="link"]')]
-      .filter(isVisible)
-      .slice(0, 60)
-      .map((element) => ({
-        tag: element.tagName.toLowerCase(),
-        role: element.getAttribute('role') || null,
-        text: trim(element.innerText || element.textContent || element.getAttribute('aria-label') || element.getAttribute('placeholder') || ''),
-        selector: selectorFor(element),
-        href: element instanceof HTMLAnchorElement ? element.href : null,
-        input_type: element instanceof HTMLInputElement ? element.type : null,
-        disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true')
-      }));
-    const headings = [...document.querySelectorAll('h1, h2, h3')]
-      .filter(isVisible)
-      .slice(0, 30)
-      .map((element) => ({
-        level: Number(element.tagName.slice(1)),
-        text: trim(element.innerText || element.textContent || '', 300),
-        selector: selectorFor(element)
-      }));
-    const forms = [...document.querySelectorAll('form')]
-      .slice(0, 20)
-      .map((form) => ({
-        selector: selectorFor(form),
-        controls: [...form.querySelectorAll('input, select, textarea, button')]
-          .filter(isVisible)
-          .slice(0, 40)
-          .map((element) => ({
-            tag: element.tagName.toLowerCase(),
-            selector: selectorFor(element),
-            name: element.getAttribute('name') || null,
-            type: element instanceof HTMLInputElement ? element.type : null,
-            label: trim(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.innerText || '', 300)
-          }))
-      }));
-    return {
-      url: window.location.href,
-      title: document.title,
-      ready_state: document.readyState,
-      language: document.documentElement.lang || null,
-      viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight
-      },
-      visible_text: trim(document.body?.innerText || '', 4000),
-      headings,
-      action_candidates: candidates,
-      forms
-    };
-  });
-
-  return redact({
-    ...state,
-    url: redactUrl(state.url),
-    visible_text: truncateText(state.visible_text, 4000)
-  });
-}
+export const collectPageState = collectPageStateFromPage;

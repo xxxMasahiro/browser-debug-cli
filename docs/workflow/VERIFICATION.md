@@ -32,10 +32,11 @@ From `/home/masahiro/projects/ai-driven-development-lesson`:
 
 ## Current Runtime Checks
 
-The current implementation includes command parser tests, deterministic JSON error tests, `doctor` tests, headed/devtools launch-mode tests, session/report/spec tests, redaction tests, local package dry-run verification, and Playwright smoke tests for local file observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, and spec export. Manual local checks can use:
+The current implementation includes command parser tests, deterministic JSON error tests, `doctor` tests, headed/devtools launch-mode tests, session/report/spec tests, redaction tests, architecture regressions for generic runtime boundaries and shared evidence helpers, local package dry-run verification, and Playwright smoke tests for local file observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, spec export, and process-scoped supervision. Manual local checks can use:
 
 ```bash
-node ./bin/browser-debug.js observe --url http://127.0.0.1:5173/ --screenshot --trace --timeout 15000 --json
+node ./bin/browser-debug.js observe --url http://127.0.0.1:3000/ --screenshot --trace --timeout 15000 --json
+node ./bin/browser-debug.js supervise --url http://127.0.0.1:3000/ --actions '[{"type":"observe"}]' --timeout 15000 --json
 ```
 
 For this session, `http://127.0.0.1:5173/` was observed successfully with screenshot and trace artifacts, and `http://127.0.0.1:5174/` was not listening.

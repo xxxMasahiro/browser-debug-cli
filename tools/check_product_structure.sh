@@ -27,8 +27,11 @@ for rel in \
   package-lock.json \
   bin/browser-debug.js \
   src/cli.js \
+  src/page-evidence.js \
   src/observe.js \
   src/sessions.js \
+  src/supervisor.js \
+  tests/architecture.test.js \
   tests/cli.test.js \
   tests/browser-smoke.test.js \
   docs/product/REQUIREMENTS.md \

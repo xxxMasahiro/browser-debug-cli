@@ -3,6 +3,7 @@ import { runDoctor } from './doctor.js';
 import { createEnvelope, createErrorEnvelope, stringifyEnvelope } from './envelope.js';
 import { runObserve } from './observe.js';
 import { parseCliArgs } from './parser.js';
+import { runSupervisor } from './supervisor.js';
 import {
   buildReport,
   closeSession,
@@ -82,6 +83,10 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'observe') {
       return runtimeResult(parsed.command, await (context.observeRunner ?? runObserve)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'supervise') {
+      return runtimeResult(parsed.command, await (context.supervisorRunner ?? runSupervisor)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'session start') {
@@ -223,6 +228,21 @@ function usageText(topic) {
     ].join('\n');
   }
 
+  if (topic === 'supervise') {
+    return [
+      `Usage: ${CLI_NAME} supervise --url <url> [--actions <json-array>] [--json]`,
+      '',
+      'Options:',
+      '  --url <url>              Absolute http, https, or file URL to inspect.',
+      '  --actions <json-array>   Ordered actions applied in one ephemeral browser context.',
+      `  --artifact-root <path>   Local artifact root. Default: ${DEFAULT_ARTIFACT_ROOT}`,
+      '  --headed                 Run supervision in a visible browser.',
+      '  --devtools               Run supervision in a visible browser with DevTools.',
+      '  --screenshot             Capture a final full-page screenshot.',
+      '  --trace                  Capture one local Playwright trace zip for the supervised run.'
+    ].join('\n');
+  }
+
   if (topic === 'doctor') {
     return `Usage: ${CLI_NAME} doctor [--json]`;
   }
@@ -237,6 +257,7 @@ function usageText(topic) {
     'Commands:',
     '  doctor',
     '  observe --url <url> --json',
+    '  supervise --url <url> [--actions <json-array>] --json',
     '  session start [--url <url>]',
     '  session close --session <id>',
     '  act --session <id> --action <json>',

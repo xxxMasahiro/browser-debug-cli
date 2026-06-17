@@ -56,7 +56,7 @@ test('observe requires an absolute URL', async () => {
 
 test('observe parses a URL and returns a deterministic JSON envelope', async () => {
   const result = await executeCli(
-    ['observe', '--url', 'http://127.0.0.1:5173/', '--trace', '--json'],
+    ['observe', '--url', 'https://example.test/', '--trace', '--json'],
     {
       now: fixedNow,
       observeRunner: async (options) => ({
@@ -80,7 +80,7 @@ test('observe parses a URL and returns a deterministic JSON envelope', async () 
   assert.equal(body.command, 'observe');
   assert.equal(body.status, 'ok');
   assert.equal(body.data.id, 'observation-fixed');
-  assert.equal(result.envelope.data.input_url, 'http://127.0.0.1:5173/');
+  assert.equal(result.envelope.data.input_url, 'https://example.test/');
   assert.equal(body.artifacts[0].type, 'observation');
 });
 
@@ -91,6 +91,36 @@ test('parser keeps the planned session command surface explicit', () => {
   assert.equal(parsed.command, 'session close');
   assert.equal(parsed.json, true);
   assert.equal(parsed.options.session, 'abc123');
+});
+
+test('supervise parses actions and returns a deterministic JSON envelope', async () => {
+  const result = await executeCli(
+    ['supervise', '--url', 'https://example.test/', '--actions', '[{"type":"observe"}]', '--json'],
+    {
+      now: fixedNow,
+      supervisorRunner: async (options) => ({
+        status: 'ok',
+        data: {
+          supervision: {
+            id: 'supervision-fixed',
+            current_url: options.url,
+            action_history: JSON.parse(options.actions)
+          },
+          final_observation: { title: 'Supervision Fixture' }
+        },
+        warnings: [],
+        errors: [],
+        artifacts: [{ type: 'supervision', path: '.browser-debug/sessions/supervision-fixed.json' }]
+      })
+    }
+  );
+
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'supervise');
+  assert.equal(body.status, 'ok');
+  assert.equal(body.data.supervision.id, 'supervision-fixed');
+  assert.equal(body.data.supervision.action_history[0].type, 'observe');
 });
 
 test('session start, act, report, and spec export use local artifacts', async () => {
@@ -117,22 +147,22 @@ test('session start, act, report, and spec export use local artifacts', async ()
   };
 
   const started = await executeCli(
-    ['session', 'start', '--url', 'http://127.0.0.1:5173/', '--json'],
+    ['session', 'start', '--url', 'https://example.test/', '--json'],
     context
   );
   assert.equal(started.exitCode, 0);
   const startedBody = JSON.parse(started.stdout);
   assert.equal(startedBody.data.session.id, 'session-fixed');
-  assert.equal(startedBody.data.session.current_url, 'http://127.0.0.1:5173/');
+  assert.equal(startedBody.data.session.current_url, 'https://example.test/');
 
   const acted = await executeCli(
-    ['act', '--session', 'session-fixed', '--action', '{"type":"navigate","url":"http://127.0.0.1:5174/"}', '--json'],
+    ['act', '--session', 'session-fixed', '--action', '{"type":"navigate","url":"https://example.test/next"}', '--json'],
     context
   );
   assert.equal(acted.exitCode, 0);
   const actedBody = JSON.parse(acted.stdout);
   assert.equal(actedBody.data.action_result.type, 'navigate');
-  assert.equal(actedBody.data.session.current_url, 'http://127.0.0.1:5174/');
+  assert.equal(actedBody.data.session.current_url, 'https://example.test/next');
 
   const reported = await executeCli(['report', '--session', 'session-fixed', '--json'], context);
   assert.equal(reported.exitCode, 0);

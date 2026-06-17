@@ -13,6 +13,8 @@ All notable local development changes are tracked here before public release.
 - Added browser smoke coverage for observation, screenshots/traces, actions, forms, keyboard input, deterministic scroll, reports, and spec export.
 - Added headed/devtools launch-mode regression coverage without requiring a GUI display.
 - Added local package dry-run verification with `npm run test:pack`.
+- Added `supervise` for one process-scoped ephemeral browser context with ordered actions.
+- Added architecture regressions for generic runtime boundaries, shared page evidence helpers, and local Node CLI packaging.
 
 ## Release Status
 

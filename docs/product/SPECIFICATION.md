@@ -24,6 +24,7 @@ browser-debug doctor
 browser-debug session start
 browser-debug session close --session <id>
 browser-debug observe --url <url> --json
+browser-debug supervise --url <url> --actions <json-array> --json
 browser-debug act --session <id> --action <json>
 browser-debug report --session <id>
 browser-debug spec export --session <id>
@@ -51,11 +52,12 @@ Implemented behavior:
 - `observe --trace` writes a local Playwright trace zip and emits a warning because traces can contain page content.
 - `observe --headed` launches a visible browser mode when the host environment supports it.
 - `observe --devtools` launches visible browser mode with DevTools enabled when the host environment supports it.
+- `supervise --url <url> --actions <json-array>` launches one ephemeral Chromium context, applies ordered local actions in that same process-scoped context, writes observation metadata for the initial page and each action, writes local supervision metadata under `.browser-debug/sessions/`, and closes the context before process exit.
 - `session start --url <url>` creates local session metadata and can attach the first observation.
 - `act --session <id> --action <json>` supports simple local actions such as `navigate`, `observe`, `screenshot`, `click`, `fill`, `select`, `press`, `scroll`, and `wait` using an ephemeral page visit. Scroll actions use deterministic page scrolling from the requested deltas.
 - `report --session <id>` writes a Markdown report.
 - `spec export --session <id>` writes a JSON action/spec export.
-- `npm test` runs deterministic no-browser tests, including headed/devtools launch-mode regression through an injected Playwright browser type. `npm run test:browser` runs Playwright smoke tests for observation, screenshots/traces, click actions, form controls, keyboard input, scroll, wait, reports, and spec export.
+- `npm test` runs deterministic no-browser tests, including headed/devtools launch-mode regression through an injected Playwright browser type and architecture regressions for generic runtime boundaries, shared page evidence helpers, and local Node CLI packaging. `npm run test:browser` runs Playwright smoke tests for observation, screenshots/traces, click actions, form controls, keyboard input, scroll, wait, reports, spec export, and supervised ordered actions.
 - `npm run test:pack` runs `npm pack --dry-run --json` with an ignored local npm cache to verify the package file set without publishing.
 - `CHANGELOG.md` and `docs/workflow/RELEASE.md` track unreleased local changes, release blockers, local readiness checks, and no-publish boundaries.
 
@@ -67,7 +69,7 @@ The package is marked `private` and `UNLICENSED` until public release naming, li
 - `headed`: visible browser mode for final UI/UX quality, animation, hover, focus, and operation feel.
 - `devtools`: headed mode with DevTools for targeted inspection.
 
-Long-running browser supervision is opt-in. The default `observe` path should launch an ephemeral context, collect the requested evidence, close cleanly, and avoid reusing a user's normal browser profile.
+Long-running browser supervision is opt-in through `supervise`. It is process-scoped, uses an ephemeral context, does not reuse a user's normal browser profile, and closes before CLI exit. The default `observe` path still launches an ephemeral context, collects the requested evidence, and closes cleanly after one page observation.
 
 ## AI Interaction Contract
 
@@ -125,7 +127,7 @@ Errors must be structured and non-secret-bearing. Page content, console output, 
 - Artifact root paths must stay inside the current workspace.
 - Observation and report data applies basic redaction to common secret-like strings and sensitive URL query parameters.
 - Trace zip files are raw local evidence and can contain unredacted page content. They must remain under ignored `.browser-debug/` paths unless a future approved workflow defines safer handling.
-- The current session model is file-backed metadata, not a long-running browser supervisor.
+- Supervision is process-scoped only. It does not create a background daemon, persistent browser profile, persistent storage state, external control channel, or reusable browser after CLI exit.
 
 ## OSS Workflow Contract
 
@@ -162,7 +164,7 @@ The current repository only implements local release readiness documentation and
 
 ## Out of Scope for the Current Local MVP
 
-- Long-running browser supervision.
+- Background browser daemons or cross-process browser supervision.
 - Existing browser profile reuse.
 - Authentication automation, OAuth flows, webhook handling, external upload, and credential storage.
 - Remote trace storage or trace upload.

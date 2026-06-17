@@ -69,10 +69,11 @@
 - Implement command parsing and deterministic JSON error output. Completed for the planned command surface.
 - Implement one-shot `observe`. Completed with Playwright-backed ephemeral Chromium contexts.
 - Implement session start and simple actions. Completed for file-backed local session metadata and ephemeral action execution.
+- Implement opt-in process-scoped browser supervision. Completed with `supervise --url <url> --actions <json-array>`.
 - Implement artifact directory handling. Completed for sessions, observations, screenshots, traces, reports, and spec exports under `.browser-debug/`.
 - Add focused tests for command parsing, observation output, action coverage, and safety boundaries. Completed with `npm test` and `npm run test:browser`.
 - Add headed/devtools launch-mode regression coverage. Completed with deterministic no-GUI tests in `npm test`.
-- Keep long-running browser supervision, authentication automation, and external upload for later approved phases.
+- Keep background browser daemons, authentication automation, and external upload for later approved phases.
 
 ### Phase 6: Release
 
@@ -90,7 +91,7 @@
 - lesson-side `product-scaffold-check` with this repository path.
 - lesson-side `product-repository-authority status` with this repository path.
 - `check_workflow_pair_sync.sh --repo <this-repo>`.
-- Current local runtime checks include command parser tests, JSON error tests, `doctor` tests, headed/devtools launch-mode tests, session/report/spec tests, redaction tests, Playwright browser smoke tests with screenshots, traces, click/form/keyboard/scroll/wait actions, local package dry-run verification, Control Center observation, and aggregate product-gate execution.
+- Current local runtime checks include command parser tests, JSON error tests, `doctor` tests, headed/devtools launch-mode tests, session/report/spec tests, redaction tests, architecture regressions for generic runtime boundaries and shared evidence helpers, Playwright browser smoke tests with screenshots, traces, click/form/keyboard/scroll/wait actions, supervised ordered actions, local package dry-run verification, Control Center observation, and aggregate product-gate execution.
 - Later release work should add CI coverage, real headed visual checks where a display is available, public package naming, license selection, and npm publication after approval.
 
 ## Recovery Path
@@ -102,7 +103,7 @@
 
 ## Approval Boundaries
 
-- Ask before new runtime phases that expand browser supervision, authentication, external upload, profile reuse, or credential handling.
+- Ask before new runtime phases that add background browser daemons, authentication, external upload, profile reuse, or credential handling.
 - Ask before new dependency installation or network use.
 - Ask before commit, push, branch deletion, or remote changes.
 - Ask before `gh repo create` or any public GitHub action.

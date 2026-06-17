@@ -18,6 +18,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Provide a Node.js package layout with a stable local CLI binary before public release work starts.
 - Support fast headless observation for routine debugging.
 - Support headed browser and DevTools workflows for visual quality, animations, hover, focus, scroll, and final interaction checks.
+- Support an opt-in process-scoped supervised browser run for ordered local actions when one-shot observation is too slow.
 - Return structured page observations suitable for AI decision making.
 - Provide explicit action candidates instead of requiring raw DOM scraping.
 - Record reproducible artifacts such as screenshots, traces, console messages, network summaries, and issue reports.
@@ -61,9 +62,11 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - `observe --screenshot` writes a local screenshot artifact without committing it.
 - `observe --trace` writes a local Playwright trace artifact and warns that traces can contain page content.
 - `session start`, `act`, `report`, and `spec export` operate on local `.browser-debug/` session metadata.
+- `supervise --url <url> --actions <json-array>` keeps one ephemeral browser context alive for ordered local actions within a single CLI process and closes it before exit.
 - Page text, console messages, URLs, action data, and generated reports are treated as untrusted data and pass through basic secret redaction.
-- Browser smoke tests verify local file observation, click actions, form controls, keyboard input, deterministic scroll, screenshots, reports, and spec export without using external services.
+- Browser smoke tests verify local file observation, click actions, form controls, keyboard input, deterministic scroll, screenshots, reports, spec export, and process-scoped supervision without using external services.
 - Headed and DevTools mode regression tests verify Playwright launch-mode wiring without requiring a GUI display.
+- Architecture regression tests check for generic runtime boundaries, shared page evidence helpers, and local Node CLI packaging.
 - Local package dry-run verification confirms the npm package file set without publishing.
 - Release readiness notes track the unreleased status, public-release blockers, and no-publish boundaries.
 

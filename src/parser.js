@@ -1,5 +1,6 @@
 const VALUE_OPTIONS = new Set([
   'action',
+  'actions',
   'artifact-root',
   'session',
   'timeout',
@@ -42,6 +43,8 @@ export function parseCliArgs(argv) {
       return parseNoArgCommand('doctor', args, globals);
     case 'observe':
       return parseObserve(args, globals);
+    case 'supervise':
+      return parseSupervise(args, globals);
     case 'session':
       return parseSession(args, globals);
     case 'act':
@@ -134,6 +137,38 @@ function parseObserve(args, globals) {
   }
 
   return { ok: true, command: 'observe', json: globals.json, options: parsed.options };
+}
+
+function parseSupervise(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: 'supervise' } };
+  }
+
+  const parsed = parseOptions('supervise', args, globals.json);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  if (parsed.positionals.length > 0) {
+    return parseError('supervise', globals.json, {
+      code: 'UNEXPECTED_ARGUMENT',
+      message: 'supervise does not accept positional arguments.',
+      details: { argument: parsed.positionals[0] }
+    });
+  }
+  if (!parsed.options.url) {
+    return parseError('supervise', globals.json, {
+      code: 'MISSING_REQUIRED_OPTION',
+      message: 'supervise requires --url <url>.',
+      details: { option: 'url' }
+    });
+  }
+
+  const urlError = validateUrl(parsed.options.url);
+  if (urlError) {
+    return parseError('supervise', globals.json, urlError);
+  }
+
+  return { ok: true, command: 'supervise', json: globals.json, options: parsed.options };
 }
 
 function parseSession(args, globals) {
@@ -325,6 +360,7 @@ function plannedCommands() {
   return [
     'doctor',
     'observe',
+    'supervise',
     'session start',
     'session close',
     'act',

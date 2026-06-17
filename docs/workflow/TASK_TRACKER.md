@@ -38,11 +38,14 @@ This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and H
 - [x] Implemented local artifact handling for observations, screenshots, sessions, reports, and spec exports under ignored `.browser-debug/`.
 - [x] Implemented `observe --trace` with local Playwright trace zip artifacts and trace-content warnings.
 - [x] Implemented `session start`, `session close`, simple `act`, `report`, and `spec export`.
+- [x] Implemented `supervise --url <url> --actions <json-array>` for process-scoped ephemeral browser supervision.
 - [x] Added browser smoke tests for local file observation and click actions.
 - [x] Strengthened browser smoke coverage for form controls, keyboard input, deterministic scroll, wait actions, screenshots, reports, and spec export.
 - [x] Added deterministic headed/devtools launch-mode regression coverage without requiring a GUI display.
 - [x] Added `npm run test:pack` local package dry-run verification and aggregate gate wiring.
 - [x] Added local release readiness notes in `CHANGELOG.md` and `docs/workflow/RELEASE.md`.
+- [x] Added browser smoke coverage for supervised ordered actions in one ephemeral context.
+- [x] Added architecture regression coverage for generic runtime boundaries, shared evidence helpers, and local Node CLI packaging.
 - [x] Verified the running Dashboard Control Center at `http://127.0.0.1:5173/` with screenshot and trace capture.
 - [x] Confirmed `http://127.0.0.1:5174/` was not listening during verification.
 - [x] Re-ran product-local `./tools/product-gate`, `npm test`, `npm run test:browser`, and `git diff --check`.
@@ -50,7 +53,11 @@ This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and H
 
 ## Remaining Work
 
-- [ ] If approved later, implement long-running browser supervision.
+No remaining local MVP implementation work is currently planned.
+
+## Future Approval-Bound Work
+
+- [ ] If approved later, implement background browser daemon supervision.
 - [ ] If approved later, run real headed visual regression checks in an environment with a display.
 - [ ] If approved later, create the public GitHub repository with `gh`.
 - [ ] If approved later, add CI manifests and GitHub Actions.
@@ -59,7 +66,7 @@ This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and H
 
 ## Next Step
 
-Ask for explicit approval before long-running browser supervision, trace capture expansion, authentication automation, external upload, existing-browser-profile reuse, credential storage, GitHub repository creation, remote setup, push, CI, or npm publication.
+Ask for explicit approval before background browser daemon supervision, trace capture expansion, authentication automation, external upload, existing-browser-profile reuse, credential storage, GitHub repository creation, remote setup, push, CI, or npm publication.
 
 ## Stop Conditions
 

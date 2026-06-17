@@ -28,13 +28,13 @@ Current design baseline:
 - First implementation slice: `doctor`, command parsing, deterministic JSON errors, and focused tests.
 - First Playwright slice: one-shot `observe --url <url> --json`.
 - Artifact root: ignored `.browser-debug/`.
-- Long-running browser supervision: opt-in after one-shot observation is stable.
+- Browser supervision: process-scoped and opt-in after one-shot observation is stable.
 
 ## Local MVP Runtime
 
 - Runtime dependency: `playwright`.
-- Implemented commands: `doctor`, `observe`, `session start`, `session close`, `act`, `report`, and `spec export`.
+- Implemented commands: `doctor`, `observe`, `supervise`, `session start`, `session close`, `act`, `report`, and `spec export`.
 - Artifact root: ignored `.browser-debug/`.
 - Default browser behavior: ephemeral Chromium context per observation/action.
-- Verification: `npm test`, `npm run test:browser`, `npm run test:pack`, `./tools/product-gate`, and local Dashboard Control Center observation. Coverage includes headed/devtools launch-mode checks, observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, spec export, and local package dry-run verification.
+- Verification: `npm test`, `npm run test:browser`, `npm run test:pack`, `./tools/product-gate`, and local Dashboard Control Center observation. Coverage includes headed/devtools launch-mode checks, architecture regressions for generic runtime boundaries and shared helpers, observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, supervised ordered actions, reports, spec export, and local package dry-run verification.
 - Release readiness: `CHANGELOG.md` and `docs/workflow/RELEASE.md` exist, but public package naming, license changes, GitHub publication, CI, and npm publication remain approval-bound.

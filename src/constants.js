@@ -7,6 +7,7 @@ export const DEFAULT_ARTIFACT_ROOT = '.browser-debug';
 export const PLANNED_COMMANDS = Object.freeze([
   'doctor',
   'observe',
+  'supervise',
   'session start',
   'session close',
   'act',

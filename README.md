@@ -20,13 +20,14 @@ This repository has completed the Free Development scaffold, local Git initializ
 
 ```bash
 node ./bin/browser-debug.js doctor --json
-node ./bin/browser-debug.js observe --url http://127.0.0.1:5173/ --screenshot --trace --json
+node ./bin/browser-debug.js observe --url http://127.0.0.1:3000/ --screenshot --trace --json
+node ./bin/browser-debug.js supervise --url http://127.0.0.1:3000/ --actions '[{"type":"observe"}]' --json
 npm test
 npm run test:browser
 npm run test:pack
 ```
 
-Artifacts are written under ignored `.browser-debug/` directories. Trace artifacts can contain page content and must remain local. `npm test` runs deterministic no-browser tests; `npm run test:browser` launches local Chromium for smoke coverage; `npm run test:pack` runs a local dry-run package check without publishing.
+Artifacts are written under ignored `.browser-debug/` directories. Trace artifacts can contain page content and must remain local. `supervise` keeps one ephemeral browser context alive only for that CLI process and closes it before exit. `npm test` runs deterministic no-browser tests; `npm run test:browser` launches local Chromium for smoke coverage; `npm run test:pack` runs a local dry-run package check without publishing.
 
 ## Canonical Documents
 
