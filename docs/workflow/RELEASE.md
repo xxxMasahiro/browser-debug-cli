@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Browser Debug CLI is not released. The repository has local MVP runtime coverage, Phase 7 review-platform coverage, Phase 8 dogfood/plugin-readiness coverage, Phase 9 local review-quality coverage, Phase 10 route-readiness coverage, Phase 11 page-expectation and artifact-index coverage, Phase 12 rendered-state dogfood hardening coverage, Phase 14 content UX advisory coverage, Phase 15 content UX heuristic coverage, Phase 16 content UX handoff coverage, a public GitHub repository, remote `main` synchronization, passing GitHub Actions `main` CI, CI manifest validation, and local package dry-run verification.
+Browser Debug CLI is not released. The repository has local MVP runtime coverage, Phase 7 review-platform coverage, Phase 8 dogfood/plugin-readiness coverage, Phase 9 local review-quality coverage, Phase 10 route-readiness coverage, Phase 11 page-expectation and artifact-index coverage, Phase 12 rendered-state dogfood hardening coverage, Phase 14 content UX advisory coverage, Phase 15 content UX heuristic coverage, Phase 16 content UX handoff coverage, Phase 17 content UX practical handoff coverage, a public GitHub repository, remote `main` synchronization, passing GitHub Actions `main` CI, CI manifest validation, and local package dry-run verification.
 
 ## Local Release Readiness Checks
 
@@ -30,7 +30,7 @@ npm pack --dry-run --json --cache .tmp/npm-cache
 - Confirm npm account, token handling, and publication method only after approval.
 - Decide whether and where to register the local Codex plugin bundle.
 - Treat `quality_signals.release_readiness` as a local review gate only; it does not authorize package publication or marketplace registration.
-- Treat `quality_signals.content_ux`, `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, and `content_ux_readiness` as advisory-only target review output; they do not authorize package publication, marketplace registration, or external evidence transfer.
+- Treat `quality_signals.content_ux`, `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, `content_ux_page_handoff`, and `content_ux_manifest_authoring` as advisory-only target review output; they do not authorize package publication, marketplace registration, external evidence transfer, or automatic manifest mutation.
 - Treat `artifact_index` as local artifact inventory and rerun guidance only; it does not authorize evidence transfer.
 - Do not upload traces, screenshots, session files, cookies, storage state, credentials, or `.browser-debug/` artifacts.
 - Keep model/API review, evidence leaving the local process, HTTP/socket MCP server mode, OAuth/login automation, and external upload approval-bound.

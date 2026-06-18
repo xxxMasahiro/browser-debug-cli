@@ -320,6 +320,9 @@ test('local content UX advisory is manifest opt-in and does not expose source va
   assert.equal(matched.action_plan.gate_effect, 'none');
   assert.equal(matched.readiness.status, 'passed');
   assert.equal(matched.readiness.legacy_release_readiness_unchanged, true);
+  assert.equal(matched.page_handoff.summary.pages, 1);
+  assert.equal(matched.page_handoff.summary.pages_with_findings, 0);
+  assert.equal(matched.manifest_authoring.status, 'advisory_notes');
   assert.doesNotMatch(JSON.stringify(matched), /Current local run is healthy/);
 
   const mismatched = buildLocalContentUxAdvisory({
@@ -343,9 +346,13 @@ test('local content UX advisory is manifest opt-in and does not expose source va
   assert.equal(mismatched.action_plan.status, 'needs_content_owner_review');
   assert.equal(mismatched.action_plan.legacy_action_plan_unchanged, true);
   assert.equal(mismatched.action_plan.total_action_items, 1);
+  assert.equal(mismatched.action_plan.page_focus[0].page_id, 'overview');
   assert.equal(mismatched.readiness.status, 'needs_content_owner_review');
   assert.equal(mismatched.readiness.gate_effect, 'none');
   assert.equal(mismatched.readiness.blocking_release_gate, false);
+  assert.equal(mismatched.page_handoff.summary.pages_with_findings, 1);
+  assert.equal(mismatched.page_handoff.pages[0].status, 'needs_content_owner_review');
+  assert.ok(mismatched.manifest_authoring.suggestions.some((suggestion) => suggestion.type === 'add_user_questions'));
   assert.doesNotMatch(JSON.stringify(mismatched), /Current local run is healthy/);
 });
 
@@ -470,12 +477,16 @@ test('local content UX advisory supports selector-scoped state contracts and use
   assert.ok(mismatch.signals.some((signal) => signal.id === 'content_ux_user_question_not_answered'));
   assert.equal(mismatch.findings.length, 4);
   assert.ok(mismatch.findings.some((finding) => finding.category === 'content_contract'));
+  assert.ok(mismatch.findings.some((finding) => finding.category === 'workflow_state_clarity'));
   assert.ok(mismatch.findings.some((finding) => finding.category === 'information_architecture'));
   assert.equal(mismatch.action_plan.total_action_items, mismatch.findings.length);
   assert.equal(mismatch.action_plan.status, 'needs_content_owner_review');
   assert.equal(mismatch.action_plan.gate_effect, 'none');
+  assert.equal(mismatch.action_plan.page_focus[0].page_id, 'status');
   assert.equal(mismatch.readiness.status, 'needs_content_owner_review');
   assert.equal(mismatch.readiness.content_owner_review_required, true);
+  assert.equal(mismatch.readiness.page_handoff.pages_with_findings, 1);
+  assert.equal(mismatch.page_handoff.pages.find((page) => page.page_id === 'status').top_categories.includes('workflow_state_clarity'), true);
   assert.doesNotMatch(JSON.stringify(mismatch), /"clean"|"complete"|"minor"/);
 
   const questionOnly = normalizeTargetManifest({
@@ -515,6 +526,50 @@ test('local content UX advisory supports selector-scoped state contracts and use
   assert.equal(questionOnlyAdvisory.counts.user_questions_answered, 1);
   assert.equal(questionOnlyAdvisory.action_plan.status, 'advisory_notes');
   assert.ok(questionOnlyAdvisory.findings.some((finding) => finding.category === 'coverage_contract'));
+
+  const userJourneyGap = normalizeTargetManifest({
+    baseUrl: 'https://example.test/app',
+    pages: [{
+      name: 'Next Action',
+      path: '/next',
+      expectations: {
+        userQuestions: [{
+          id: 'next-action',
+          question: 'Can users identify the next action?',
+          expectedEvidence: ['Run checks'],
+          severity: 'medium'
+        }, {
+          id: 'details-navigation',
+          question: 'Can users find the details page?',
+          expectedEvidence: ['Open details'],
+          severity: 'medium'
+        }]
+      }
+    }],
+    localContentUxAdvisory: {
+      enabled: true,
+      audience: ['operators'],
+      goal: 'Explain next actions and navigation.'
+    }
+  });
+  const userJourneyGapAdvisory = buildLocalContentUxAdvisory({
+    target: userJourneyGap.target,
+    routeReviews: [{
+      route: { url: userJourneyGap.target.pages[0].url },
+      manifest_page_id: 'next-action',
+      viewport: { name: 'desktop' },
+      evidenceSummary: {
+        visible_text: 'Overview only.',
+        visible_text_length: 14,
+        elements: []
+      }
+    }]
+  });
+  assert.ok(userJourneyGapAdvisory.findings.some((finding) => finding.category === 'next_action_clarity'));
+  assert.ok(userJourneyGapAdvisory.findings.some((finding) => finding.category === 'navigation_clarity'));
+  assert.equal(userJourneyGapAdvisory.page_handoff.summary.pages_with_findings, 1);
+  assert.ok(userJourneyGapAdvisory.manifest_authoring.suggestions.some((suggestion) => suggestion.type === 'strengthen_next_action_contracts'));
+  assert.ok(userJourneyGapAdvisory.manifest_authoring.suggestions.some((suggestion) => suggestion.type === 'strengthen_navigation_contracts'));
 });
 
 test('target init writes a reusable local target manifest artifact', async () => {

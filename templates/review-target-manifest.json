@@ -21,8 +21,11 @@
       "content_contract",
       "source_data_alignment",
       "selector_scoped_state",
+      "workflow_state_clarity",
       "information_architecture",
-      "user_journey"
+      "user_journey",
+      "next_action_clarity",
+      "navigation_clarity"
     ],
     "requiredUserQuestions": []
   },

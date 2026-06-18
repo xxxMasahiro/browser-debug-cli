@@ -61,6 +61,8 @@ export async function runTargetInit(options = {}, context = {}) {
       },
       usage_notes: [
         'Edit expectedRoutes when the application has known routes that must be covered.',
+        'Add pages[].expectations.userQuestions for decisions the intended user must be able to make.',
+        'Add pages[].expectations.dataBindings and bounded inline sourceData for important source-to-screen facts.',
         'Raise budgets.maxRoutes for larger applications.',
         'Keep credentials, cookies, storage state, and private browser profiles out of manifests.'
       ],
@@ -105,8 +107,11 @@ export function createTargetManifest(options = {}) {
         'content_contract',
         'source_data_alignment',
         'selector_scoped_state',
+        'workflow_state_clarity',
         'information_architecture',
-        'user_journey'
+        'user_journey',
+        'next_action_clarity',
+        'navigation_clarity'
       ],
       requiredUserQuestions: []
     },

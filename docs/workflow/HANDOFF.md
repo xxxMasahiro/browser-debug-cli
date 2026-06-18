@@ -2,7 +2,7 @@
 
 ## Current State
 
-Browser Debug CLI has completed Phase 1, Phase 2a package/runtime design verification, the Phase 5 local MVP runtime slice, the Phase 7 local review-platform implementation, the Phase 8 local dogfood/plugin-readiness implementation, the Phase 9 local review-quality implementation, the Phase 10 local dogfood route-readiness implementation, the Phase 11 local page-expectation review implementation, the Phase 12 local rendered-state dogfood hardening implementation, the Phase 13 local dogfood signal refinement implementation, the Phase 14 local content UX advisory implementation, the Phase 15 local content UX heuristic strengthening implementation, and the Phase 16 local content UX handoff output implementation. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally.
+Browser Debug CLI has completed Phase 1, Phase 2a package/runtime design verification, the Phase 5 local MVP runtime slice, the Phase 7 local review-platform implementation, the Phase 8 local dogfood/plugin-readiness implementation, the Phase 9 local review-quality implementation, the Phase 10 local dogfood route-readiness implementation, the Phase 11 local page-expectation review implementation, the Phase 12 local rendered-state dogfood hardening implementation, the Phase 13 local dogfood signal refinement implementation, the Phase 14 local content UX advisory implementation, the Phase 15 local content UX heuristic strengthening implementation, the Phase 16 local content UX handoff output implementation, and the Phase 17 local content UX practical handoff implementation. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally.
 
 This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and TASK_TRACKER workflow-state pair synchronized whenever task state changes.
 
@@ -109,12 +109,15 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 - Target review now emits additive `content_ux_findings`, `content_ux_action_plan`, and `content_ux_readiness` only when content UX advisory is enabled.
 - `content_ux_findings` are separate from review `findings`; they do not change `metrics.finding_count`, the existing `action_plan`, or `quality_signals.release_readiness`.
 - Markdown reports now include a bounded Content UX Developer Handoff section without copying source values or full page text.
+- Content UX findings now include local advisory categories for workflow state clarity, next-action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
+- Target review now emits additive `content_ux_page_handoff` and `content_ux_manifest_authoring` only when content UX advisory is enabled.
+- Markdown reports now include page-level content UX summaries and manifest-authoring suggestion counts in the Content UX Developer Handoff section.
 - No arbitrary source-data file or URL loader was added; external references remain ignored advisory signals until a separately approved loader design exists.
 - Model/API review, evidence leaving the local process, HTTP/socket MCP server mode, persistent browser profile reuse, authentication automation, external upload, arbitrary shell execution, destructive cleanup, npm publication, package naming, and license changes remain approval-bound.
 
 ## Next Step
 
-No remaining local Phase 16 implementation work is currently planned. Ask for explicit approval before authentication automation, external daemon control channels, external upload, evidence leaving the local process, arbitrary source-data file or URL loaders, model/API review, HTTP/socket MCP server mode, existing-browser-profile reuse, credential storage, plugin marketplace registration, license change, public package naming, npm publication, or destructive cleanup.
+No remaining local Phase 17 implementation work is currently planned. Ask for explicit approval before authentication automation, external daemon control channels, external upload, evidence leaving the local process, arbitrary source-data file or URL loaders, model/API review, HTTP/socket MCP server mode, existing-browser-profile reuse, credential storage, plugin marketplace registration, license change, public package naming, npm publication, or destructive cleanup.
 
 ## Restart Notes
 

@@ -477,6 +477,42 @@ Phase 16 completes the six-step local implementation path for turning content UX
 - Completed: browser smoke tests cover opt-in top-level `content_ux_*` output, disabled-output absence, Markdown handoff output, and unchanged review findings, metrics, existing action plans, and release readiness.
 - Completed: architecture tests continue to guard against target-specific runtime literals, profile reuse, storage-state persistence, external listeners, arbitrary shell execution, unapproved upload paths, destructive cleanup, filesystem reads in the advisory helper, and model/API review.
 
+### Phase 17: Practical Content UX Handoff
+
+Phase 17 completes the six-step local implementation path for making content UX advisory more actionable while preserving all existing review outputs. It remains manifest-driven, local-only, advisory-only, and generic. It does not add external source loaders, model/API review, evidence upload, existing-profile reuse, HTTP/socket MCP transport, authentication automation, package publication, license changes, marketplace mutation, or target-specific runtime branches.
+
+#### Phase 17a: Expanded Content UX Categories
+
+- Completed: `content_ux_findings` now distinguish workflow state clarity, next-action clarity, navigation clarity, information architecture, content contracts, source-data alignment, coverage contracts, and review scope.
+- Completed: category selection is derived from local advisory signal shape and manifest question text, not model output or target-specific runtime branches.
+
+#### Phase 17b: Page-Level Developer Handoff
+
+- Completed: target review emits top-level `content_ux_page_handoff` only when content UX advisory is enabled.
+- Completed: page handoff groups advisory findings by manifest page with status, owner-review need, finding count, top categories, and bounded top findings.
+- Completed: `content_ux_readiness` summarizes page-handoff counts without changing `quality_signals.release_readiness`.
+
+#### Phase 17c: Manifest Authoring Guidance
+
+- Completed: target review emits top-level `content_ux_manifest_authoring` only when content UX advisory is enabled.
+- Completed: manifest-authoring suggestions cover missing audience or goal, missing inline source data, ignored external source references, missing page data bindings, missing user questions, inconclusive question evidence, inconclusive binding sources, next-action contracts, and navigation contracts.
+- Completed: `target init` and reusable target templates expose the expanded local content UX check vocabulary while staying disabled by default.
+
+#### Phase 17d: Report Triage Improvements
+
+- Completed: Markdown target reports include page-level content UX finding summaries inside Content UX Developer Handoff.
+- Completed: Markdown target reports include manifest-authoring suggestion counts and bounded suggestions, including zero-suggestion runs.
+
+#### Phase 17e: Regression Tests
+
+- Completed: no-browser tests cover expanded content UX categories, page handoff, manifest-authoring suggestions, source-value non-disclosure, and unchanged advisory-only gates.
+- Completed: browser smoke tests cover disabled-output absence, enabled page handoff, enabled manifest-authoring output, report handoff output, and unchanged review findings, metrics, existing action plans, and release readiness.
+
+#### Phase 17f: Documentation, Schema, and Evidence Sync
+
+- Completed: review schema registry and packaged review schema files include additive `content_ux_page_handoff` and `content_ux_manifest_authoring` properties.
+- Completed: requirements, specification, implementation plan, task tracker, handoff, security, verification, README, changelog, manifests, templates, and session memory are synchronized with the Phase 17 contract.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -500,9 +536,10 @@ Phase 16 completes the six-step local implementation path for turning content UX
 - Phase 11 checks cover manifest page expectation normalization, page-specific viewport execution, expected text and selector checks, page-level mock metrics, local review artifact indexes, and page expectation quality signals.
 - Phase 12 checks cover rendered-state evidence for broken images, lingering loading indicators, empty data containers, developer triage report summaries, manifest suggestions, and fixture-backed target review report output.
 - Phase 13 checks cover loading-indicator precision for ready/progress business-state text and local dogfood rechecks against Control Center pages without target-specific runtime branches.
-- Phase 14 checks cover schema registry/file parity, manifest opt-in content UX advisory, bounded inline source data, source-to-screen text binding checks, source-value non-disclosure, report output, advisory purity, and unchanged findings, metrics, action plans, and release readiness.
-- Phase 15 checks cover selector-scoped content UX advisory bindings, attribute/state/risk targets, required user-question advisory checks, reusable Control Center-style manifest templates, source-value non-disclosure, and unchanged findings, metrics, action plans, and release readiness.
+- Phase 14 checks cover schema registry/file parity, manifest opt-in content UX advisory, bounded inline source data, source-to-screen text binding checks, source-value non-disclosure, report output, advisory purity, and unchanged review findings, metrics, action plans, and release readiness.
+- Phase 15 checks cover selector-scoped content UX advisory bindings, attribute/state/risk targets, required user-question advisory checks, reusable Control Center-style manifest templates, source-value non-disclosure, and unchanged review findings, metrics, action plans, and release readiness.
 - Phase 16 checks cover additive `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, Markdown Content UX Developer Handoff output, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.
+- Phase 17 checks cover expanded content UX categories, `content_ux_page_handoff`, `content_ux_manifest_authoring`, report page/authoring summaries, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, and destructive cleanup commands.
 
 ## Recovery Path

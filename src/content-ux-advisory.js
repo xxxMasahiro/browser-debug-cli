@@ -270,8 +270,10 @@ export function buildLocalContentUxAdvisory({ target, routeReviews = [] } = {}) 
   const status = statusForSignals(signals);
   const advisorySignals = signals.slice(0, SIGNAL_LIMIT);
   const findings = buildContentUxFindings(advisorySignals);
-  const actionPlan = buildContentUxActionPlan({ findings, counts, status });
-  const readiness = buildContentUxReadiness({ findings, counts, status });
+  const pageHandoff = buildContentUxPageHandoff({ findings, target });
+  const manifestAuthoring = buildContentUxManifestAuthoring({ config, target, counts, findings });
+  const actionPlan = buildContentUxActionPlan({ findings, counts, status, pageHandoff, manifestAuthoring });
+  const readiness = buildContentUxReadiness({ findings, counts, status, pageHandoff });
   return redact({
     reviewer: 'local_content_ux_advisory',
     status,
@@ -287,6 +289,8 @@ export function buildLocalContentUxAdvisory({ target, routeReviews = [] } = {}) 
     findings,
     action_plan: actionPlan,
     readiness,
+    page_handoff: pageHandoff,
+    manifest_authoring: manifestAuthoring,
     source_data: {
       declared: counts.source_data_declared,
       inline_available: counts.source_data_available,
@@ -307,7 +311,7 @@ export function buildLocalContentUxAdvisory({ target, routeReviews = [] } = {}) 
       external_evidence_transfer: false
     },
     limitations: [
-      'This advisory is manifest opt-in and does not change findings, metrics, action plans, or release gates.',
+      'This advisory is manifest opt-in and does not change review findings, metrics, action plans, or release gates.',
       'The local advisory layer checks declared source-to-screen contracts, selector-scoped evidence, and required user-question coverage; it is not model output or final product approval.',
       'Inline source data is used only in-process and source values are not copied into advisory messages or Markdown reports.',
       'External source references are recorded but not read by this phase.'
@@ -840,9 +844,19 @@ function buildContentUxFindings(signals) {
 
 function contentUxFindingCategory(signal) {
   if (signal.question) {
+    const questionText = String(signal.question.text ?? '').toLowerCase();
+    if (/\b(next|action|step|fix|resolve|run|start|continue|proceed|decision)\b/.test(questionText)) {
+      return 'next_action_clarity';
+    }
+    if (/\b(where|navigate|navigation|route|page|detail|link|drill|open|find)\b/.test(questionText)) {
+      return 'navigation_clarity';
+    }
     return 'information_architecture';
   }
   if (signal.binding) {
+    if (['data-state', 'data-risk'].includes(signal.binding.target)) {
+      return 'workflow_state_clarity';
+    }
     return 'content_contract';
   }
   if (signal.id?.includes('source')) {
@@ -872,7 +886,7 @@ function contentUxFindingEvidence(signal) {
   });
 }
 
-function buildContentUxActionPlan({ findings, counts, status }) {
+function buildContentUxActionPlan({ findings, counts, status, pageHandoff, manifestAuthoring }) {
   const nextActions = findings
     .slice()
     .sort(compareContentUxFindingPriority)
@@ -896,6 +910,16 @@ function buildContentUxActionPlan({ findings, counts, status }) {
     total_action_items: findings.length,
     total_actionable_items: findings.filter((finding) => finding.owner_decision_required).length,
     focus_areas: [...new Set(findings.map((finding) => finding.category))],
+    page_focus: (pageHandoff?.pages ?? [])
+      .filter((page) => page.finding_count > 0)
+      .slice(0, 8)
+      .map((page) => ({
+        page_id: page.page_id,
+        status: page.status,
+        finding_count: page.finding_count,
+        top_categories: page.top_categories
+      })),
+    manifest_authoring_suggestions: manifestAuthoring?.suggestions?.length ?? 0,
     counts: {
       data_binding_mismatches: counts.data_binding_mismatches,
       data_binding_inconclusive: counts.data_binding_inconclusive,
@@ -907,7 +931,7 @@ function buildContentUxActionPlan({ findings, counts, status }) {
   };
 }
 
-function buildContentUxReadiness({ findings, counts, status }) {
+function buildContentUxReadiness({ findings, counts, status, pageHandoff }) {
   return {
     reviewer: 'local_content_ux_advisory',
     status: contentUxDecisionStatus(findings, status),
@@ -923,12 +947,188 @@ function buildContentUxReadiness({ findings, counts, status }) {
       inline_available: counts.source_data_available,
       external_references_ignored: counts.source_data_external_references_ignored
     },
+    page_handoff: {
+      pages: pageHandoff?.summary?.pages ?? 0,
+      pages_with_findings: pageHandoff?.summary?.pages_with_findings ?? 0,
+      pages_needing_owner_review: pageHandoff?.summary?.pages_needing_owner_review ?? 0
+    },
     counts: {
       data_binding_checks: counts.data_binding_checks,
       data_binding_mismatches: counts.data_binding_mismatches,
       required_user_questions: counts.required_user_questions,
       user_questions_unanswered: counts.user_questions_unanswered
     }
+  };
+}
+
+function buildContentUxPageHandoff({ findings, target }) {
+  const pageIndex = new Map((target?.pages ?? []).map((page) => [page.id, {
+    page_id: page.id,
+    name: page.name,
+    url: page.url,
+    priority: page.priority
+  }]));
+  const grouped = new Map();
+  for (const page of pageIndex.values()) {
+    grouped.set(page.page_id, { ...page, findings: [] });
+  }
+  for (const finding of findings) {
+    const pageId = finding.page?.id ?? 'target';
+    if (!grouped.has(pageId)) {
+      grouped.set(pageId, {
+        page_id: pageId,
+        name: pageId === 'target' ? 'Target-wide advisory' : pageId,
+        priority: 'medium',
+        findings: []
+      });
+    }
+    grouped.get(pageId).findings.push(finding);
+  }
+
+  const pages = [...grouped.values()].map((page) => {
+    const pageFindings = page.findings.slice().sort(compareContentUxFindingPriority);
+    const ownerReviewRequired = pageFindings.some((finding) => severityRank(finding.severity) >= SEVERITY_RANK.medium);
+    return compactObject({
+      page_id: page.page_id,
+      name: page.name,
+      url: page.url,
+      priority: page.priority,
+      status: ownerReviewRequired ? 'needs_content_owner_review' : pageFindings.length > 0 ? 'advisory_notes' : 'passed',
+      finding_count: pageFindings.length,
+      owner_review_required: ownerReviewRequired,
+      top_categories: [...new Set(pageFindings.map((finding) => finding.category))].slice(0, 5),
+      top_findings: pageFindings.slice(0, 6).map((finding) => compactObject({
+        finding_id: finding.id,
+        category: finding.category,
+        severity: finding.severity,
+        selector: finding.selector,
+        recommendation: finding.recommendation
+      }))
+    });
+  });
+
+  return {
+    reviewer: 'local_content_ux_advisory',
+    status: pages.some((page) => page.status === 'needs_content_owner_review')
+      ? 'needs_content_owner_review'
+      : pages.some((page) => page.status === 'advisory_notes')
+        ? 'advisory_notes'
+        : 'passed',
+    advisory_only: true,
+    gate_effect: 'none',
+    summary: {
+      pages: pages.length,
+      pages_with_findings: pages.filter((page) => page.finding_count > 0).length,
+      pages_needing_owner_review: pages.filter((page) => page.owner_review_required).length
+    },
+    pages
+  };
+}
+
+function buildContentUxManifestAuthoring({ config, target, counts, findings }) {
+  const suggestions = [];
+  const addSuggestion = (suggestion) => {
+    suggestions.push({
+      severity: 'info',
+      owner_decision_required: false,
+      gate_effect: 'none',
+      ...suggestion
+    });
+  };
+
+  if (!config.goal) {
+    addSuggestion({
+      id: 'content-ux-authoring-goal',
+      type: 'declare_goal',
+      severity: 'low',
+      recommendation: 'Add localContentUxAdvisory.goal so content UX findings can be interpreted against the intended user outcome.'
+    });
+  }
+  if (config.audience.length === 0) {
+    addSuggestion({
+      id: 'content-ux-authoring-audience',
+      type: 'declare_audience',
+      severity: 'low',
+      recommendation: 'Add localContentUxAdvisory.audience so advisory output can distinguish beginner, operator, and maintainer comprehension needs.'
+    });
+  }
+  if (counts.source_data_declared === 0 && (target?.pages ?? []).some((page) => page.expectations?.dataBindings?.length > 0)) {
+    addSuggestion({
+      id: 'content-ux-authoring-source-data',
+      type: 'add_source_data',
+      severity: 'medium',
+      recommendation: 'Add bounded inline sourceData entries for declared dataBindings before relying on source-to-screen advisory.'
+    });
+  }
+  if (counts.source_data_external_references_ignored > 0) {
+    addSuggestion({
+      id: 'content-ux-authoring-inline-source-data',
+      type: 'inline_source_data',
+      severity: 'medium',
+      recommendation: 'Replace path or URL source references with bounded inline sourceData, or approve a separate loader design with security tests.'
+    });
+  }
+  if (counts.pages_without_content_contract > 0) {
+    addSuggestion({
+      id: 'content-ux-authoring-page-contracts',
+      type: 'add_page_data_bindings',
+      severity: 'low',
+      recommendation: 'Add page expectations.dataBindings for important facts, state labels, or risk indicators that must be represented on each reviewed page.'
+    });
+  }
+  if (counts.required_user_questions === 0) {
+    addSuggestion({
+      id: 'content-ux-authoring-user-questions',
+      type: 'add_user_questions',
+      severity: 'low',
+      recommendation: 'Add requiredUserQuestions or page userQuestions for the user decisions the reviewed page must support.'
+    });
+  }
+  if (counts.user_questions_inconclusive > 0) {
+    addSuggestion({
+      id: 'content-ux-authoring-question-evidence',
+      type: 'add_question_expected_evidence',
+      severity: 'medium',
+      recommendation: 'Add expectedEvidence to userQuestions so the advisory can distinguish unsupported copy from unconfigured questions.'
+    });
+  }
+  if (counts.data_binding_inconclusive > 0) {
+    addSuggestion({
+      id: 'content-ux-authoring-binding-pointers',
+      type: 'fix_binding_sources',
+      severity: 'medium',
+      recommendation: 'Review sourceData IDs, JSON Pointers, selectors, and binding targets for inconclusive content contracts.'
+    });
+  }
+  if (findings.some((finding) => finding.category === 'next_action_clarity')) {
+    addSuggestion({
+      id: 'content-ux-authoring-next-actions',
+      type: 'strengthen_next_action_contracts',
+      severity: 'medium',
+      recommendation: 'Pin next-action questions or selector-scoped calls to action in page expectations so the review can track whether users know what to do next.'
+    });
+  }
+  if (findings.some((finding) => finding.category === 'navigation_clarity')) {
+    addSuggestion({
+      id: 'content-ux-authoring-navigation',
+      type: 'strengthen_navigation_contracts',
+      severity: 'medium',
+      recommendation: 'Pin route, detail-link, or drill-down questions in page expectations so the review can track whether users can move naturally through the workflow.'
+    });
+  }
+
+  return {
+    reviewer: 'local_content_ux_advisory',
+    status: suggestions.some((suggestion) => severityRank(suggestion.severity) >= SEVERITY_RANK.medium)
+      ? 'manifest_authoring_recommended'
+      : suggestions.length > 0
+        ? 'advisory_notes'
+        : 'passed',
+    advisory_only: true,
+    gate_effect: 'none',
+    external_evidence_transfer: false,
+    suggestions,
+    suggested_manifest_sections: [...new Set(suggestions.map((suggestion) => suggestion.type))]
   };
 }
 

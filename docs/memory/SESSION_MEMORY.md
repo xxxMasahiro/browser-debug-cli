@@ -102,3 +102,13 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - `content_ux_readiness` stays separate from `quality_signals.release_readiness` and records `legacy_release_readiness_unchanged=true`, `blocking_release_gate=false`, and `external_evidence_transfer=false`.
 - Markdown reports include a bounded Content UX Developer Handoff section without copying source values or full page text.
 - The implementation remains generic, local-first, and advisory-only. It does not read arbitrary source-data files or URLs, add Control Center-specific runtime branches, upload evidence, call models/APIs, automate OAuth/login, reuse existing profiles, add HTTP/socket MCP transport, publish packages, change license, or mutate marketplace state.
+
+## 2026-06-18 Phase 17 Content UX Practical Handoff
+
+- Phase 17 is complete for practical local content UX handoff output.
+- `content_ux_findings` now categorize local advisory signals into workflow state clarity, next-action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
+- Target review emits additive `content_ux_page_handoff` with page status, owner-review need, finding count, top categories, and bounded top findings.
+- Target review emits additive `content_ux_manifest_authoring` with manifest-only suggestions for audience, goal, source data, data bindings, user questions, next-action contracts, and navigation contracts.
+- Target init and reusable templates expose the expanded content UX check vocabulary while keeping advisory opt-in disabled by default.
+- Markdown reports include page-level content UX summaries and manifest-authoring suggestion counts.
+- The implementation remains generic, local-first, advisory-only, and non-mutating. It does not read arbitrary source-data files or URLs, add Control Center-specific runtime branches, upload evidence, call models/APIs, automate OAuth/login, reuse existing profiles, add HTTP/socket MCP transport, publish packages, change license, or mutate marketplace state.

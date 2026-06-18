@@ -54,6 +54,9 @@ All notable local development changes are tracked here before public release.
 - Added a reusable disabled-by-default Control Center-style content UX target manifest template.
 - Added separate `content_ux_findings`, `content_ux_action_plan`, and `content_ux_readiness` target-review outputs without changing review findings, metrics, existing action plans, or release readiness.
 - Added bounded Content UX Developer Handoff Markdown report output.
+- Added expanded content UX advisory categories for workflow state clarity, next-action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
+- Added separate `content_ux_page_handoff` and `content_ux_manifest_authoring` target-review outputs.
+- Added page-level content UX and manifest-authoring summaries to Markdown target reports.
 
 ## Release Status
 

@@ -34,6 +34,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Support optional manifest `pages` entries so named pages can define expected visible text, expected selectors, page-specific viewport coverage, and page-specific mock metrics without runtime product branches.
 - Support manifest opt-in content UX advisory data so whole-application reviews can compare declared source facts with reviewed page text, selector-scoped UI state, and required user-question evidence without changing deterministic review findings or local gates.
 - Provide separate content UX handoff outputs for advisory findings, next actions, and readiness so developers can act on content and information-architecture issues without mixing them into existing review findings, action plans, metrics, or release gates.
+- Provide page-level content UX handoff and manifest-authoring suggestions so developers can see which page, route, selector, or target-manifest contract needs attention.
 - Keep review findings developer-facing, reproducible, and tied to selectors, rectangles, routes, viewports, artifacts, confidence, severity, and reproduction steps.
 - Produce a local review artifact index that groups review JSON, layout JSON, screenshots, mock metrics, coverage, reports, evidence classes, local boundaries, and rerun guidance for developer handoff.
 - Detect generic rendered-state risks such as broken visible images, lingering loading indicators after the review wait, and empty data containers without visible empty-state messaging.
@@ -101,7 +102,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - `target init --url <url> --json` writes a reusable local target manifest artifact for route and viewport review.
 - Review outputs include `action_plan`, `review_advisory`, and `quality_signals` objects for developer handoff while keeping subjective or model-like judgment out of deterministic gates.
 - Review outputs include local `evidence_summary` data and `artifact_index` metadata so agents can evaluate expected UI state and hand developers a bounded artifact bundle.
-- Target review can emit `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, and `quality_signals.content_ux` only when the target manifest explicitly enables `localContentUxAdvisory.enabled=true`.
+- Target review can emit `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, `content_ux_page_handoff`, `content_ux_manifest_authoring`, and `quality_signals.content_ux` only when the target manifest explicitly enables `localContentUxAdvisory.enabled=true`.
 - The repository includes local plugin metadata, local MCP configuration, and a plugin-facing skill without adding marketplace registration, npm publication, external upload, credential handling, or HTTP/socket MCP transport.
 
 ## Review Platform Criteria
@@ -127,6 +128,8 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Completed: content UX advisory supports selector-scoped `text`, `attribute`, `data-state`, and `data-risk` bindings plus required user-question checks for information architecture and user-journey handoff.
 - Completed: content UX advisory is additive, local-only, creates only separate `content_ux_findings`, does not create review findings, does not change `metrics.finding_count`, does not change `action_plan`, and does not change `quality_signals.release_readiness`.
 - Completed: target review emits separate `content_ux_action_plan` and `content_ux_readiness` outputs so content-owner handoff can advance without changing existing release readiness or action-plan semantics.
+- Completed: content UX advisory categorizes advisory findings for workflow state clarity, next-action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
+- Completed: target review emits separate `content_ux_page_handoff` and `content_ux_manifest_authoring` outputs for page-level triage and manifest authoring guidance.
 - Completed: mock comparison is optional and conservative; dimension mismatches, missing baselines, or unsupported images produce `inconclusive` review metrics rather than false pass/fail certainty.
 - Completed: MCP support is implemented as a thin local stdio adapter over the same core, not as a separate product runtime, network service, or default dependency.
 - Completed: model or vision review remains outside deterministic local review checks and has not been implemented.

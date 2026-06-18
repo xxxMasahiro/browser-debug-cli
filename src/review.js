@@ -491,7 +491,9 @@ export async function runTargetReview(options = {}, context = {}) {
       local_content_ux_advisory: localContentUxAdvisory,
       content_ux_findings: localContentUxAdvisory.findings,
       content_ux_action_plan: localContentUxAdvisory.action_plan,
-      content_ux_readiness: localContentUxAdvisory.readiness
+      content_ux_readiness: localContentUxAdvisory.readiness,
+      content_ux_page_handoff: localContentUxAdvisory.page_handoff,
+      content_ux_manifest_authoring: localContentUxAdvisory.manifest_authoring
     } : {}),
     quality_signals: qualitySignals,
     environment: {
@@ -3112,6 +3114,21 @@ function renderReviewReport(data, artifacts) {
       for (const action of plan.next_actions.slice(0, 12)) {
         const locator = action.selector ? ` (${action.selector})` : '';
         lines.push(`- ${action.severity.toUpperCase()} ${action.finding_id}${locator}: ${action.recommendation}`);
+      }
+    }
+    if (data.content_ux_page_handoff?.pages?.length) {
+      const pagesWithFindings = data.content_ux_page_handoff.pages.filter((page) => page.finding_count > 0);
+      lines.push(`- Pages with content UX findings: ${pagesWithFindings.length}`);
+      for (const page of pagesWithFindings.slice(0, 8)) {
+        const categories = page.top_categories?.length ? ` [${page.top_categories.join(', ')}]` : '';
+        lines.push(`- Page ${page.page_id}: ${page.status}, ${page.finding_count} finding(s)${categories}`);
+      }
+    }
+    if (data.content_ux_manifest_authoring) {
+      const suggestions = data.content_ux_manifest_authoring.suggestions ?? [];
+      lines.push(`- Manifest authoring suggestions: ${suggestions.length}`);
+      for (const suggestion of suggestions.slice(0, 6)) {
+        lines.push(`- ${suggestion.severity.toUpperCase()} ${suggestion.type}: ${suggestion.recommendation}`);
       }
     }
     lines.push('');
