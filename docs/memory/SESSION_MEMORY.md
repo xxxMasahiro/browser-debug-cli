@@ -132,3 +132,11 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - Validation output includes manifest counts, content UX authoring suggestions, review next commands, and explicit local-first boundaries.
 - The local MCP adapter exposes `browser_debug_target_validate`, and the package API exports `runTargetValidate`.
 - The implementation remains generic, local-first, no-browser, and non-mutating. It does not launch Chromium, mutate manifests, expose sourceData values, read arbitrary source-data files or URLs, upload evidence, reuse profiles, add HTTP/socket MCP transport, change review findings, change `metrics.finding_count`, change the existing `action_plan`, or change `quality_signals.release_readiness`.
+
+## 2026-06-18 Phase 20 Resource Status Preflight Handoff
+
+- Phase 20 is complete for no-browser local resource status preflight.
+- `browser-debug resource status --json` reports process-visible memory, swap, cgroup, pressure, and Node.js process memory signals.
+- Resource status output includes status classification, thresholds, warnings, recommendations, cache policy, and explicit local-first boundaries.
+- The local MCP adapter exposes `browser_debug_resource_status`, and the package API exports resource status collection and parsing helpers.
+- The implementation remains generic, local-first, no-browser, read-only, and non-mutating. It does not launch Chromium, write artifacts, mutate system cache, configure swap, delete files, execute shell commands, use privileged helpers, upload evidence, reuse profiles, add HTTP/socket MCP transport, control arbitrary processes, change review findings, change `metrics.finding_count`, change the existing `action_plan`, or change `quality_signals.release_readiness`.

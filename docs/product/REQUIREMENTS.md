@@ -41,6 +41,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Detect generic rendered-state risks such as broken visible images, lingering loading indicators after the review wait, and empty data containers without visible empty-state messaging.
 - Generate reusable target manifests so whole-application review can start from a URL without hand-writing the full manifest.
 - Validate edited target manifests before browser review so developers can catch manifest shape, route, page expectation, content UX, and local boundary issues without launching Chromium.
+- Provide a no-browser local resource status preflight so developers and agents can inspect memory, swap, cgroup, pressure, and process memory signals before browser-heavy review work.
 - Suggest target manifest improvements when dogfood review evidence shows missing page expectations, unpinned discovered routes, exhausted route budgets, failed page checks, or rendered-state gaps.
 - Provide action plans, implementation-focused fix candidates, and local heuristic advisory signals that help developers decide what to fix first.
 - Provide structured local quality signals for visual hierarchy, rendered state, responsive layout, interaction affordance, accessibility structure, evidence completeness, local release readiness, and model-review boundaries.
@@ -61,6 +62,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Do not treat content UX advisory as deterministic product approval, a replacement for owner judgment, or a release gate.
 - Do not treat content UX review brief or rubric output as model judgment, aesthetic approval, deterministic product approval, or a release gate.
 - Do not read arbitrary source-data files or remote source-data URLs from target manifests in the local content UX advisory layer.
+- Do not mutate system memory cache, configure swap, delete artifact caches, kill arbitrary processes, or perform privileged host cleanup from the local resource status preflight.
 - Do not register a plugin marketplace entry, change the package license, choose a public package name, or publish to npm without explicit release approval.
 
 ## Success Criteria
@@ -104,6 +106,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Browser smoke tests cover deterministic review findings, mock metrics, target manifest review, route discovery, viewport execution, and coverage artifacts.
 - `target init --url <url> --json` writes a reusable local target manifest artifact for route and viewport review.
 - `target validate --target <manifest> --json` validates edited target manifests without launching a browser, mutating the manifest, exposing sourceData values, uploading artifacts, or reusing profiles.
+- `resource status --json` reports local memory, swap, cgroup, pressure, and process memory signals without launching a browser, writing artifacts, deleting caches, mutating swap, mutating system cache, uploading evidence, or reusing profiles.
 - Review outputs include `action_plan`, `review_advisory`, and `quality_signals` objects for developer handoff while keeping subjective or model-like judgment out of deterministic gates.
 - Review outputs include local `evidence_summary` data and `artifact_index` metadata so agents can evaluate expected UI state and hand developers a bounded artifact bundle.
 - Target review can emit `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, `content_ux_page_handoff`, `content_ux_manifest_authoring`, and `quality_signals.content_ux` only when the target manifest explicitly enables `localContentUxAdvisory.enabled=true`.
@@ -151,6 +154,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Completed: target review can emit a Markdown report with action plan and local advisory sections.
 - Completed: Markdown reports include quality signal summaries so developers can triage local review output without reading raw JSON first.
 - Completed: MCP tool allowlists include target manifest initialization, target manifest validation, and target review without adding shell, cleanup, HTTP/socket, external upload, or profile-reuse tools.
+- Completed: MCP tool allowlists include local resource status preflight without adding shell, cleanup, HTTP/socket, external upload, profile-reuse, or privileged host mutation tools.
 - Completed: `.codex-plugin/plugin.json`, `.mcp.json`, and `skills/browser-debug-review/SKILL.md` define a local plugin bundle over the existing CLI/MCP surface.
 - Completed: `templates/review-target-manifest.json` provides a reusable manifest starting point for local route and viewport review.
 

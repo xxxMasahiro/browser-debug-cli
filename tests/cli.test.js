@@ -39,6 +39,42 @@ test('doctor returns the JSON envelope without launching a browser', async () =>
   assert.equal(body.warnings[0].code, 'PLAYWRIGHT_NOT_INSTALLED');
 });
 
+test('resource status reports local memory boundaries without launching a browser', async () => {
+  const parsed = parseCliArgs(['resource', 'status', '--json']);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'resource status');
+
+  const result = await executeCli(['resource', 'status', '--json'], {
+    now: fixedNow,
+    ...createResourceStatusContext()
+  });
+
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'resource status');
+  assert.equal(body.status, 'ok');
+  assert.equal(body.data.resource_status.status, 'ok');
+  assert.equal(body.data.resource_status.source, 'proc_meminfo');
+  assert.equal(body.data.resource_status.memory.total_bytes, 1024 * 1024 * 1024);
+  assert.equal(body.data.resource_status.memory.available_ratio, 0.25);
+  assert.equal(body.data.resource_status.memory.swap_used_ratio, 0.25);
+  assert.equal(body.data.resource_status.cgroup.version, 'v2');
+  assert.equal(body.data.resource_status.cgroup.usage_ratio, 0.5);
+  assert.equal(body.data.resource_status.pressure.available, true);
+  assert.equal(body.data.resource_status.process.rss_bytes, 64 * 1024 * 1024);
+  assert.equal(body.data.resource_status.cache_policy.automatic_system_cache_reclamation, false);
+  assert.equal(body.data.resource_status.cache_policy.automatic_swap_configuration, false);
+  assert.equal(body.data.boundary.browser_launched, false);
+  assert.equal(body.data.boundary.external_upload, false);
+  assert.equal(body.data.boundary.profile_reuse, false);
+  assert.equal(body.data.boundary.system_cache_mutated, false);
+  assert.equal(body.data.boundary.swap_mutated, false);
+  assert.equal(body.data.boundary.cache_deleted, false);
+  assert.equal(body.data.boundary.shell_used, false);
+  assert.deepEqual(body.artifacts, []);
+  assert.deepEqual(body.errors, []);
+});
+
 test('missing command produces a deterministic JSON error', async () => {
   const result = await executeCli(['--json'], { now: fixedNow });
 
@@ -771,6 +807,7 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_target_init'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_target_validate'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_resource_status'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review_target'), true);
   assert.equal(listed.result.tools.some((tool) => /shell|cleanup/i.test(tool.name)), false);
 
@@ -785,6 +822,20 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   }, { now: fixedNow });
   assert.equal(schema.result.structuredContent.command, 'schema get');
   assert.equal(schema.result.structuredContent.status, 'ok');
+
+  const resource = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 5,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_resource_status',
+      arguments: {}
+    }
+  }, { now: fixedNow, ...createResourceStatusContext() });
+  assert.equal(resource.result.structuredContent.command, 'resource status');
+  assert.equal(resource.result.structuredContent.status, 'ok');
+  assert.equal(resource.result.structuredContent.data.boundary.browser_launched, false);
+  assert.equal(resource.result.structuredContent.data.boundary.system_cache_mutated, false);
 
   const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-mcp-target-'));
   await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
@@ -982,6 +1033,57 @@ function createFakeBrowserType(launches) {
       launches.push(options);
       return createFakeBrowser();
     }
+  };
+}
+
+function createResourceStatusContext() {
+  const files = new Map([
+    ['/proc/meminfo', [
+      'MemTotal:       1048576 kB',
+      'MemFree:         131072 kB',
+      'MemAvailable:    262144 kB',
+      'Buffers:          16384 kB',
+      'Cached:           65536 kB',
+      'SwapCached:           0 kB',
+      'Active(file):      4096 kB',
+      'Inactive(file):    8192 kB',
+      'Dirty:                0 kB',
+      'Writeback:            0 kB',
+      'KReclaimable:      8192 kB',
+      'SReclaimable:      8192 kB',
+      'SUnreclaim:        4096 kB',
+      'SwapTotal:       524288 kB',
+      'SwapFree:        393216 kB'
+    ].join('\n')],
+    ['/sys/fs/cgroup/memory.max', `${1024 * 1024 * 1024}\n`],
+    ['/sys/fs/cgroup/memory.current', `${512 * 1024 * 1024}\n`],
+    ['/sys/fs/cgroup/memory.swap.max', `${512 * 1024 * 1024}\n`],
+    ['/sys/fs/cgroup/memory.swap.current', `${128 * 1024 * 1024}\n`],
+    ['/proc/pressure/memory', [
+      'some avg10=0.00 avg60=0.00 avg300=0.00 total=0',
+      'full avg10=0.00 avg60=0.00 avg300=0.00 total=0'
+    ].join('\n')]
+  ]);
+  return {
+    readTextFile: async (filePath) => {
+      if (files.has(filePath)) {
+        return files.get(filePath);
+      }
+      const error = new Error(`missing fixture: ${filePath}`);
+      error.code = 'ENOENT';
+      throw error;
+    },
+    os: {
+      totalmem: () => 2 * 1024 * 1024 * 1024,
+      freemem: () => 1024 * 1024 * 1024
+    },
+    memoryUsage: () => ({
+      rss: 64 * 1024 * 1024,
+      heapTotal: 16 * 1024 * 1024,
+      heapUsed: 8 * 1024 * 1024,
+      external: 2 * 1024 * 1024,
+      arrayBuffers: 1024 * 1024
+    })
   };
 }
 

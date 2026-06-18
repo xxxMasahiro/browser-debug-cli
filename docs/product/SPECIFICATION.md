@@ -20,6 +20,7 @@ The Phase 2a design baseline uses Node.js 20 or newer, ESM modules, and a local 
 - Artifact index layer: groups local review artifacts, evidence classes, rerun guidance, and local safety boundaries for developer handoff.
 - Manifest suggestion layer: turns target review coverage and rendered-state evidence into local suggestions for better reruns without editing runtime code for specific applications.
 - Content UX advisory layer: evaluates manifest opt-in source-to-screen content contracts, selector-scoped state contracts, required user-question evidence, review briefs, and rubric criteria from existing target review evidence without creating review findings or changing release gates.
+- Resource status layer: reads local process-visible memory, swap, cgroup, and pressure signals before browser-heavy work without launching Playwright, writing artifacts, mutating host cache, changing swap, deleting files, or controlling arbitrary processes.
 - Schema layer: defines stable JSON contracts for envelopes, artifacts, target manifests, findings, reports, and adapter I/O.
 - Adapter layer: keeps CLI as the source of truth and later exposes the same core through an MCP stdio adapter.
 
@@ -36,6 +37,7 @@ browser-debug supervise --url <url> --actions <json-array> --json
 browser-debug daemon start --url <url> --json
 browser-debug daemon status --daemon <id> --json
 browser-debug daemon stop --daemon <id> --json
+browser-debug resource status --json
 browser-debug target init --url <url> --json
 browser-debug target validate --target <manifest> --json
 browser-debug act --session <id> --action <json>
@@ -72,6 +74,7 @@ Implemented behavior:
 - `observe --devtools` launches visible browser mode with DevTools enabled when the host environment supports it.
 - `supervise --url <url> --actions <json-array>` launches one ephemeral Chromium context, applies ordered local actions in that same process-scoped context, writes observation metadata for the initial page and each action, writes local supervision metadata under `.browser-debug/sessions/`, and closes the context before process exit.
 - `daemon start --url <url>` starts a detached local worker process with one ephemeral Chromium context, writes daemon metadata under `.browser-debug/daemons/`, writes an initial observation, and returns a daemon ID and process ID. `daemon status --daemon <id>` reads metadata and checks whether the process is alive. `daemon stop --daemon <id>` sends a local process signal and records the stopped state.
+- `resource status --json` reports local memory, swap, cgroup, pressure, and current process memory signals. It returns `data.resource_status`, recommendations, local safety boundaries, and warnings for elevated pressure without launching a browser, writing artifacts, mutating system cache, configuring swap, deleting files, uploading evidence, or reusing profiles.
 - `session start --url <url>` creates local session metadata and can attach the first observation.
 - `act --session <id> --action <json>` supports simple local actions such as `navigate`, `observe`, `screenshot`, `click`, `fill`, `select`, `press`, `scroll`, and `wait` using an ephemeral page visit. Scroll actions use deterministic page scrolling from the requested deltas.
 - `report --session <id>` writes a Markdown report.
@@ -82,7 +85,7 @@ Implemented behavior:
 - `target validate --target <manifest>` or `target validate --input -` loads a target manifest through the same normalization contract as target review, returns route/page/content UX counts, manifest-authoring suggestions, review next commands, and explicit local-first boundaries, and does not launch a browser, mutate the manifest, expose sourceData values, upload artifacts, or reuse profiles.
 - Review results include `action_plan`, `review_advisory`, `quality_signals`, `evidence_summary`, and `artifact_index` objects. Target review results also include `manifest_suggestions`, and can include `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, `content_ux_page_handoff`, `content_ux_manifest_authoring`, `content_ux_review_brief`, and `content_ux_rubric_evaluation` only when the target manifest explicitly enables it. `action_plan` prioritizes review findings, groups developer next actions, and reports a local release gate. Content UX action/readiness/page/authoring/brief/rubric output is separate and advisory-only. `review_advisory` is a local heuristic signal that summarizes browser health, rendered state, layout, accessibility, interaction, mock, and coverage concerns without claiming human or model aesthetic approval. `quality_signals` gives structured developer handoff data for visual hierarchy, rendered state, responsive layout, interaction affordance, accessibility structure, evidence completeness, local release readiness, route coverage, page expectations, optional content UX advisory, and the disabled model-review boundary. `artifact_index` points to a local artifact index JSON that groups evidence classes and rerun guidance.
 - `schema list` and `schema get --name <schema>` expose machine-readable JSON contracts for envelopes, artifacts, findings, target manifests, review results, and MCP tool metadata.
-- `browser-debug-mcp` provides a local stdio MCP adapter with an allowlisted tool surface over the same CLI/core contracts, including target manifest initialization, target manifest validation, and target review.
+- `browser-debug-mcp` provides a local stdio MCP adapter with an allowlisted tool surface over the same CLI/core contracts, including target manifest initialization, target manifest validation, local resource status preflight, and target review.
 - `act --input -`, `supervise --input -`, `--action @file`, and `--actions @file` support shell-safe structured input while preserving inline JSON compatibility.
 - `npm test` runs deterministic no-browser tests, including headed/devtools launch-mode regression through an injected Playwright browser type and architecture regressions for generic runtime boundaries, shared page evidence helpers, local daemon boundaries, and local Node CLI packaging. `npm run test:browser` runs Playwright smoke tests for observation, screenshots/traces, click actions, form controls, keyboard input, scroll, wait, reports, spec export, supervised ordered actions, and local daemon start/status/stop.
 - `npm run test:pack` runs `npm pack --dry-run --json` with an ignored local npm cache to verify the package file set without publishing.
@@ -104,6 +107,7 @@ Implemented review components:
 - `site-review`: target manifest loading, route discovery, viewport matrix execution, action risk policy, budgets, and coverage reporting.
 - `reporter`: JSON and Markdown issue reports with artifact references, reproduction steps, prioritized action plans, developer triage summaries, manifest suggestions, local artifact indexes, local heuristic advisory data, and implementation-focused fix candidates.
 - `content-ux-advisory`: pure local helper that reads normalized manifest data and target review summaries, then returns advisory source-to-screen, selector-scoped state, and user-question signals without Playwright, filesystem access, or artifact reads.
+- `resource-status`: pure local preflight helper that reads process-visible memory, swap, cgroup, and pressure state without Playwright, shell execution, host mutation, artifact writes, or external transfer.
 - `schema`: machine-readable contracts for envelopes, findings, artifacts, target manifests, reports, and MCP tool I/O.
 - `cli-adapter`: the primary command surface for review workflows.
 - `mcp-adapter`: a thin local stdio adapter over the same core through `browser-debug-mcp`.
@@ -259,13 +263,21 @@ The output includes status, counts, advisory signals, separate `content_ux_findi
 
 Each review writes a local `review_artifact_index` JSON artifact under `.browser-debug/review-artifacts/`. The index records the review ID, review mode, artifact root, artifact descriptors, evidence classes, triage summary, coverage summary when available, rerun guidance, and local safety boundaries. The index is a handoff aid only; it does not upload evidence, delete artifacts, reuse browser profiles, store credentials, or authorize publication.
 
+## Local Resource Status Contract
+
+`resource status` is a no-browser preflight command for planning browser-heavy work. It reads process-visible system memory, swap, cgroup memory limits, Linux memory pressure data when available, and current Node.js process memory. The standard JSON envelope includes `data.resource_status.status`, memory snapshots, cgroup snapshots, pressure snapshots, process memory, thresholds, recommendations, a `cache_policy`, and explicit local boundaries.
+
+The command status reflects successful inspection, while `data.resource_status.status` can be `ok`, `watch`, or `critical`. `watch` and `critical` produce warnings and recommendations such as reducing route or viewport budgets, splitting manifests, validating target manifests before browser review, capturing screenshots and traces selectively, and stopping unneeded Browser Debug CLI daemons. These are planning signals, not deterministic product gates.
+
+The command must not launch a browser, write artifacts, upload evidence, reuse browser profiles, mutate system cache, change swap configuration, delete files, execute shell commands, run privileged helpers, or control arbitrary processes. Any future host cleanup, swap configuration, artifact deletion, or privileged memory operation requires a separate approved design, security documentation, tests, and operator approval.
+
 ## MCP Adapter Contract
 
 MCP compatibility is implemented as an adapter, not as the product owner layer. The initial MCP adapter:
 
 - Uses stdio/local process communication only.
 - Calls the same CLI/core contracts used by local commands.
-- Exposes a narrow allowlist: `browser_debug_doctor`, `browser_debug_observe`, `browser_debug_review`, `browser_debug_target_init`, `browser_debug_review_target`, `browser_debug_schema_list`, and `browser_debug_schema_get`.
+- Exposes a narrow allowlist: `browser_debug_doctor`, `browser_debug_observe`, `browser_debug_review`, `browser_debug_target_init`, `browser_debug_target_validate`, `browser_debug_resource_status`, `browser_debug_review_target`, `browser_debug_schema_list`, and `browser_debug_schema_get`.
 - Avoids HTTP listeners, socket listeners, remote control channels, arbitrary shell execution, cleanup commands, profile reuse, storage-state persistence, OAuth, external upload, and credential handling.
 - Returns the same envelope families as the CLI.
 

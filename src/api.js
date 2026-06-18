@@ -1,5 +1,6 @@
 export { executeCli, runCli } from './cli.js';
 export { runObserve } from './observe.js';
+export { collectResourceStatus, parseMeminfoText, parsePressureText, runResourceStatus } from './resource-status.js';
 export { runReview } from './review.js';
 export { runSupervisor } from './supervisor.js';
 export { createTargetManifest, runTargetInit, runTargetValidate } from './target.js';

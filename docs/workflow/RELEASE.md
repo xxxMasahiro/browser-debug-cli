@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Browser Debug CLI is not released. The repository has local MVP runtime coverage, Phase 7 review-platform coverage, Phase 8 dogfood/plugin-readiness coverage, Phase 9 local review-quality coverage, Phase 10 route-readiness coverage, Phase 11 page-expectation and artifact-index coverage, Phase 12 rendered-state dogfood hardening coverage, Phase 14 content UX advisory coverage, Phase 15 content UX heuristic coverage, Phase 16 content UX handoff coverage, Phase 17 content UX practical handoff coverage, Phase 18 content UX review brief/rubric coverage, Phase 19 no-browser target manifest validation coverage, a public GitHub repository, remote `main` synchronization, passing GitHub Actions `main` CI, CI manifest validation, and local package dry-run verification.
+Browser Debug CLI is not released. The repository has local MVP runtime coverage, Phase 7 review-platform coverage, Phase 8 dogfood/plugin-readiness coverage, Phase 9 local review-quality coverage, Phase 10 route-readiness coverage, Phase 11 page-expectation and artifact-index coverage, Phase 12 rendered-state dogfood hardening coverage, Phase 14 content UX advisory coverage, Phase 15 content UX heuristic coverage, Phase 16 content UX handoff coverage, Phase 17 content UX practical handoff coverage, Phase 18 content UX review brief/rubric coverage, Phase 19 no-browser target manifest validation coverage, Phase 20 no-browser local resource status preflight coverage, a public GitHub repository, remote `main` synchronization, passing GitHub Actions `main` CI, CI manifest validation, and local package dry-run verification.
 
 ## Local Release Readiness Checks
 
@@ -32,6 +32,7 @@ npm pack --dry-run --json --cache .tmp/npm-cache
 - Treat `quality_signals.release_readiness` as a local review gate only; it does not authorize package publication or marketplace registration.
 - Treat `quality_signals.content_ux`, `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, `content_ux_page_handoff`, and `content_ux_manifest_authoring` as advisory-only target review output; they do not authorize package publication, marketplace registration, external evidence transfer, or automatic manifest mutation.
 - Treat `artifact_index` as local artifact inventory and rerun guidance only; it does not authorize evidence transfer.
+- Treat `resource status` as a local preflight signal only; it does not authorize host cleanup, system cache mutation, swap configuration, artifact cache deletion, privileged helper use, or arbitrary process control.
 - Do not upload traces, screenshots, session files, cookies, storage state, credentials, or `.browser-debug/` artifacts.
 - Keep model/API review, evidence leaving the local process, HTTP/socket MCP server mode, OAuth/login automation, and external upload approval-bound.
 
@@ -42,3 +43,4 @@ npm pack --dry-run --json --cache .tmp/npm-cache
 - No model/API review or evidence upload.
 - No HTTP/socket MCP server mode.
 - No plugin marketplace registration or installation-state mutation.
+- No host memory-cache mutation, swap configuration, artifact cache deletion, privileged helper execution, or arbitrary process control.

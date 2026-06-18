@@ -58,6 +58,8 @@ export function parseCliArgs(argv) {
       return parseSupervise(args, globals);
     case 'daemon':
       return parseDaemon(args, globals);
+    case 'resource':
+      return parseResource(args, globals);
     case 'target':
       return parseTarget(args, globals);
     case 'session':
@@ -269,6 +271,28 @@ function parseDaemonStart(args, globals) {
     return parseError('daemon start', globals.json, urlError);
   }
   return { ok: true, command: 'daemon start', json: globals.json, options: parsed.options };
+}
+
+function parseResource(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: 'resource' } };
+  }
+  const subcommand = args[0];
+  if (!subcommand) {
+    return parseError('resource', globals.json, {
+      code: 'MISSING_SUBCOMMAND',
+      message: 'resource requires a subcommand.',
+      details: { subcommands: ['status'] }
+    });
+  }
+  if (subcommand === 'status') {
+    return parseNoArgCommand('resource status', args.slice(1), globals);
+  }
+  return parseError('resource', globals.json, {
+    code: 'UNKNOWN_SUBCOMMAND',
+    message: `Unknown resource subcommand: ${subcommand}`,
+    details: { subcommands: ['status'] }
+  });
 }
 
 function parseSpec(args, globals) {

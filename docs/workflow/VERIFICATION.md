@@ -2,7 +2,7 @@
 
 ## Verification Scope
 
-Current verification checks repository structure, document synchronization, security defaults, review/MCP/plugin local boundaries, CI configuration, design-system placeholders, product operation mode, local MVP runtime behavior, review platform behavior, dogfood target workflow behavior, no-browser target manifest validation, expected-route execution, route-budget coverage accounting, page expectation coverage, rendered-state findings, manifest suggestions, opt-in content UX advisory behavior, selector-scoped advisory contracts, required user-question advisory checks, dedicated content UX handoff output, page-level content UX handoff, manifest-authoring suggestions, review brief/rubric evaluation, local artifact indexes, local review-quality signals, and browser smoke coverage.
+Current verification checks repository structure, document synchronization, security defaults, review/MCP/plugin local boundaries, CI configuration, design-system placeholders, product operation mode, local MVP runtime behavior, review platform behavior, dogfood target workflow behavior, no-browser target manifest validation, no-browser resource status preflight, expected-route execution, route-budget coverage accounting, page expectation coverage, rendered-state findings, manifest suggestions, opt-in content UX advisory behavior, selector-scoped advisory contracts, required user-question advisory checks, dedicated content UX handoff output, page-level content UX handoff, manifest-authoring suggestions, review brief/rubric evaluation, local artifact indexes, local review-quality signals, and browser smoke coverage.
 
 ## Product-Local Commands
 
@@ -34,7 +34,7 @@ From `/home/masahiro/projects/ai-driven-development-lesson`:
 
 ## Current Runtime Checks
 
-The current implementation includes command parser tests, deterministic JSON error tests, `doctor` tests for environment, schema-versioning, and artifact-retention metadata, review parser tests, schema command tests, schema registry/file parity tests, target init tests, target validate tests, target manifest tests, opt-in content UX advisory tests, selector-scoped binding tests, required user-question tests, dedicated content UX handoff tests, page handoff tests, manifest-authoring suggestion tests, review brief/rubric tests, action risk classification tests, MCP adapter allowlist tests, shell-safe action input tests, headed/devtools launch-mode tests, session/report/spec tests, daemon parser tests, redaction tests, architecture regressions for generic runtime boundaries, shared evidence helpers, local daemon boundaries, content UX advisory purity, review/MCP/plugin security boundaries, local package dry-run verification, and Playwright smoke tests for local file observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, spec export, process-scoped supervision, daemon start/status/stop, deterministic review findings, action plans, local review advisory output, quality signals, rendered-state findings, mock metrics, target manifest review, target reports, manifest suggestions, content UX advisory opt-in invariance, selector-scoped content UX advisory, content UX Developer Handoff reports, content UX page handoff output, manifest-authoring output, content UX review brief/rubric output, route discovery, explicit expected-route execution, route-budget skip coverage, viewport execution, and coverage artifacts. Manual local checks can use:
+The current implementation includes command parser tests, deterministic JSON error tests, `doctor` tests for environment, schema-versioning, and artifact-retention metadata, resource status tests for deterministic memory/cgroup/pressure fixtures and read-only boundaries, review parser tests, schema command tests, schema registry/file parity tests, target init tests, target validate tests, target manifest tests, opt-in content UX advisory tests, selector-scoped binding tests, required user-question tests, dedicated content UX handoff tests, page handoff tests, manifest-authoring suggestion tests, review brief/rubric tests, action risk classification tests, MCP adapter allowlist tests, shell-safe action input tests, headed/devtools launch-mode tests, session/report/spec tests, daemon parser tests, redaction tests, architecture regressions for generic runtime boundaries, shared evidence helpers, local daemon boundaries, resource status read-only boundaries, content UX advisory purity, review/MCP/plugin security boundaries, local package dry-run verification, and Playwright smoke tests for local file observation, screenshot/trace artifacts, click actions, form controls, keyboard input, deterministic scroll, wait actions, reports, spec export, process-scoped supervision, daemon start/status/stop, deterministic review findings, action plans, local review advisory output, quality signals, rendered-state findings, mock metrics, target manifest review, target reports, manifest suggestions, content UX advisory opt-in invariance, selector-scoped content UX advisory, content UX Developer Handoff reports, content UX page handoff output, manifest-authoring output, content UX review brief/rubric output, route discovery, explicit expected-route execution, route-budget skip coverage, viewport execution, and coverage artifacts. Manual local checks can use:
 
 Phase 11 adds no-browser coverage for optional manifest page normalization and browser smoke coverage for page expectation checks, page-specific mock metrics, review artifact indexes, `coverage.pages`, and `quality_signals.page_expectations`.
 
@@ -52,7 +52,10 @@ Phase 18 adds no-browser and browser smoke coverage for additive `content_ux_rev
 
 Phase 19 adds no-browser coverage for `target validate` parser/runtime behavior, invalid manifest errors, manifest count output, source-value non-disclosure, MCP validation wiring, and local-first boundaries without launching a browser.
 
+Phase 20 adds no-browser coverage for `resource status` parser/runtime behavior, deterministic memory/cgroup/pressure fixture output, MCP resource status wiring, API export, warnings and recommendations, and read-only local-first boundaries without launching a browser, writing artifacts, mutating system cache, configuring swap, deleting files, executing shell commands, using privileged helpers, uploading evidence, reusing profiles, or controlling arbitrary processes.
+
 ```bash
+node ./bin/browser-debug.js resource status --json
 node ./bin/browser-debug.js observe --url http://127.0.0.1:3000/ --screenshot --trace --timeout 15000 --json
 node ./bin/browser-debug.js supervise --url http://127.0.0.1:3000/ --actions '[{"type":"observe"}]' --timeout 15000 --json
 node ./bin/browser-debug.js daemon start --url http://127.0.0.1:3000/ --timeout 15000 --json
@@ -80,6 +83,7 @@ Phase 7 review-platform implementation includes focused checks before any releas
 - Browser smoke fixture tests for console errors, empty renders, horizontal overflow, clipped text, missing accessible names, nonblank screenshots, route coverage, viewport coverage, and local artifact placement.
 - Mock comparison tests for local metrics and dimension mismatch `inconclusive` behavior.
 - MCP adapter tests for stdio/local-only behavior, tool allowlist, schema-compatible responses, no shell tool, no cleanup tool, and no external upload by default.
+- Resource status tests for no-browser local memory, swap, cgroup, pressure, process memory, warning/recommendation output, MCP wiring, and read-only host boundaries.
 
 Optional acceptance checks against local application servers may run only when those servers are listening. Those checks should use target manifests or fixtures and should not introduce product-specific branches into the runtime.
 
@@ -164,6 +168,13 @@ Optional acceptance checks against local application servers may run only when t
 - Browser smoke tests verify disabled manifests omit the new review brief and rubric outputs.
 - Browser smoke tests verify enabled manifests emit `content_ux_review_brief`, `content_ux_rubric_evaluation`, and Content UX Review Brief report output.
 - Browser smoke tests continue to prove enabled advisory output does not change review findings, `metrics.finding_count`, the existing `action_plan`, or `quality_signals.release_readiness`.
+
+## Phase 20 Resource Status Checks
+
+- No-browser tests cover `resource status` parser/runtime behavior with injected local memory, cgroup, and pressure fixtures.
+- No-browser tests cover MCP `browser_debug_resource_status` wiring and local API exports.
+- Architecture tests verify the resource status module has no Playwright import, no child process use, no external listener, no profile reuse, no storage persistence, no file deletion path, and explicit host-mutation false boundaries.
+- `resource status` output is advisory preflight data only; it does not change review findings, `metrics.finding_count`, existing `action_plan`, or `quality_signals.release_readiness`.
 
 ## Release Readiness Checks
 

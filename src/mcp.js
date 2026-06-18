@@ -67,6 +67,11 @@ export const MCP_TOOLS = Object.freeze([
     }
   },
   {
+    name: 'browser_debug_resource_status',
+    description: 'Report local memory, swap, cgroup, and pressure signals without launching a browser.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {} }
+  },
+  {
     name: 'browser_debug_review_target',
     description: 'Run a deterministic local browser review for a target manifest.',
     inputSchema: {
@@ -176,6 +181,9 @@ function toolToCliArgs(name, args) {
   }
   if (name === 'browser_debug_target_validate') {
     return ['target', 'validate', '--target', args.target, '--json'];
+  }
+  if (name === 'browser_debug_resource_status') {
+    return ['resource', 'status', '--json'];
   }
   if (name === 'browser_debug_review_target') {
     return withCommonOptions(['review', '--target', args.target], args);

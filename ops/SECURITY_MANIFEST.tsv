@@ -6,3 +6,4 @@ review-local-evidence	optional	all	docs/workflow/SECURITY.md	product.security.re
 mcp-stdio-only	optional	all	docs/workflow/SECURITY.md	product.security.mcp_stdio	security	MCP compatibility remains a local stdio adapter without HTTP or socket listeners.
 no-arbitrary-shell	optional	all	docs/workflow/SECURITY.md	product.security.no_shell	security	Runtime must not expose arbitrary shell execution through CLI, review, or MCP adapter paths.
 plugin-local-only	optional	all	docs/workflow/SECURITY.md	product.security.plugin_local	security	Codex plugin metadata must use the local stdio adapter and must not add external upload, profile reuse, or credential storage.
+resource-read-only	optional	all	docs/workflow/SECURITY.md	product.security.resource_status	security	Resource status preflight must remain read-only and must not mutate host cache, swap, files, processes, profiles, or external services.

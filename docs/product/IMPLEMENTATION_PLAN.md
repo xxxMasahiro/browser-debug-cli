@@ -572,6 +572,28 @@ Phase 19 completes the local no-browser manifest-authoring checkpoint for target
 - Completed: no-browser tests cover successful validation, invalid manifest errors, source-value non-disclosure, explicit local boundaries, parser shape, and MCP tool coverage.
 - Completed: product documents, workflow documents, README, changelog, security notes, test-plan manifest, and plugin-facing skill are synchronized with the target validation contract.
 
+### Phase 20: Local Resource Status Preflight
+
+Phase 20 adds a no-browser local resource status preflight for safer browser-heavy review planning. It remains generic, local-first, read-only, and additive. It does not add host cleanup, swap configuration, artifact deletion, arbitrary process control, external upload, existing-profile reuse, HTTP/socket MCP transport, model/API review, authentication automation, package publication, license changes, marketplace mutation, target-specific runtime branches, or changes to existing review findings, metrics, action plans, or release readiness.
+
+#### Phase 20a: CLI Parser and Runtime Contract
+
+- Completed: `browser-debug resource status --json` is parsed as an explicit resource subcommand.
+- Completed: the runtime reports process-visible memory, swap, cgroup, pressure, and current Node.js process memory signals through the standard JSON envelope.
+- Completed: output includes status classification, thresholds, recommendations, cache policy, and explicit local-first boundaries without launching a browser or writing artifacts.
+
+#### Phase 20b: MCP and API Reuse
+
+- Completed: the local stdio MCP adapter exposes `browser_debug_resource_status` over the same CLI/core path.
+- Completed: `runResourceStatus`, `collectResourceStatus`, `parseMeminfoText`, and `parsePressureText` are exported from the local package API.
+- Completed: no shell tool, cleanup tool, privileged helper, HTTP/socket transport, external upload, profile-reuse capability, or host mutation capability was added.
+
+#### Phase 20c: Tests and Documentation
+
+- Completed: no-browser tests cover parser shape, deterministic resource fixture output, cgroup and pressure parsing through injected readers, MCP tool wiring, and local safety boundaries.
+- Completed: architecture tests verify the resource status module has no Playwright import, child process use, external listener, profile reuse, storage persistence, file deletion, or host mutation path.
+- Completed: product documents, workflow documents, README, changelog, security notes, test-plan manifest, and plugin-facing skill are synchronized with the resource status preflight contract.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -601,6 +623,7 @@ Phase 19 completes the local no-browser manifest-authoring checkpoint for target
 - Phase 17 checks cover expanded content UX categories, `content_ux_page_handoff`, `content_ux_manifest_authoring`, report page/authoring summaries, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.
 - Phase 18 checks cover additive `content_ux_review_brief`, additive `content_ux_rubric_evaluation`, report brief/rubric summaries, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.
 - Phase 19 checks cover `target validate` parser/runtime behavior, invalid manifest errors, manifest count output, source-value non-disclosure, MCP tool coverage, API export, and no-browser local-first boundaries.
+- Phase 20 checks cover `resource status` parser/runtime behavior, deterministic memory/cgroup/pressure fixture output, MCP tool coverage, API export, warnings/recommendations, and read-only local-first boundaries without browser launch, artifact writes, cache mutation, swap mutation, file deletion, shell execution, or profile reuse.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, and destructive cleanup commands.
 
 ## Recovery Path

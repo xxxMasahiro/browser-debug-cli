@@ -4,6 +4,7 @@ import { runDoctor } from './doctor.js';
 import { createEnvelope, createErrorEnvelope, stringifyEnvelope } from './envelope.js';
 import { runObserve } from './observe.js';
 import { parseCliArgs } from './parser.js';
+import { runResourceStatus } from './resource-status.js';
 import { runReview } from './review.js';
 import { schemaListResult, schemaResult } from './schema-registry.js';
 import { runSupervisor } from './supervisor.js';
@@ -103,6 +104,10 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'daemon stop') {
       return runtimeResult(parsed.command, await (context.daemonStopRunner ?? stopDaemon)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'resource status') {
+      return runtimeResult(parsed.command, await (context.resourceStatusRunner ?? runResourceStatus)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'target init') {
@@ -307,6 +312,14 @@ function usageText(topic) {
     return `Usage: ${CLI_NAME} daemon stop --daemon <id> [--json]`;
   }
 
+  if (topic === 'resource' || topic === 'resource status') {
+    return [
+      `Usage: ${CLI_NAME} resource status [--json]`,
+      '',
+      'Reports local memory, swap, cgroup, pressure, and process memory signals without launching a browser or mutating the host.'
+    ].join('\n');
+  }
+
   if (topic === 'review') {
     return [
       `Usage: ${CLI_NAME} review (--url <url> | --target <manifest> | --input -) [--json]`,
@@ -375,6 +388,7 @@ function usageText(topic) {
     '  daemon start --url <url> --json',
     '  daemon status --daemon <id> --json',
     '  daemon stop --daemon <id> --json',
+    '  resource status --json',
     '  target init --url <url> --json',
     '  target validate --target <manifest> --json',
     '  session start [--url <url>]',

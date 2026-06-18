@@ -16,6 +16,7 @@ test('runtime and tests avoid caller-specific implementation literals', async ()
     'src/observe.js',
     'src/page-evidence.js',
     'src/parser.js',
+    'src/resource-status.js',
     'src/review.js',
     'src/mcp.js',
     'src/api.js',
@@ -103,6 +104,22 @@ test('review platform keeps local-first and manifest-driven boundaries', async (
   assert.match(target, /createTargetManifest/);
   assert.match(mcp, /tools\/list/);
   assert.match(mcp, /tools\/call/);
+});
+
+test('resource status preflight stays read-only and local', async () => {
+  const resourceStatus = await readText('src/resource-status.js');
+
+  assert.doesNotMatch(resourceStatus, /node:child_process|child_process|execFile|spawn\(/);
+  assert.doesNotMatch(resourceStatus, /createServer|listen\(|WebSocket|EventSource/);
+  assert.doesNotMatch(resourceStatus, /from 'playwright'|import\('playwright'\)/);
+  assert.doesNotMatch(resourceStatus, /launchPersistentContext|userDataDir|storageState/);
+  assert.doesNotMatch(resourceStatus, /\bwriteFile\b|\bunlink\b|\brmdir\b|\bchmod\b|\bchown\b/);
+  assert.match(resourceStatus, /automatic_system_cache_reclamation:\s*false/);
+  assert.match(resourceStatus, /automatic_swap_configuration:\s*false/);
+  assert.match(resourceStatus, /system_cache_mutated:\s*false/);
+  assert.match(resourceStatus, /swap_mutated:\s*false/);
+  assert.match(resourceStatus, /cache_deleted:\s*false/);
+  assert.match(resourceStatus, /shell_used:\s*false/);
 });
 
 test('packaged target templates stay domain-neutral', async () => {
