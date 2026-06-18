@@ -2,7 +2,7 @@
 
 ## Current State
 
-Browser Debug CLI has completed Phase 1, Phase 2a package/runtime design verification, the Phase 5 local MVP runtime slice, the Phase 7 local review-platform implementation, the Phase 8 local dogfood/plugin-readiness implementation, the Phase 9 local review-quality implementation, the Phase 10 local dogfood route-readiness implementation, the Phase 11 local page-expectation review implementation, the Phase 12 local rendered-state dogfood hardening implementation, the Phase 13 local dogfood signal refinement implementation, the Phase 14 local content UX advisory implementation, the Phase 15 local content UX heuristic strengthening implementation, the Phase 16 local content UX handoff output implementation, the Phase 17 local content UX practical handoff implementation, and the Phase 18 local content UX review brief/rubric implementation. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally.
+Browser Debug CLI has completed Phase 1, Phase 2a package/runtime design verification, the Phase 5 local MVP runtime slice, the Phase 7 local review-platform implementation, the Phase 8 local dogfood/plugin-readiness implementation, the Phase 9 local review-quality implementation, the Phase 10 local dogfood route-readiness implementation, the Phase 11 local page-expectation review implementation, the Phase 12 local rendered-state dogfood hardening implementation, the Phase 13 local dogfood signal refinement implementation, the Phase 14 local content UX advisory implementation, the Phase 15 local content UX heuristic strengthening implementation, the Phase 16 local content UX handoff output implementation, the Phase 17 local content UX practical handoff implementation, the Phase 18 local content UX review brief/rubric implementation, and the Phase 19 local target manifest validation implementation. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally.
 
 This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and TASK_TRACKER workflow-state pair synchronized whenever task state changes.
 
@@ -117,12 +117,15 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 - Packaged content UX templates and tests now use domain-neutral status-dashboard vocabulary while preserving selector-scoped state/risk coverage.
 - `status_clarity` and `action_clarity` are the preferred default content UX categories; existing manifest rubric categories `workflow_state_clarity` and `next_action_clarity` remain accepted as legacy-compatible aliases.
 - Lesson-specific Dashboard Control Center workflow, Git, CI, blocker, repository-selection, and next-safe-action semantics should live in lesson-owned target manifests or fixtures, not Browser Debug CLI runtime code.
+- `browser-debug target validate --target <manifest> --json` validates edited manifests without launching a browser and returns normalized counts, authoring suggestions, review next commands, and local-first boundaries.
+- The local MCP adapter exposes `browser_debug_target_validate`, and the local package API exports `runTargetValidate`.
+- Target validation does not mutate manifests, expose sourceData values, upload evidence, reuse profiles, add external source loaders, add HTTP/socket MCP transport, or change review findings, metrics, existing action plans, or release readiness.
 - No arbitrary source-data file or URL loader was added; external references remain ignored advisory signals until a separately approved loader design exists.
 - Model/API review, evidence leaving the local process, HTTP/socket MCP server mode, persistent browser profile reuse, authentication automation, external upload, arbitrary shell execution, destructive cleanup, npm publication, package naming, and license changes remain approval-bound.
 
 ## Next Step
 
-No remaining local Phase 18 implementation work is currently planned. Ask for explicit approval before authentication automation, external daemon control channels, external upload, evidence leaving the local process, arbitrary source-data file or URL loaders, model/API review, HTTP/socket MCP server mode, existing-browser-profile reuse, credential storage, plugin marketplace registration, license change, public package naming, npm publication, or destructive cleanup.
+No remaining local Phase 19 implementation work is currently planned. Ask for explicit approval before authentication automation, external daemon control channels, external upload, evidence leaving the local process, arbitrary source-data file or URL loaders, model/API review, HTTP/socket MCP server mode, existing-browser-profile reuse, credential storage, plugin marketplace registration, license change, public package naming, npm publication, or destructive cleanup.
 
 ## Restart Notes
 

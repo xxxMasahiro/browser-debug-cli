@@ -26,6 +26,7 @@ export const PLANNED_COMMANDS = Object.freeze([
   'daemon status',
   'daemon stop',
   'target init',
+  'target validate',
   'session start',
   'session close',
   'act',

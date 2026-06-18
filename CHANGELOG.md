@@ -61,6 +61,7 @@ All notable local development changes are tracked here before public release.
 - Added Content UX Review Brief summaries to Markdown target reports and reusable manifest templates without changing existing review findings, metrics, action plans, or release readiness.
 - Replaced the packaged content UX example manifest with a domain-neutral status-dashboard template while preserving selector-scoped state/risk coverage.
 - Switched generated/default content UX advisory categories to `status_clarity` and `action_clarity` while keeping legacy rubric category aliases accepted for existing manifests.
+- Added `target validate` for no-browser target manifest validation with manifest counts, authoring suggestions, MCP tool coverage, API export, source-value non-disclosure, and local-first boundaries.
 
 ## Release Status
 

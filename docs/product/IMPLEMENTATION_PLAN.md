@@ -551,6 +551,27 @@ Phase 18 completes the six-step local implementation path for making content UX 
 - Completed: review schema registry and packaged review schema files include additive `content_ux_review_brief` and `content_ux_rubric_evaluation` properties.
 - Completed: requirements, specification, implementation plan, task tracker, handoff, security, verification, README, changelog, manifests, templates, and session memory are synchronized with the Phase 18 contract.
 
+### Phase 19: Local Target Manifest Validation
+
+Phase 19 completes the local no-browser manifest-authoring checkpoint for target review workflows. It remains generic, local-first, non-mutating, and additive. It does not add external source loaders, model/API review, evidence upload, existing-profile reuse, HTTP/socket MCP transport, authentication automation, package publication, license changes, marketplace mutation, target-specific runtime branches, or changes to existing review findings, metrics, action plans, or release readiness.
+
+#### Phase 19a: CLI Parser and Runtime Contract
+
+- Completed: `browser-debug target validate --target <manifest> --json` and `browser-debug target validate --input - --json` are parsed as explicit target subcommands.
+- Completed: the runtime reuses the existing target manifest normalization contract and returns validation status, normalized counts, local authoring suggestions, review next commands, and local-first boundaries.
+- Completed: validation does not launch a browser, mutate manifests, upload evidence, reuse profiles, read arbitrary source-data files or URLs, or expose sourceData values.
+
+#### Phase 19b: MCP and API Reuse
+
+- Completed: the local stdio MCP adapter exposes `browser_debug_target_validate` over the same CLI/core path.
+- Completed: `runTargetValidate` is exported from the local package API next to target manifest creation.
+- Completed: no HTTP/socket transport, shell tool, cleanup tool, marketplace mutation, external upload, or profile-reuse capability was added.
+
+#### Phase 19c: Tests and Documentation
+
+- Completed: no-browser tests cover successful validation, invalid manifest errors, source-value non-disclosure, explicit local boundaries, parser shape, and MCP tool coverage.
+- Completed: product documents, workflow documents, README, changelog, security notes, test-plan manifest, and plugin-facing skill are synchronized with the target validation contract.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -579,6 +600,7 @@ Phase 18 completes the six-step local implementation path for making content UX 
 - Phase 16 checks cover additive `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, Markdown Content UX Developer Handoff output, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.
 - Phase 17 checks cover expanded content UX categories, `content_ux_page_handoff`, `content_ux_manifest_authoring`, report page/authoring summaries, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.
 - Phase 18 checks cover additive `content_ux_review_brief`, additive `content_ux_rubric_evaluation`, report brief/rubric summaries, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.
+- Phase 19 checks cover `target validate` parser/runtime behavior, invalid manifest errors, manifest count output, source-value non-disclosure, MCP tool coverage, API export, and no-browser local-first boundaries.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, and destructive cleanup commands.
 
 ## Recovery Path

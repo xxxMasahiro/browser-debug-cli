@@ -295,17 +295,27 @@ function parseTarget(args, globals) {
     return parseError('target', globals.json, {
       code: 'MISSING_SUBCOMMAND',
       message: 'target requires a subcommand.',
-      details: { subcommands: ['init'] }
+      details: { subcommands: ['init', 'validate'] }
     });
   }
-  if (subcommand !== 'init') {
-    return parseError('target', globals.json, {
-      code: 'UNKNOWN_SUBCOMMAND',
-      message: `Unknown target subcommand: ${subcommand}`,
-      details: { subcommands: ['init'] }
-    });
+  if (subcommand === 'init') {
+    return parseTargetInit(args.slice(1), globals);
   }
-  const parsed = parseOptions('target init', args.slice(1), globals.json);
+  if (subcommand === 'validate') {
+    return parseTargetValidate(args.slice(1), globals);
+  }
+  return parseError('target', globals.json, {
+    code: 'UNKNOWN_SUBCOMMAND',
+    message: `Unknown target subcommand: ${subcommand}`,
+    details: { subcommands: ['init', 'validate'] }
+  });
+}
+
+function parseTargetInit(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: 'target init' } };
+  }
+  const parsed = parseOptions('target init', args, globals.json);
   if (!parsed.ok) {
     return parsed;
   }
@@ -328,6 +338,38 @@ function parseTarget(args, globals) {
     return parseError('target init', globals.json, urlError);
   }
   return { ok: true, command: 'target init', json: globals.json, options: parsed.options };
+}
+
+function parseTargetValidate(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: 'target validate' } };
+  }
+  const parsed = parseOptions('target validate', args, globals.json);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  if (parsed.positionals.length > 0) {
+    return parseError('target validate', globals.json, {
+      code: 'UNEXPECTED_ARGUMENT',
+      message: 'target validate does not accept positional arguments.',
+      details: { argument: parsed.positionals[0] }
+    });
+  }
+  if (parsed.options.target && parsed.options.input) {
+    return parseError('target validate', globals.json, {
+      code: 'CONFLICTING_OPTIONS',
+      message: 'target validate accepts either --target <manifest> or --input -, not both.',
+      details: { options: ['target', 'input'] }
+    });
+  }
+  if (!parsed.options.target && !parsed.options.input) {
+    return parseError('target validate', globals.json, {
+      code: 'MISSING_REQUIRED_OPTION',
+      message: 'target validate requires --target <manifest> or --input -.',
+      details: { options: ['target', 'input'] }
+    });
+  }
+  return { ok: true, command: 'target validate', json: globals.json, options: parsed.options };
 }
 
 function parseReview(args, globals) {
@@ -586,6 +628,8 @@ function plannedCommands() {
     'daemon start',
     'daemon status',
     'daemon stop',
+    'target init',
+    'target validate',
     'session start',
     'session close',
     'act',

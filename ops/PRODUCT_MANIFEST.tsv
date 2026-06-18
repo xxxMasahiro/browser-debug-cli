@@ -22,7 +22,7 @@ product.content_ux_advisory	optional	all	all	src/content-ux-advisory.js	source	f
 product.schema_registry	optional	all	all	src/schema-registry.js	source	file_nonempty	workflow	Machine-readable schema registry for CLI and adapter contracts.
 product.sessions	optional	all	all	src/sessions.js	source	file_nonempty	workflow	Local session, action, report, and spec runtime.
 product.supervisor	optional	all	all	src/supervisor.js	source	file_nonempty	workflow	Process-scoped supervised ephemeral browser runtime.
-product.target	optional	all	all	src/target.js	source	file_nonempty	workflow	Reusable target manifest generation runtime.
+product.target	optional	all	all	src/target.js	source	file_nonempty	workflow	Reusable target manifest generation and validation runtime.
 product.schemas	optional	all	all	schemas/review.schema.json	doc	file_nonempty	workflow	Public machine-readable schema files for review and adapter contracts.
 product.target_template	optional	all	all	templates/review-target-manifest.json	doc	file_nonempty	workflow	Reusable target manifest template for route and viewport review.
 product.status_dashboard_content_ux_template	optional	all	all	templates/status-dashboard-content-ux-target-manifest.json	doc	file_nonempty	workflow	Reusable manifest example for generic status-dashboard content UX advisory, review brief, and rubric review.

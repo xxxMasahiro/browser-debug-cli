@@ -124,3 +124,11 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - The preferred default content UX categories are `status_clarity` and `action_clarity`; existing manifest rubric categories `workflow_state_clarity` and `next_action_clarity` remain accepted as legacy-compatible aliases.
 - Lesson-specific Dashboard Control Center workflow, Git, CI, blocker, repository-selection, and next-safe-action semantics belong in lesson-owned target manifests or fixtures, not Browser Debug CLI runtime code.
 - The implementation remains generic, local-first, advisory-only, and non-mutating. It does not change review findings, `metrics.finding_count`, the existing `action_plan`, or `quality_signals.release_readiness`; it does not read arbitrary source-data files or URLs, add Control Center-specific runtime branches, upload evidence, call models/APIs, automate OAuth/login, reuse existing profiles, add HTTP/socket MCP transport, publish packages, change license, or mutate marketplace state.
+
+## 2026-06-18 Phase 19 Target Manifest Validation Handoff
+
+- Phase 19 is complete for no-browser target manifest validation.
+- `browser-debug target validate --target <manifest> --json` and `browser-debug target validate --input - --json` validate edited target manifests through the existing normalization contract.
+- Validation output includes manifest counts, content UX authoring suggestions, review next commands, and explicit local-first boundaries.
+- The local MCP adapter exposes `browser_debug_target_validate`, and the package API exports `runTargetValidate`.
+- The implementation remains generic, local-first, no-browser, and non-mutating. It does not launch Chromium, mutate manifests, expose sourceData values, read arbitrary source-data files or URLs, upload evidence, reuse profiles, add HTTP/socket MCP transport, change review findings, change `metrics.finding_count`, change the existing `action_plan`, or change `quality_signals.release_readiness`.

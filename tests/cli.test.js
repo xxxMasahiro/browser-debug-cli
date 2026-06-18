@@ -669,10 +669,108 @@ test('target init writes a reusable local target manifest artifact', async () =>
   assert.equal(manifest.baseUrl, 'https://example.test/app');
 });
 
+test('target validate checks edited manifests without launching a browser', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-target-validate-'));
+  const manifestPath = path.join(cwd, 'target.json');
+  await writeFile(manifestPath, JSON.stringify({
+    baseUrl: 'https://example.test/app',
+    expectedRoutes: ['/app/status'],
+    pages: [{
+      name: 'Status',
+      path: '/app/status',
+      role: 'status_overview',
+      expectations: {
+        text: ['Status'],
+        selectors: ['#status'],
+        dataBindings: [{
+          id: 'status-summary',
+          sourceId: 'status-source',
+          pointer: '/status/summary',
+          selector: '#status',
+          target: 'text'
+        }],
+        userQuestions: [{
+          id: 'status-understanding',
+          question: 'Can users understand the current status?',
+          expectedEvidence: ['healthy']
+        }]
+      }
+    }],
+    sourceData: [{
+      id: 'status-source',
+      data: { status: { summary: 'Current local run is healthy' } }
+    }],
+    localContentUxAdvisory: {
+      enabled: true,
+      audience: ['operators'],
+      goal: 'Explain status clearly.',
+      requiredUserQuestions: [{
+        id: 'next-decision',
+        pageId: 'status',
+        question: 'Can users decide the next step?',
+        expectedEvidence: ['healthy']
+      }],
+      reviewBrief: {
+        summary: 'The status page should explain whether action is needed.',
+        userRoles: ['operator'],
+        decisionNeeds: [{
+          id: 'action-decision',
+          pageId: 'status',
+          question: 'Can users decide whether action is needed?',
+          expectedEvidence: ['healthy']
+        }]
+      },
+      rubric: [{
+        id: 'status-clarity',
+        pageId: 'status',
+        category: 'status_clarity',
+        criterion: 'Status is clear.',
+        expectedEvidence: ['healthy']
+      }]
+    }
+  }), 'utf8');
+
+  const parsed = parseCliArgs(['target', 'validate', '--target', manifestPath, '--json']);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'target validate');
+
+  const result = await executeCli(['target', 'validate', '--target', manifestPath, '--json'], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'target validate');
+  assert.equal(body.data.target_manifest.status, 'valid');
+  assert.equal(body.data.target_manifest.counts.expected_routes, 1);
+  assert.equal(body.data.target_manifest.counts.pages, 1);
+  assert.equal(body.data.target_manifest.counts.source_data_available, 1);
+  assert.equal(body.data.target_manifest.counts.data_bindings, 1);
+  assert.equal(body.data.target_manifest.counts.required_user_questions, 1);
+  assert.equal(body.data.target_manifest.counts.review_brief_decision_needs, 1);
+  assert.equal(body.data.target_manifest.counts.rubric_criteria, 1);
+  assert.equal(body.data.boundary.browser_launched, false);
+  assert.equal(body.data.boundary.external_upload, false);
+  assert.equal(body.data.boundary.profile_reuse, false);
+  assert.equal(body.data.boundary.source_data_values_exposed, false);
+  assert.equal(body.data.boundary.manifest_mutated, false);
+  assert.match(body.data.next_commands.review_json, /browser-debug review --target @/);
+  assert.doesNotMatch(result.stdout, /Current local run is healthy/);
+
+  const invalid = await executeCli(['target', 'validate', '--target', '{"name":"missing base"}', '--json'], {
+    now: fixedNow
+  });
+  assert.equal(invalid.exitCode, 1);
+  const invalidBody = JSON.parse(invalid.stdout);
+  assert.equal(invalidBody.command, 'target validate');
+  assert.equal(invalidBody.errors[0].code, 'TARGET_BASE_URL_REQUIRED');
+});
+
 test('MCP adapter exposes a local allowlisted tool surface', async () => {
   const listed = await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_target_init'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_target_validate'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review_target'), true);
   assert.equal(listed.result.tools.some((tool) => /shell|cleanup/i.test(tool.name)), false);
 
@@ -701,6 +799,20 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   }, { cwd, now: fixedNow, createId: () => 'target-mcp' });
   assert.equal(target.result.structuredContent.command, 'target init');
   assert.equal(target.result.structuredContent.data.target_manifest.budgets.maxRoutes, 4);
+
+  const targetArtifact = target.result.structuredContent.artifacts.find((artifact) => artifact.type === 'target_manifest');
+  const validated = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 4,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_target_validate',
+      arguments: { target: targetArtifact.path }
+    }
+  }, { cwd, now: fixedNow });
+  assert.equal(validated.result.structuredContent.command, 'target validate');
+  assert.equal(validated.result.structuredContent.data.target_manifest.status, 'valid');
+  assert.equal(validated.result.structuredContent.data.boundary.browser_launched, false);
 });
 
 test('daemon commands parse and return deterministic JSON envelopes', async () => {
