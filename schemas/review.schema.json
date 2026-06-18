@@ -23,6 +23,10 @@
     "resource_guard": { "type": "object" },
     "evidence_summary": { "type": "object" },
     "artifact_index": { "type": "object" },
+    "agent_advisory": { "type": "object" },
+    "agent_advisory_findings": { "type": "array" },
+    "agent_advisory_action_plan": { "type": "object" },
+    "agent_advisory_readiness": { "type": "object" },
     "environment": { "type": "object" },
     "coverage": { "type": "object" }
   },

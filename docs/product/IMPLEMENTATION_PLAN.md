@@ -637,6 +637,34 @@ Phase 24 adds explicit local cleanup execution scoped to the configured Browser 
 - Completed: cleanup skips symbolic links, preserves receipts, uses the configured artifact root boundary, and does not mutate system cache, configure swap, execute shell commands, use privileged helpers, upload evidence, reuse profiles, or control arbitrary processes.
 - Completed: no-browser tests cover parser shape, dry-run no-delete behavior, explicit execute receipt behavior, MCP plan-only wiring, and architecture boundaries.
 
+### Phase 25: Local Agent Advisory Handoff
+
+Phase 25 adds local agent advisory package, ingest, and report contracts for subscription-capable local agents and future API-provider boundaries. It remains local-first, advisory-only, provider-neutral, and additive. It does not add direct provider API calls, automatic upload, OAuth, credential storage, existing-profile reuse, HTTP/socket MCP transport, model output as deterministic findings, marketplace mutation, package publication, or changes to existing review findings, `metrics.finding_count`, existing `action_plan`, or `quality_signals.release_readiness`.
+
+#### Phase 25a: Surface Registry and Schemas
+
+- Completed: `agent surfaces list --json` returns local subscription-agent surfaces and a generic API-provider boundary without contacting providers.
+- Completed: machine-readable schemas define `agent_surface`, `agent_task_package`, `agent_advisory_result`, and `agent_disclosure_policy`.
+- Completed: review schema accepts additive agent advisory fields while preserving existing review result requirements.
+
+#### Phase 25b: Evidence Package and Subscription Handoff
+
+- Completed: `agent package --review-index <path> --surface <id> --json` creates local `.browser-debug/agent-packages/<id>/packet.json`, prompt, and evidence-packet receipt artifacts from an existing review artifact index.
+- Completed: packages include bounded triage, coverage, evidence class, rerun, and local artifact-reference metadata only. Raw screenshots, trace contents, raw DOM, console payloads, network payloads, report bodies, and sourceData values are not copied into the package.
+- Completed: package output records included/excluded evidence classes, hashes, sensitive local artifact reference types, and `api_call_performed=false`.
+
+#### Phase 25c: Advisory Ingest and Report
+
+- Completed: `agent ingest --package <path> --input <json> --json` normalizes untrusted advisory JSON from inline input, stdin, or a workspace-relative `@file` into separate `agent_advisory`, `agent_advisory_findings`, `agent_advisory_action_plan`, `agent_advisory_readiness`, and `owner_decision_requests` output.
+- Completed: advisory output is labeled untrusted, `gate_effect="none"`, `legacy_action_plan_unchanged=true`, and `legacy_release_readiness_unchanged=true`.
+- Completed: `agent report --review-index <path> --agent-result <path> --json` renders a separate Markdown advisory report without mutating review artifacts.
+
+#### Phase 25d: MCP and API Boundaries
+
+- Completed: the local stdio MCP adapter allowlist is unchanged for agent advisory work; no MCP agent execution, provider API execution, artifact upload, cleanup execution, shell execution, or credential tool was added.
+- Completed: API-provider support is represented only as a future approval-bound surface. No provider SDK, network request, endpoint selection, token handling, or external evidence transfer was implemented.
+- Completed: package API exports the local agent advisory helpers for future dashboard integration.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -671,6 +699,7 @@ Phase 24 adds explicit local cleanup execution scoped to the configured Browser 
 - Phase 22 checks cover daemon lifecycle parser and metadata behavior plus local daemon boundary regressions.
 - Phase 23 checks cover artifact usage planning, dry-run cleanup proposals, MCP plan-only wiring, and no-delete boundaries.
 - Phase 24 checks cover explicit artifact-root-only cleanup receipts and architecture boundaries that prevent host cache/swap mutation, shell execution, privileged helpers, external upload, profile reuse, arbitrary process control, and MCP cleanup execution.
+- Phase 25 checks cover agent surface listing, evidence package generation, prompt and receipt artifacts, advisory result ingest, advisory report generation, schema parity, API-boundary status, unchanged deterministic gate semantics, and architecture boundaries that prevent provider API calls, automatic upload, credential storage, external listeners, shell execution, profile reuse, MCP agent execution, and review artifact mutation.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
 
 ## Recovery Path
@@ -693,5 +722,6 @@ Phase 24 adds explicit local cleanup execution scoped to the configured Browser 
 - Ask before npm publish.
 - Ask before external uploads, OAuth, webhooks, credential storage, cleanup outside the configured artifact root, automatic cleanup, host cleanup, or destructive cleanup not explicitly scoped to `.browser-debug/`.
 - Ask before model/API review integration or any evidence leaves the local process.
+- Ask before turning the generic API-provider boundary into direct provider API execution, adding provider SDKs, storing provider credentials, or exposing agent/API execution through MCP.
 - Ask before HTTP/socket MCP server mode, remote control channels, persistent session storage, existing-browser-profile reuse, or authentication automation.
 - Ask before public API stabilization, npm package file-set changes intended for publication, package naming, license changes, or packed release promotion.

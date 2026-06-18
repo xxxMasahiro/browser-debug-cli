@@ -24,6 +24,7 @@ The Phase 2a design baseline uses Node.js 20 or newer, ESM modules, and a local 
 - Resource guard layer: reuses resource status for review preflight and route/viewport rechecks, emits additive `resource_guard` data, warns on heavy screenshot/trace artifacts, and can stop browser work only when explicitly set to `fail-critical`.
 - Resource artifact layer: inventories `.browser-debug/` artifact usage, proposes cleanup candidates, and performs explicit artifact-root-only cleanup with receipts when `--execute` is provided.
 - Daemon lifecycle layer: adds optional local idle-timeout and max-lifetime shutdown guards to detached ephemeral browser workers.
+- Agent advisory layer: creates bounded local evidence packages from review artifact indexes, generates handoff prompts for local subscription agents, imports untrusted advisory JSON, and renders separate advisory reports without direct API calls, external upload, credential storage, or deterministic gate changes.
 - Schema layer: defines stable JSON contracts for envelopes, artifacts, target manifests, findings, reports, and adapter I/O.
 - Adapter layer: keeps CLI as the source of truth and later exposes the same core through an MCP stdio adapter.
 
@@ -44,6 +45,10 @@ browser-debug resource status --json
 browser-debug resource artifacts plan --json
 browser-debug resource artifacts cleanup --dry-run --json
 browser-debug resource artifacts cleanup --execute --json
+browser-debug agent surfaces list --json
+browser-debug agent package --review-index <review-artifact-index> --surface <surface-id> --json
+browser-debug agent ingest --package <agent-package> --input <agent-result-json> --json
+browser-debug agent report --review-index <review-artifact-index> --agent-result <agent-result> --json
 browser-debug target init --url <url> --json
 browser-debug target validate --target <manifest> --json
 browser-debug act --session <id> --action <json>
@@ -84,6 +89,10 @@ Implemented behavior:
 - `resource status --json` reports local memory, swap, cgroup, pressure, and current process memory signals. It returns `data.resource_status`, recommendations, local safety boundaries, and warnings for elevated pressure without launching a browser, writing artifacts, mutating system cache, configuring swap, deleting files, uploading evidence, or reusing profiles.
 - `resource artifacts plan --json` reports `.browser-debug/` usage, largest files, top-level directory totals, cleanup candidates, and local boundaries without deleting files.
 - `resource artifacts cleanup --dry-run --json` reports the same cleanup proposal without deleting files. `resource artifacts cleanup --execute --json` deletes only selected regular files under the configured artifact root, preserves receipts, and writes an `artifact_cleanup_receipt` artifact.
+- `agent surfaces list --json` returns provider-neutral local agent surfaces. Local subscription-agent surfaces are available for local handoff; the generic API provider surface is listed as approval-bound and does not execute network requests.
+- `agent package --review-index <path> --surface <id> --json` reads an explicitly provided local review artifact index, creates `.browser-debug/agent-packages/<id>/packet.json`, `.browser-debug/agent-packages/<id>/prompt.md`, and an evidence-packet receipt. The package includes bounded triage, coverage, evidence-class, rerun, and local artifact-reference metadata only. It does not copy raw screenshot bytes, trace contents, raw DOM, console payloads, network payloads, reports, or sourceData values.
+- `agent ingest --package <path> --input <json> --json` validates and normalizes untrusted agent output from inline JSON, stdin, or a workspace-relative `@file` into `agent_advisory`, `agent_advisory_findings`, `agent_advisory_action_plan`, `agent_advisory_readiness`, and `owner_decision_requests`. These outputs are separate from review `findings`, `metrics.finding_count`, existing `action_plan`, and `quality_signals.release_readiness`.
+- `agent report --review-index <path> --agent-result <path> --json` writes a separate Markdown advisory report under `.browser-debug/reports/` without mutating existing review artifacts.
 - `session start --url <url>` creates local session metadata and can attach the first observation.
 - `act --session <id> --action <json>` supports simple local actions such as `navigate`, `observe`, `screenshot`, `click`, `fill`, `select`, `press`, `scroll`, and `wait` using an ephemeral page visit. Scroll actions use deterministic page scrolling from the requested deltas.
 - `report --session <id>` writes a Markdown report.
@@ -288,6 +297,41 @@ The command must not launch a browser, write artifacts, upload evidence, reuse b
 `review --resource-guard advisory|fail-critical|off` reuses the local resource status contract. It records preflight checks before single-URL review and route/viewport checks during target review. Advisory is the default and emits warnings only. Fail-critical can stop browser launch or skip remaining target work only when the resource status is critical. The output is additive under `data.resource_guard` and must not change review findings, `metrics.finding_count`, existing `action_plan`, or `quality_signals.release_readiness`.
 
 `resource artifacts plan` inventories the configured artifact root and returns summary totals, top-level directory totals, largest files, cleanup candidates, and no-delete boundaries. `resource artifacts cleanup --dry-run` returns the same proposal without deleting files. `resource artifacts cleanup --execute` deletes selected regular files only under the configured artifact root and writes a local receipt under `receipts/`. It does not follow symlinks, mutate system cache, configure swap, execute shell commands, use privileged helpers, upload evidence, reuse profiles, control arbitrary processes, or expose cleanup execution through MCP.
+
+## Agent Advisory Handoff Contract
+
+The agent advisory layer is a local handoff/import contract for subscription-capable local agents and a future API-provider boundary. It is not direct model/API execution and is not a deterministic review gate.
+
+The surface registry uses provider-neutral records:
+
+```text
+id
+kind: subscription_surface | api_provider
+transport: local_files | local_stdio | provider_api
+status: available | approval_required | disabled
+external_evidence_transfer
+credential_mode
+implemented
+capabilities
+boundaries
+```
+
+`local-subscription-agent` and `local-stdio-agent` are available local surfaces. `generic-api-provider` is an approval-bound boundary marker only; it does not contact a provider, require credentials, upload evidence, or send artifacts outside the local process.
+
+`agent_task_package` records:
+
+```text
+source review artifact index
+surface
+disclosure_policy
+evidence_packet
+prompt metadata
+local safety boundary
+```
+
+The disclosure policy defaults to metadata and local artifact references only. Raw screenshots, trace contents, raw DOM, console payloads, network payloads, sourceData values, and report bodies are excluded by default. The command writes content-free receipts with hashes, included evidence classes, sensitive artifact reference types, and explicit `api_call_performed=false`.
+
+`agent_advisory_result` records imported advisory output as untrusted text. It may include visual design, content information architecture, user journey, mock interpretation, implementation diagnosis, accessibility advisory, and evidence-quality categories. It must set `gate_effect="none"`, `legacy_action_plan_unchanged=true`, `legacy_release_readiness_unchanged=true`, and `blocking_release_gate=false`. Imported advisory output must never execute shell commands, browser actions, file edits, cleanup, publication, dependency changes, manifest mutations, or external uploads.
 
 ## MCP Adapter Contract
 

@@ -67,7 +67,9 @@ All notable local development changes are tracked here before public release.
 - Added daemon `--idle-timeout` and `--max-lifetime` lifecycle guards with local metadata and worker shutdown behavior.
 - Added `resource artifacts plan` and `resource artifacts cleanup --dry-run` for local `.browser-debug/` artifact usage planning without deletion.
 - Added explicit `resource artifacts cleanup --execute` scoped to selected regular files under the configured artifact root with local cleanup receipts.
+- Added local `agent surfaces list`, `agent package`, `agent ingest`, and `agent report` commands for subscription/local agent handoff and advisory result import without API calls, automatic upload, credential storage, or changes to deterministic review gates.
+- Added agent advisory schemas, local package/import receipts, no-browser tests, and architecture boundaries for advisory-only agent output.
 
 ## Release Status
 
-No public package has been released. Package naming, license selection, npm authentication, npm publication, plugin marketplace registration, model/API review, evidence leaving the local process, arbitrary source-data file or URL loaders, HTTP/socket MCP server mode, OAuth/login automation, profile reuse, external upload, host memory-cache mutation, swap configuration, cleanup outside the configured artifact root, MCP cleanup execution, privileged helper execution, and arbitrary process control remain explicit release blockers.
+No public package has been released. Package naming, license selection, npm authentication, npm publication, plugin marketplace registration, direct model/API execution, evidence leaving the local process, arbitrary source-data file or URL loaders, HTTP/socket MCP server mode, OAuth/login automation, profile reuse, external upload, host memory-cache mutation, swap configuration, cleanup outside the configured artifact root, MCP cleanup execution, privileged helper execution, and arbitrary process control remain explicit release blockers.

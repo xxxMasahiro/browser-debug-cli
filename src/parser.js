@@ -1,6 +1,7 @@
 const VALUE_OPTIONS = new Set([
   'action',
   'actions',
+  'agent-result',
   'artifact-root',
   'daemon',
   'idle-timeout',
@@ -12,12 +13,16 @@ const VALUE_OPTIONS = new Set([
   'mock',
   'name',
   'older-than',
+  'package',
   'region',
   'resource-guard',
+  'review-index',
   'session',
+  'surface',
   'target',
   'threshold',
   'timeout',
+  'task',
   'url',
   'viewport'
 ]);
@@ -67,6 +72,8 @@ export function parseCliArgs(argv) {
       return parseDaemon(args, globals);
     case 'resource':
       return parseResource(args, globals);
+    case 'agent':
+      return parseAgent(args, globals);
     case 'target':
       return parseTarget(args, globals);
     case 'session':
@@ -343,6 +350,73 @@ function parseResourceArtifacts(args, globals) {
     });
   }
   return { ok: true, command: `resource artifacts ${subcommand}`, json: globals.json, options: parsed.options };
+}
+
+function parseAgent(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: 'agent' } };
+  }
+  const subcommand = args[0];
+  if (!subcommand) {
+    return parseError('agent', globals.json, {
+      code: 'MISSING_SUBCOMMAND',
+      message: 'agent requires a subcommand.',
+      details: { subcommands: ['surfaces', 'package', 'ingest', 'report'] }
+    });
+  }
+  if (subcommand === 'surfaces') {
+    return parseAgentSurfaces(args.slice(1), globals);
+  }
+  if (subcommand === 'package') {
+    return parseAgentPackage(args.slice(1), globals);
+  }
+  if (subcommand === 'ingest') {
+    return parseAgentIngest(args.slice(1), globals);
+  }
+  if (subcommand === 'report') {
+    return parseAgentReport(args.slice(1), globals);
+  }
+  return parseError('agent', globals.json, {
+    code: 'UNKNOWN_SUBCOMMAND',
+    message: `Unknown agent subcommand: ${subcommand}`,
+    details: { subcommands: ['surfaces', 'package', 'ingest', 'report'] }
+  });
+}
+
+function parseAgentSurfaces(args, globals) {
+  const subcommand = args[0];
+  if (subcommand !== 'list') {
+    return parseError('agent surfaces', globals.json, {
+      code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+      message: subcommand ? `Unknown agent surfaces subcommand: ${subcommand}` : 'agent surfaces requires a subcommand.',
+      details: { subcommands: ['list'] }
+    });
+  }
+  return parseNoArgCommand('agent surfaces list', args.slice(1), globals);
+}
+
+function parseAgentPackage(args, globals) {
+  const parsed = parseRequiredOptions('agent package', args, globals, ['review-index']);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  return parsed;
+}
+
+function parseAgentIngest(args, globals) {
+  const parsed = parseRequiredOptions('agent ingest', args, globals, ['package', 'input']);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  return parsed;
+}
+
+function parseAgentReport(args, globals) {
+  const parsed = parseRequiredOptions('agent report', args, globals, ['review-index', 'agent-result']);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  return parsed;
 }
 
 function parseSpec(args, globals) {
@@ -705,6 +779,10 @@ function plannedCommands() {
     'resource status',
     'resource artifacts plan',
     'resource artifacts cleanup',
+    'agent surfaces list',
+    'agent package',
+    'agent ingest',
+    'agent report',
     'target init',
     'target validate',
     'session start',

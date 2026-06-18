@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://browser-debug.local/schemas/agent-disclosure-policy.schema.json",
+  "title": "Browser Debug CLI Agent Disclosure Policy",
+  "type": "object",
+  "required": [
+    "scope",
+    "raw_artifact_content_included",
+    "external_evidence_transfer",
+    "redaction_applied"
+  ],
+  "properties": {
+    "scope": { "type": "string" },
+    "raw_artifact_content_included": { "type": "boolean" },
+    "raw_dom_included": { "type": "boolean" },
+    "trace_content_included": { "type": "boolean" },
+    "screenshot_binary_included": { "type": "boolean" },
+    "console_payloads_included": { "type": "boolean" },
+    "network_payloads_included": { "type": "boolean" },
+    "source_data_values_included": { "type": "boolean" },
+    "local_artifact_paths_included": { "type": "boolean" },
+    "external_evidence_transfer": { "type": "boolean" },
+    "requires_owner_review_before_external_transfer": { "type": "boolean" },
+    "redaction_applied": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}

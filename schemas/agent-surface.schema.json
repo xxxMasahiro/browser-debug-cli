@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://browser-debug.local/schemas/agent-surface.schema.json",
+  "title": "Browser Debug CLI Agent Surface",
+  "type": "object",
+  "required": [
+    "id",
+    "kind",
+    "transport",
+    "status",
+    "external_evidence_transfer",
+    "credential_mode",
+    "implemented"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "display_name": { "type": "string" },
+    "kind": { "enum": ["subscription_surface", "api_provider"] },
+    "transport": { "type": "string" },
+    "status": { "enum": ["available", "approval_required", "disabled"] },
+    "automation": { "type": "string" },
+    "external_evidence_transfer": { "type": "boolean" },
+    "credential_mode": { "type": "string" },
+    "implemented": { "type": "boolean" },
+    "capabilities": { "type": "array" },
+    "boundaries": { "type": "object" },
+    "approval_required_for": { "type": "array" }
+  },
+  "additionalProperties": true
+}

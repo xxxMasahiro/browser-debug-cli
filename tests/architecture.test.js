@@ -9,6 +9,7 @@ const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 test('runtime and tests avoid caller-specific implementation literals', async () => {
   const files = [
     'src/cli.js',
+    'src/agent.js',
     'src/constants.js',
     'src/content-ux-advisory.js',
     'src/daemon.js',
@@ -149,6 +150,24 @@ test('resource guard and artifact cleanup keep explicit local boundaries', async
   assert.match(resourceArtifacts, /deletion_scope:\s*cacheDeleted \? 'artifact_root_only' : 'none'/);
   assert.match(resourceArtifacts, /privileged_helper_used:\s*false/);
   assert.match(resourceArtifacts, /shell_used:\s*false/);
+});
+
+test('agent advisory layer keeps local handoff and import boundaries', async () => {
+  const agent = await readText('src/agent.js');
+  const mcp = await readText('src/mcp.js');
+
+  assert.doesNotMatch(agent, /from 'playwright'|import\('playwright'\)/);
+  assert.doesNotMatch(agent, /node:child_process|child_process|execFile|spawn\(/);
+  assert.doesNotMatch(agent, /createServer|listen\(|WebSocket|EventSource/);
+  assert.doesNotMatch(agent, /\bfetch\s*\(|XMLHttpRequest|curl|wget/);
+  assert.doesNotMatch(agent, /launchPersistentContext|userDataDir|storageState/);
+  assert.match(agent, /api_call_performed:\s*false/);
+  assert.match(agent, /automatic_upload:\s*false/);
+  assert.match(agent, /credential_storage:\s*false/);
+  assert.match(agent, /existing_review_mutated:\s*false/);
+  assert.match(agent, /raw_artifact_content_included:\s*false/);
+  assert.match(agent, /external_evidence_transfer:\s*false/);
+  assert.doesNotMatch(mcp, /browser_debug_agent|agent package|agent ingest|agent report/);
 });
 
 test('packaged target templates stay domain-neutral', async () => {

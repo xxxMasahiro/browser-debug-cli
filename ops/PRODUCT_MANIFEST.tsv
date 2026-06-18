@@ -11,6 +11,7 @@ product.cli_bin	optional	all	all	bin/browser-debug.js	source	file_nonempty	workf
 product.mcp_bin	optional	all	all	bin/browser-debug-mcp.js	source	file_nonempty	workflow	Local stdio MCP adapter executable entrypoint.
 product.source	required	all	all	src/cli.js	source	file_nonempty	workflow	CLI runtime entrypoint.
 product.public_api	optional	all	all	src/api.js	source	file_nonempty	workflow	Public local package API exports for reusable core functions.
+product.agent_advisory	optional	all	all	src/agent.js	source	file_nonempty	workflow	Local agent advisory package, ingest, report, and surface registry runtime.
 product.input	optional	all	all	src/input.js	source	file_nonempty	workflow	Reusable structured input resolution helpers for inline, file, and stdin input.
 product.daemon	optional	all	all	src/daemon.js	source	file_nonempty	workflow	Local background browser daemon controller.
 product.daemon_worker	optional	all	all	src/daemon-worker.js	source	file_nonempty	workflow	Local background browser daemon worker process.
@@ -28,6 +29,10 @@ product.sessions	optional	all	all	src/sessions.js	source	file_nonempty	workflow	
 product.supervisor	optional	all	all	src/supervisor.js	source	file_nonempty	workflow	Process-scoped supervised ephemeral browser runtime.
 product.target	optional	all	all	src/target.js	source	file_nonempty	workflow	Reusable target manifest generation and validation runtime.
 product.schemas	optional	all	all	schemas/review.schema.json	doc	file_nonempty	workflow	Public machine-readable schema files for review and adapter contracts.
+product.agent_surface_schema	optional	all	all	schemas/agent-surface.schema.json	doc	file_nonempty	workflow	Public schema for local subscription and future API provider surfaces.
+product.agent_task_package_schema	optional	all	all	schemas/agent-task-package.schema.json	doc	file_nonempty	workflow	Public schema for local agent evidence handoff packages.
+product.agent_advisory_result_schema	optional	all	all	schemas/agent-advisory-result.schema.json	doc	file_nonempty	workflow	Public schema for normalized untrusted agent advisory results.
+product.agent_disclosure_policy_schema	optional	all	all	schemas/agent-disclosure-policy.schema.json	doc	file_nonempty	workflow	Public schema for agent evidence disclosure policies.
 product.target_template	optional	all	all	templates/review-target-manifest.json	doc	file_nonempty	workflow	Reusable target manifest template for route and viewport review.
 product.status_dashboard_content_ux_template	optional	all	all	templates/status-dashboard-content-ux-target-manifest.json	doc	file_nonempty	workflow	Reusable manifest example for generic status-dashboard content UX advisory, review brief, and rubric review.
 product.plugin_skill	optional	all	all	skills/browser-debug-review/SKILL.md	doc	file_nonempty	workflow	Plugin-facing usage skill for local browser review workflows.

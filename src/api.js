@@ -1,4 +1,5 @@
 export { executeCli, runCli } from './cli.js';
+export { AGENT_SURFACES, runAgentIngest, runAgentPackage, runAgentReport, runAgentSurfacesList } from './agent.js';
 export { runObserve } from './observe.js';
 export { buildArtifactCleanupPlan, runResourceArtifactsCleanup, runResourceArtifactsPlan } from './resource-artifacts.js';
 export { createResourceGuard, normalizeResourceGuardMode, resourceGuardSummary } from './resource-guard.js';

@@ -101,6 +101,93 @@ const schemas = Object.freeze({
     },
     additionalProperties: true
   }),
+  agent_surface: Object.freeze({
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: 'https://browser-debug.local/schemas/agent-surface.schema.json',
+    title: 'Browser Debug CLI Agent Surface',
+    type: 'object',
+    required: ['id', 'kind', 'transport', 'status', 'external_evidence_transfer', 'credential_mode', 'implemented'],
+    properties: {
+      id: { type: 'string' },
+      display_name: { type: 'string' },
+      kind: { enum: ['subscription_surface', 'api_provider'] },
+      transport: { type: 'string' },
+      status: { enum: ['available', 'approval_required', 'disabled'] },
+      automation: { type: 'string' },
+      external_evidence_transfer: { type: 'boolean' },
+      credential_mode: { type: 'string' },
+      implemented: { type: 'boolean' },
+      capabilities: { type: 'array' },
+      boundaries: { type: 'object' },
+      approval_required_for: { type: 'array' }
+    },
+    additionalProperties: true
+  }),
+  agent_task_package: Object.freeze({
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: 'https://browser-debug.local/schemas/agent-task-package.schema.json',
+    title: 'Browser Debug CLI Agent Task Package',
+    type: 'object',
+    required: ['schema_version', 'id', 'task', 'status', 'created_at', 'surface', 'source', 'disclosure_policy', 'evidence_packet', 'boundary'],
+    properties: {
+      schema_version: { type: 'string' },
+      id: { type: 'string' },
+      task: { type: 'string' },
+      status: { enum: ['ready', 'error'] },
+      created_at: { type: 'string' },
+      surface: { type: 'object' },
+      source: { type: 'object' },
+      disclosure_policy: { type: 'object' },
+      evidence_packet: { type: 'object' },
+      prompt: { type: 'object' },
+      boundary: { type: 'object' }
+    },
+    additionalProperties: true
+  }),
+  agent_advisory_result: Object.freeze({
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: 'https://browser-debug.local/schemas/agent-advisory-result.schema.json',
+    title: 'Browser Debug CLI Agent Advisory Result',
+    type: 'object',
+    required: ['schema_version', 'id', 'agent_advisory', 'agent_advisory_findings', 'agent_advisory_action_plan', 'agent_advisory_readiness', 'boundary'],
+    properties: {
+      schema_version: { type: 'string' },
+      id: { type: 'string' },
+      package_id: { type: ['string', 'null'] },
+      package_path: { type: 'string' },
+      imported_at: { type: 'string' },
+      agent_advisory: { type: 'object' },
+      agent_advisory_findings: { type: 'array' },
+      agent_advisory_action_plan: { type: 'object' },
+      agent_advisory_readiness: { type: 'object' },
+      owner_decision_requests: { type: 'array' },
+      warnings: { type: 'array' },
+      boundary: { type: 'object' }
+    },
+    additionalProperties: true
+  }),
+  agent_disclosure_policy: Object.freeze({
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: 'https://browser-debug.local/schemas/agent-disclosure-policy.schema.json',
+    title: 'Browser Debug CLI Agent Disclosure Policy',
+    type: 'object',
+    required: ['scope', 'raw_artifact_content_included', 'external_evidence_transfer', 'redaction_applied'],
+    properties: {
+      scope: { type: 'string' },
+      raw_artifact_content_included: { type: 'boolean' },
+      raw_dom_included: { type: 'boolean' },
+      trace_content_included: { type: 'boolean' },
+      screenshot_binary_included: { type: 'boolean' },
+      console_payloads_included: { type: 'boolean' },
+      network_payloads_included: { type: 'boolean' },
+      source_data_values_included: { type: 'boolean' },
+      local_artifact_paths_included: { type: 'boolean' },
+      external_evidence_transfer: { type: 'boolean' },
+      requires_owner_review_before_external_transfer: { type: 'boolean' },
+      redaction_applied: { type: 'boolean' }
+    },
+    additionalProperties: true
+  }),
   review: Object.freeze({
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: 'https://browser-debug.local/schemas/review.schema.json',
@@ -126,6 +213,10 @@ const schemas = Object.freeze({
       resource_guard: { type: 'object' },
       evidence_summary: { type: 'object' },
       artifact_index: { type: 'object' },
+      agent_advisory: { type: 'object' },
+      agent_advisory_findings: { type: 'array' },
+      agent_advisory_action_plan: { type: 'object' },
+      agent_advisory_readiness: { type: 'object' },
       environment: { type: 'object' },
       coverage: { type: 'object' }
     },

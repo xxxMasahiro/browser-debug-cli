@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://browser-debug.local/schemas/agent-task-package.schema.json",
+  "title": "Browser Debug CLI Agent Task Package",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "task",
+    "status",
+    "created_at",
+    "surface",
+    "source",
+    "disclosure_policy",
+    "evidence_packet",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "id": { "type": "string" },
+    "task": { "type": "string" },
+    "status": { "enum": ["ready", "error"] },
+    "created_at": { "type": "string" },
+    "surface": { "type": "object" },
+    "source": { "type": "object" },
+    "disclosure_policy": { "type": "object" },
+    "evidence_packet": { "type": "object" },
+    "prompt": { "type": "object" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

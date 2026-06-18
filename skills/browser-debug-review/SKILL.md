@@ -30,6 +30,12 @@ Use this skill when a user wants local browser observation, route coverage, UI r
 13. Use `quality_signals.page_expectations`, `quality_signals.rendered_state`, and `artifact_index` to decide whether expected page states, loaded/empty UI states, mocks, or evidence bundles need follow-up.
 14. Use `manifest_suggestions` to identify manifest-only rerun improvements such as adding named pages, pinning routes, or raising route budgets.
 15. Use the returned `action_plan`, `review_advisory`, `quality_signals`, findings, and artifact paths for developer handoff.
+16. When a local subscription agent should provide advisory review, package the existing review artifact index:
+   `browser-debug agent package --review-index <review-artifact-index> --surface local-subscription-agent --json`
+17. Import the returned advisory JSON without changing deterministic review fields:
+   `browser-debug agent ingest --package <agent-package> --input @agent-advisory-result.json --json`
+18. Render a separate advisory report when needed:
+   `browser-debug agent report --review-index <review-artifact-index> --agent-result <agent-result> --json`
 
 ## Boundaries
 
@@ -43,4 +49,6 @@ Use this skill when a user wants local browser observation, route coverage, UI r
 - `resource_guard` is additive review safety output; it must not change review findings, metrics, existing action plans, or release readiness.
 - `resource artifacts plan` and cleanup dry-run are local no-delete checks. `resource artifacts cleanup --execute` must stay scoped to selected regular files under the configured artifact root and write a receipt.
 - MCP exposes artifact planning only; do not use MCP for cleanup execution.
+- Agent advisory commands are local handoff/import tools. They do not call provider APIs, upload artifacts, store credentials, mutate review JSON, or change deterministic findings, metrics, existing action plans, or release readiness.
+- Keep direct model/API execution approval-bound even when an API-provider surface is listed as a future boundary.
 - Prefer target manifests, route budgets, expected routes, and viewport matrices over app-specific runtime branches.

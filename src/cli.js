@@ -1,4 +1,5 @@
 import { CLI_NAME, DEFAULT_ARTIFACT_ROOT, PACKAGE_VERSION, PLANNED_COMMANDS } from './constants.js';
+import { runAgentIngest, runAgentPackage, runAgentReport, runAgentSurfacesList } from './agent.js';
 import { daemonStatus, startDaemon, stopDaemon } from './daemon.js';
 import { runDoctor } from './doctor.js';
 import { createEnvelope, createErrorEnvelope, stringifyEnvelope } from './envelope.js';
@@ -117,6 +118,22 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'resource artifacts cleanup') {
       return runtimeResult(parsed.command, await (context.resourceArtifactsCleanupRunner ?? runResourceArtifactsCleanup)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent surfaces list') {
+      return runtimeResult(parsed.command, await (context.agentSurfacesListRunner ?? runAgentSurfacesList)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent package') {
+      return runtimeResult(parsed.command, await (context.agentPackageRunner ?? runAgentPackage)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent ingest') {
+      return runtimeResult(parsed.command, await (context.agentIngestRunner ?? runAgentIngest)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent report') {
+      return runtimeResult(parsed.command, await (context.agentReportRunner ?? runAgentReport)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'target init') {

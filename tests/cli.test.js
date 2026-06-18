@@ -305,6 +305,197 @@ test('schema commands expose machine-readable contracts', async () => {
     Object.keys(targetManifestSchemaBody.data.schema.properties).sort(),
     Object.keys(targetManifestSchemaFile.properties).sort()
   );
+
+  const agentSchemaPairs = [
+    ['agent_surface', '../schemas/agent-surface.schema.json'],
+    ['agent_task_package', '../schemas/agent-task-package.schema.json'],
+    ['agent_advisory_result', '../schemas/agent-advisory-result.schema.json'],
+    ['agent_disclosure_policy', '../schemas/agent-disclosure-policy.schema.json']
+  ];
+  for (const [name, file] of agentSchemaPairs) {
+    const schemaFile = JSON.parse(await readFile(new URL(file, import.meta.url), 'utf8'));
+    const schema = await executeCli(['schema', 'get', '--name', name, '--json'], { now: fixedNow });
+    assert.equal(schema.exitCode, 0);
+    const schemaBody = JSON.parse(schema.stdout);
+    assert.deepEqual(
+      Object.keys(schemaBody.data.schema.properties).sort(),
+      Object.keys(schemaFile.properties).sort()
+    );
+  }
+});
+
+test('agent package, ingest, and report stay local and advisory-only', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-agent-'));
+  await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
+  await mkdir(path.join(cwd, '.browser-debug', 'review-artifacts'), { recursive: true });
+  const reviewIndex = {
+    schema_version: '0.1.0',
+    id: 'review-fixed',
+    mode: 'target_manifest',
+    local_only: true,
+    external_upload: false,
+    artifact_root: '.browser-debug',
+    evidence_classes: ['layout', 'screenshot'],
+    artifacts: [
+      { type: 'review', path: '.browser-debug/reviews/review-fixed.json', description: 'Review JSON.' },
+      { type: 'screenshot', path: '.browser-debug/screenshots/review-fixed.png', description: 'Screenshot.' }
+    ],
+    triage: {
+      status: 'needs_attention',
+      local_release_gate: 'needs_fixes',
+      model_review_enabled: false
+    },
+    coverage_summary: {
+      discovered_routes: 1,
+      visited_routes: 1,
+      expected_routes: 1,
+      skipped_routes: 0,
+      failed_page_expectations: 0,
+      viewports: ['desktop']
+    },
+    rerun: {
+      command: 'browser-debug review --target @target.json --json',
+      guidance: ['Rerun after fixes.']
+    },
+    boundaries: {
+      screenshots_may_contain_page_content: true,
+      traces_may_contain_page_content: false,
+      profile_reuse: false,
+      credential_storage: false
+    }
+  };
+  await writeFile(
+    path.join(cwd, '.browser-debug', 'review-artifacts', 'review-fixed.json'),
+    `${JSON.stringify(reviewIndex, null, 2)}\n`,
+    'utf8'
+  );
+
+  const listed = await executeCli(['agent', 'surfaces', 'list', '--json'], { now: fixedNow });
+  assert.equal(listed.exitCode, 0);
+  const listedBody = JSON.parse(listed.stdout);
+  assert.equal(listedBody.command, 'agent surfaces list');
+  assert.ok(listedBody.data.agent_surfaces.some((surface) => surface.kind === 'subscription_surface' && surface.implemented === true));
+  assert.ok(listedBody.data.agent_surfaces.some((surface) => surface.kind === 'api_provider' && surface.status === 'approval_required'));
+  assert.equal(listedBody.data.boundary.api_call_performed, false);
+
+  const packaged = await executeCli([
+    'agent',
+    'package',
+    '--review-index',
+    '.browser-debug/review-artifacts/review-fixed.json',
+    '--surface',
+    'local-subscription-agent',
+    '--task',
+    'experience_review',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agent-package-fixed'
+  });
+  assert.equal(packaged.exitCode, 0);
+  const packagedBody = JSON.parse(packaged.stdout);
+  assert.equal(packagedBody.command, 'agent package');
+  assert.equal(packagedBody.data.agent_task_package.path, '.browser-debug/agent-packages/agent-package-fixed/packet.json');
+  assert.equal(packagedBody.data.agent_disclosure_policy.raw_artifact_content_included, false);
+  assert.equal(packagedBody.data.agent_disclosure_policy.screenshot_binary_included, false);
+  assert.equal(packagedBody.data.agent_disclosure_policy.external_evidence_transfer, false);
+  assert.equal(packagedBody.data.boundary.api_call_performed, false);
+  assert.equal(packagedBody.data.boundary.existing_review_mutated, false);
+  assert.equal(packagedBody.artifacts.some((artifact) => artifact.type === 'agent_prompt'), true);
+  assert.equal(packagedBody.warnings.some((warning) => warning.code === 'AGENT_PACKAGE_SENSITIVE_ARTIFACT_REFERENCES'), true);
+  const packet = JSON.parse(await readFile(path.join(cwd, '.browser-debug', 'agent-packages', 'agent-package-fixed', 'packet.json'), 'utf8'));
+  assert.equal(packet.evidence_packet.artifacts[1].content_included, false);
+  assert.equal(packet.boundary.external_evidence_transfer, false);
+  const prompt = await readFile(path.join(cwd, '.browser-debug', 'agent-packages', 'agent-package-fixed', 'prompt.md'), 'utf8');
+  assert.match(prompt, /Required output shape/);
+
+  const advisoryInput = JSON.stringify({
+    agent_advisory_findings: [{
+      id: 'visual-density',
+      category: 'visual_design',
+      severity: 'medium',
+      confidence: { evidence: 'high', judgment: 'medium', implementation: 'low' },
+      message: 'Primary controls compete with secondary metadata.',
+      recommendation: 'Reduce secondary metadata weight before changing the primary action.',
+      selector: '#primary-panel',
+      evidence_refs: ['.browser-debug/screenshots/review-fixed.png'],
+      owner_decision_required: true
+    }],
+    owner_decision_requests: [{
+      id: 'brand-fit',
+      question: 'Is the denser layout acceptable for the target audience?',
+      reason: 'This is a subjective product judgment.'
+    }]
+  });
+  const absoluteInput = await executeCli([
+    'agent',
+    'ingest',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--input',
+    `@${path.join(cwd, 'agent-advisory-result.json')}`,
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(absoluteInput.exitCode, 1);
+  const absoluteInputBody = JSON.parse(absoluteInput.stdout);
+  assert.equal(absoluteInputBody.errors[0].code, 'AGENT_INPUT_PATH_OUTSIDE_WORKSPACE');
+
+  const ingested = await executeCli([
+    'agent',
+    'ingest',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--input',
+    '-',
+    '--surface',
+    'local-subscription-agent',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    stdinText: advisoryInput,
+    createId: () => 'agent-result-fixed'
+  });
+  assert.equal(ingested.exitCode, 0);
+  const ingestedBody = JSON.parse(ingested.stdout);
+  assert.equal(ingestedBody.command, 'agent ingest');
+  assert.equal(ingestedBody.data.agent_advisory.gate_effect, 'none');
+  assert.equal(ingestedBody.data.agent_advisory.untrusted_model_output, true);
+  assert.equal(ingestedBody.data.agent_advisory_findings.length, 1);
+  assert.equal(ingestedBody.data.agent_advisory_findings[0].source, 'agent_advisory');
+  assert.equal(ingestedBody.data.agent_advisory_findings[0].gate_effect, 'none');
+  assert.equal(ingestedBody.data.agent_advisory_action_plan.legacy_action_plan_unchanged, true);
+  assert.equal(ingestedBody.data.agent_advisory_readiness.legacy_release_readiness_unchanged, true);
+  assert.equal(ingestedBody.data.boundary.existing_review_mutated, false);
+  assert.equal(ingestedBody.artifacts.some((artifact) => artifact.type === 'agent_import_receipt'), true);
+  const receipt = JSON.parse(await readFile(path.join(cwd, '.browser-debug', 'receipts', 'agent-result-fixed.json'), 'utf8'));
+  assert.equal(receipt.raw_response_stored, false);
+  assert.equal(receipt.api_call_performed, false);
+
+  const reported = await executeCli([
+    'agent',
+    'report',
+    '--review-index',
+    '.browser-debug/review-artifacts/review-fixed.json',
+    '--agent-result',
+    '.browser-debug/agent-results/agent-result-fixed.json',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agent-report-fixed'
+  });
+  assert.equal(reported.exitCode, 0);
+  const reportedBody = JSON.parse(reported.stdout);
+  assert.equal(reportedBody.command, 'agent report');
+  assert.equal(reportedBody.data.agent_report.existing_review_mutated, false);
+  const report = await readFile(path.join(cwd, '.browser-debug', 'reports', 'agent-report-fixed.md'), 'utf8');
+  assert.match(report, /Agent Advisory Report/);
+  assert.match(report, /Existing deterministic review findings/);
 });
 
 test('target manifests and action candidates use generic review abstractions', () => {

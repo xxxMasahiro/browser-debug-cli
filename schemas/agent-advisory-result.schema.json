@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://browser-debug.local/schemas/agent-advisory-result.schema.json",
+  "title": "Browser Debug CLI Agent Advisory Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "agent_advisory",
+    "agent_advisory_findings",
+    "agent_advisory_action_plan",
+    "agent_advisory_readiness",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "id": { "type": "string" },
+    "package_id": { "type": ["string", "null"] },
+    "package_path": { "type": "string" },
+    "imported_at": { "type": "string" },
+    "agent_advisory": { "type": "object" },
+    "agent_advisory_findings": { "type": "array" },
+    "agent_advisory_action_plan": { "type": "object" },
+    "agent_advisory_readiness": { "type": "object" },
+    "owner_decision_requests": { "type": "array" },
+    "warnings": { "type": "array" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}
