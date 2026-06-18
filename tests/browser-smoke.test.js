@@ -690,8 +690,8 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
     '<main>',
     '<h1>Overview</h1>',
     '<p id="summary" data-state="ready">Operations summary ready</p>',
-    '<p id="checks" data-status="passed">Checks passed</p>',
-    '<p id="risk" data-risk="low">No blockers</p>',
+    '<p id="checks" data-status="passed">Health checks passed</p>',
+    '<p id="risk" data-risk="low">Low risk</p>',
     '<button id="primary">Open Details</button>',
     '</main>',
     '</body>',
@@ -703,24 +703,24 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
     pages: [{
       name: 'Overview Page',
       url: `file://${page}`,
-      role: 'workflow_overview',
+      role: 'status_overview',
       expectations: {
         dataBindings: [{
           id: 'summary-copy',
-          sourceId: 'workflow',
+          sourceId: 'service',
           pointer: '/status/summary',
           selector: '#summary',
           target: 'text'
         }, {
           id: 'summary-state',
-          sourceId: 'workflow',
+          sourceId: 'service',
           pointer: '/status/state',
           selector: '#summary',
           target: 'data-state',
           match: 'exact'
         }, {
           id: 'check-status',
-          sourceId: 'workflow',
+          sourceId: 'service',
           pointer: '/checks/status',
           selector: '#checks',
           target: 'attribute',
@@ -728,16 +728,16 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
           match: 'exact'
         }, {
           id: 'risk-level',
-          sourceId: 'workflow',
+          sourceId: 'service',
           pointer: '/risk/level',
           selector: '#risk',
           target: 'data-risk',
           match: 'exact'
         }],
         userQuestions: [{
-          id: 'blocker-awareness',
-          question: 'Can the user tell whether there are blockers?',
-          expectedEvidence: ['No blockers'],
+          id: 'risk-awareness',
+          question: 'Can the user tell whether the status needs attention?',
+          expectedEvidence: ['Low risk'],
           selector: '#risk'
         }]
       }
@@ -750,7 +750,7 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
   await writeFile(enabledManifest, JSON.stringify({
     ...baseManifest,
     sourceData: [{
-      id: 'workflow',
+      id: 'service',
       data: {
         status: { summary: 'Operations summary ready', state: 'ready' },
         checks: { status: 'passed' },
@@ -760,7 +760,7 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
     localContentUxAdvisory: {
       enabled: true,
       audience: ['operators'],
-      goal: 'Explain the current workflow state at a glance.',
+      goal: 'Explain the current service status at a glance.',
       requiredUserQuestions: [{
         id: 'summary-awareness',
         pageId: 'overview-page',
@@ -768,21 +768,21 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
         expectedEvidence: ['Operations summary']
       }],
       reviewBrief: {
-        summary: 'The overview page should let operators understand state, blockers, and next actions.',
+        summary: 'The overview page should let operators understand status, risk, and next actions.',
         userRoles: ['operator'],
         decisionNeeds: [{
           id: 'state-decision',
           pageId: 'overview-page',
-          question: 'Can operators decide whether the workflow needs intervention?',
-          expectedEvidence: ['No blockers']
+          question: 'Can operators decide whether the status needs intervention?',
+          expectedEvidence: ['Low risk']
         }]
       },
       rubric: [{
         id: 'state-clarity',
-        category: 'workflow_state_clarity',
+        category: 'status_clarity',
         pageId: 'overview-page',
-        criterion: 'The page communicates workflow state and blocker risk.',
-        expectedEvidence: ['No blockers'],
+        criterion: 'The page communicates status and risk.',
+        expectedEvidence: ['Low risk'],
         severity: 'medium'
       }]
     }

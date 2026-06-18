@@ -88,7 +88,7 @@
 
 ### Phase 7: Review Platform and CLI/MCP Adapter
 
-Phase 7 extends the local MVP into a reusable review platform. It preserves the existing local-first Playwright runtime, schema compatibility rules, artifact boundaries, and security invariants. It does not reimplement Playwright, clone the full Playwright MCP surface, or add product-specific branches for individual Control Centers.
+Phase 7 extends the local MVP into a reusable review platform. It preserves the existing local-first Playwright runtime, schema compatibility rules, artifact boundaries, and security invariants. It does not reimplement Playwright, clone the full Playwright MCP surface, or add product-specific branches for individual applications.
 
 Current status: completed for local deterministic review, target manifests, route/viewport coverage, risk classification, conservative mock metrics, local stdio MCP adapter, schema registry, package API exports, and package file-set readiness. Model or vision review remains a later explicit opt-in layer and was not implemented.
 
@@ -115,7 +115,7 @@ Current status: completed for local deterministic review, target manifests, rout
 
 - Completed: added `browser-debug review --target <manifest> --json`.
 - Completed: defined a generic target manifest with `baseUrl`, `scope`, `seeds`, `expectedRoutes`, `viewportMatrix`, `actionPolicy`, `budgets`, `artifacts`, `masks`, `regions`, and optional `appHints`.
-- Completed: kept Control Center examples out of runtime-specific branches.
+- Completed: kept application examples out of runtime-specific branches.
 - Completed: implemented route and review run IDs for deduplication while avoiding dependency on one framework or one route style.
 - Completed: added support for shell-safe structured input such as `--input -`, `--target @file`, `--actions @file`, and `--action @file`.
 
@@ -208,13 +208,13 @@ Phase 8 turns the Phase 7 review core into a more complete local workflow for wh
 
 ### Phase 9: Local Review Quality Signals and Dogfood Readiness
 
-Phase 9 completes the local implementation path for the five-step next-work plan: Control-surface dogfood workflow readiness, detection quality strengthening, developer improvement handoff, local release decision support, and model/vision review boundary preparation. It remains local-first and generic. It does not add target-specific Control Center runtime branches, external upload, model/API calls, OAuth, existing-profile reuse, HTTP/socket MCP transport, marketplace mutation, license changes, or npm publication.
+Phase 9 completes the local implementation path for the five-step next-work plan: review-surface dogfood readiness, detection quality strengthening, developer improvement handoff, local release decision support, and model/vision review boundary preparation. It remains local-first and generic. It does not add target-specific application runtime branches, external upload, model/API calls, OAuth, existing-profile reuse, HTTP/socket MCP transport, marketplace mutation, license changes, or npm publication.
 
 #### Phase 9a: Control-Surface Dogfood Workflow Readiness
 
 - Completed: target-manifest review output now includes `quality_signals` for route and viewport coverage.
 - Completed: target Markdown reports include quality signal summaries for developer triage.
-- Completed as boundary: specific Control Center URLs, labels, routes, and acceptance notes remain in manifests or local evidence, not runtime code.
+- Completed as boundary: specific application URLs, labels, routes, and acceptance notes remain in manifests or local evidence, not runtime code.
 
 #### Phase 9b: Detection Quality Strengthening
 
@@ -315,7 +315,7 @@ Phase 11 completes the five-step local implementation path for practical whole-a
 
 - Completed: browser smoke coverage verifies page-specific viewports, expected text, missing expected selectors, page-level mock metrics, target report output, and review artifact indexes.
 - Completed: no-browser tests verify manifest page normalization and generated target manifest shape.
-- Completed as boundary: live Control Center review should run only when URLs are provided and listening; fixture tests cover the generic runtime path when no live target is available.
+- Completed as boundary: live application review should run only when URLs are provided and listening; fixture tests cover the generic runtime path when no live target is available.
 
 ### Phase 12: Rendered-State Dogfood Hardening
 
@@ -355,7 +355,7 @@ Phase 12 completes the six-step local dogfood hardening path for making real app
 
 ### Phase 13: Dogfood Signal Refinement
 
-Phase 13 completes the local dogfood refinement found while reviewing real Control Center pages. It keeps the review engine generic and avoids application-specific branches while reducing false-positive rendered-state findings.
+Phase 13 completes the local dogfood refinement found while reviewing real application pages. It keeps the review engine generic and avoids application-specific branches while reducing false-positive rendered-state findings.
 
 #### Phase 13a: Loading Signal Precision
 
@@ -366,12 +366,12 @@ Phase 13 completes the local dogfood refinement found while reviewing real Contr
 #### Phase 13b: Dogfood Recheck Boundary
 
 - Completed: local dogfood rechecks confirmed API/proxy startup issues are reported as browser-health findings, and corrected startup removes those findings.
-- Completed: corrected FrameCue Control Center review no longer reports loading indicators for ready/progress business-state copy.
-- Completed as boundary: remaining Control Center findings are target UI findings or owner-review heuristics, not target-specific Browser Debug CLI runtime branches.
+- Completed: corrected local dogfood review no longer reports loading indicators for ready/progress business-state copy.
+- Completed as boundary: remaining target findings are target UI findings or owner-review heuristics, not target-specific Browser Debug CLI runtime branches.
 
 ### Phase 14: Manifest Opt-In Content UX Advisory
 
-Phase 14 adds a local content UX advisory layer for the gap identified during dogfood review: deterministic rendered-state checks do not judge whether a page communicates the right workflow state, audience, or source facts. The implementation is manifest-driven, reusable, and additive. It does not add model/API review, evidence transfer, Control Center-specific runtime branches, arbitrary source-data file reads, HTTP/socket MCP transport, authentication automation, existing-profile reuse, package publication, license changes, or marketplace mutation.
+Phase 14 adds a local content UX advisory layer for the gap identified during dogfood review: deterministic rendered-state checks do not judge whether a page communicates the right state, audience, or source facts. The implementation is manifest-driven, reusable, and additive. It does not add model/API review, evidence transfer, application-specific runtime branches, arbitrary source-data file reads, HTTP/socket MCP transport, authentication automation, existing-profile reuse, package publication, license changes, or marketplace mutation.
 
 #### Phase 14a: Document and Contract Sync
 
@@ -406,7 +406,7 @@ Phase 14 adds a local content UX advisory layer for the gap identified during do
 
 ### Phase 15: Content UX Heuristic Strengthening
 
-Phase 15 completes the five-step local implementation path for making content and UX advisory more useful for Control Center-style applications without adding model/API review, evidence transfer, target-specific runtime branches, arbitrary source-data file reads, HTTP/socket MCP transport, authentication automation, existing-profile reuse, package publication, license changes, marketplace mutation, or existing-feature tradeoffs.
+Phase 15 completes the five-step local implementation path for making content and UX advisory more useful for manifest-declared dashboard and application review targets without adding model/API review, evidence transfer, target-specific runtime branches, arbitrary source-data file reads, HTTP/socket MCP transport, authentication automation, existing-profile reuse, package publication, license changes, marketplace mutation, or existing-feature tradeoffs.
 
 #### Phase 15a: Selector-Scoped Content Contracts
 
@@ -427,11 +427,11 @@ Phase 15 completes the five-step local implementation path for making content an
 - Completed: advisory counts now include required user questions, answered questions, unanswered questions, and inconclusive questions.
 - Completed: unanswered questions remain advisory signals and do not create findings or alter release gates.
 
-#### Phase 15d: Reusable Control Center-Style Manifest Example
+#### Phase 15d: Reusable Status Dashboard Manifest Example
 
-- Completed: added `templates/control-center-content-ux-target-manifest.json` as a generic, disabled-by-default manifest example for Control Center-style workflow dashboards.
+- Completed: added `templates/status-dashboard-content-ux-target-manifest.json` as a generic, disabled-by-default manifest example for status dashboards.
 - Completed: generated and reusable target manifests now expose disabled advisory scaffolding with content contract, source alignment, selector-scoped state, information architecture, and user journey checks.
-- Completed as boundary: Control Center-specific URLs, product names, labels, and ports remain outside runtime code.
+- Completed as boundary: application-specific URLs, product names, labels, and ports remain outside runtime code.
 
 #### Phase 15e: Tests, Safety Boundaries, and Loader Deferral
 
@@ -483,7 +483,7 @@ Phase 17 completes the six-step local implementation path for making content UX 
 
 #### Phase 17a: Expanded Content UX Categories
 
-- Completed: `content_ux_findings` now distinguish workflow state clarity, next-action clarity, navigation clarity, information architecture, content contracts, source-data alignment, coverage contracts, and review scope.
+- Completed: `content_ux_findings` now distinguish status clarity, action clarity, navigation clarity, information architecture, content contracts, source-data alignment, coverage contracts, and review scope while keeping legacy manifest category aliases accepted.
 - Completed: category selection is derived from local advisory signal shape and manifest question text, not model output or target-specific runtime branches.
 
 #### Phase 17b: Page-Level Developer Handoff
@@ -526,7 +526,7 @@ Phase 18 completes the six-step local implementation path for making content UX 
 #### Phase 18b: Rubric Manifest Contract
 
 - Completed: `localContentUxAdvisory.rubric[]` supports category, page, selector, criterion, expected evidence, match mode, text match, severity, and required fields.
-- Completed: rubric categories remain generic and reusable across Control Center-style applications.
+- Completed: rubric categories remain generic and reusable across status dashboard and application review targets.
 - Completed: expected evidence phrases are used only for local matching and are not copied into reports.
 
 #### Phase 18c: Local Brief and Rubric Evaluation
@@ -562,7 +562,7 @@ Phase 18 completes the six-step local implementation path for making content UX 
 - lesson-side `product-scaffold-check` with this repository path.
 - lesson-side `product-repository-authority status` with this repository path.
 - `check_workflow_pair_sync.sh --repo <this-repo>`.
-- Current local runtime checks include command parser tests, JSON error tests, `doctor` schema/retention metadata tests, headed/devtools launch-mode tests, session/report/spec tests, daemon parser tests, redaction tests, architecture regressions for generic runtime boundaries, shared page evidence helpers, and local daemon boundaries, Playwright browser smoke tests with screenshots, traces, click/form/keyboard/scroll/wait actions, supervised ordered actions, daemon start/status/stop, local package dry-run verification, Control Center observation, and aggregate product-gate execution.
+- Current local runtime checks include command parser tests, JSON error tests, `doctor` schema/retention metadata tests, headed/devtools launch-mode tests, session/report/spec tests, daemon parser tests, redaction tests, architecture regressions for generic runtime boundaries, shared page evidence helpers, and local daemon boundaries, Playwright browser smoke tests with screenshots, traces, click/form/keyboard/scroll/wait actions, supervised ordered actions, daemon start/status/stop, local package dry-run verification, optional live application observation, and aggregate product-gate execution.
 - Later release work should add real headed visual checks where a display is available, choose public package naming and license, and publish to npm after approval.
 - Phase 7 review-platform checks should add no-browser tests for parser contracts, target manifest validation, route normalization, viewport matrix expansion, action risk classification, finding generation, issue deduplication, schema compatibility, and report shape.
 - Phase 7 browser smoke checks should add fixture-based review runs for console errors, failed requests, empty render, horizontal overflow, clipped text, missing labels, screenshots, route coverage, viewport coverage, and artifact placement under ignored `.browser-debug/`.
@@ -573,9 +573,9 @@ Phase 18 completes the six-step local implementation path for making content UX 
 - Phase 10 checks cover unlinked expected route execution, expected route coverage artifacts, route budget skip accounting, and target quality signal route-budget warnings.
 - Phase 11 checks cover manifest page expectation normalization, page-specific viewport execution, expected text and selector checks, page-level mock metrics, local review artifact indexes, and page expectation quality signals.
 - Phase 12 checks cover rendered-state evidence for broken images, lingering loading indicators, empty data containers, developer triage report summaries, manifest suggestions, and fixture-backed target review report output.
-- Phase 13 checks cover loading-indicator precision for ready/progress business-state text and local dogfood rechecks against Control Center pages without target-specific runtime branches.
+- Phase 13 checks cover loading-indicator precision for ready/progress business-state text and local dogfood rechecks against application pages without target-specific runtime branches.
 - Phase 14 checks cover schema registry/file parity, manifest opt-in content UX advisory, bounded inline source data, source-to-screen text binding checks, source-value non-disclosure, report output, advisory purity, and unchanged review findings, metrics, action plans, and release readiness.
-- Phase 15 checks cover selector-scoped content UX advisory bindings, attribute/state/risk targets, required user-question advisory checks, reusable Control Center-style manifest templates, source-value non-disclosure, and unchanged review findings, metrics, action plans, and release readiness.
+- Phase 15 checks cover selector-scoped content UX advisory bindings, attribute/state/risk targets, required user-question advisory checks, reusable status-dashboard manifest templates, source-value non-disclosure, and unchanged review findings, metrics, action plans, and release readiness.
 - Phase 16 checks cover additive `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, Markdown Content UX Developer Handoff output, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.
 - Phase 17 checks cover expanded content UX categories, `content_ux_page_handoff`, `content_ux_manifest_authoring`, report page/authoring summaries, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.
 - Phase 18 checks cover additive `content_ux_review_brief`, additive `content_ux_rubric_evaluation`, report brief/rubric summaries, source-value non-disclosure, and unchanged review findings, metrics, existing action plans, and release readiness.

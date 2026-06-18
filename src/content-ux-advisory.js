@@ -8,7 +8,9 @@ const KNOWN_BINDING_TARGETS = SUPPORTED_BINDING_TARGETS;
 const SEVERITIES = new Set(['info', 'low', 'medium', 'high', 'critical']);
 const SEVERITY_RANK = Object.freeze({ info: 0, low: 1, medium: 2, high: 3, critical: 4 });
 const RUBRIC_CATEGORIES = new Set([
+  'status_clarity',
   'workflow_state_clarity',
+  'action_clarity',
   'next_action_clarity',
   'navigation_clarity',
   'information_architecture',
@@ -920,7 +922,7 @@ function contentUxFindingCategory(signal) {
   if (signal.question) {
     const questionText = String(signal.question.text ?? '').toLowerCase();
     if (/\b(next|action|step|fix|resolve|run|start|continue|proceed|decision)\b/.test(questionText)) {
-      return 'next_action_clarity';
+      return 'action_clarity';
     }
     if (/\b(where|navigate|navigation|route|page|detail|link|drill|open|find)\b/.test(questionText)) {
       return 'navigation_clarity';
@@ -929,7 +931,7 @@ function contentUxFindingCategory(signal) {
   }
   if (signal.binding) {
     if (['data-state', 'data-risk'].includes(signal.binding.target)) {
-      return 'workflow_state_clarity';
+      return 'status_clarity';
     }
     return 'content_contract';
   }
@@ -1174,7 +1176,7 @@ function buildContentUxManifestAuthoring({ config, target, counts, findings }) {
       recommendation: 'Review sourceData IDs, JSON Pointers, selectors, and binding targets for inconclusive content contracts.'
     });
   }
-  if (findings.some((finding) => finding.category === 'next_action_clarity')) {
+  if (findings.some((finding) => ['action_clarity', 'next_action_clarity'].includes(finding.category))) {
     addSuggestion({
       id: 'content-ux-authoring-next-actions',
       type: 'strengthen_next_action_contracts',
@@ -1187,7 +1189,7 @@ function buildContentUxManifestAuthoring({ config, target, counts, findings }) {
       id: 'content-ux-authoring-navigation',
       type: 'strengthen_navigation_contracts',
       severity: 'medium',
-      recommendation: 'Pin route, detail-link, or drill-down questions in page expectations so the review can track whether users can move naturally through the workflow.'
+      recommendation: 'Pin route, detail-link, or drill-down questions in page expectations so the review can track whether users can move naturally through the experience.'
     });
   }
 
@@ -1376,17 +1378,23 @@ function reviewsForPageId(routeReviews, target, pageId) {
 }
 
 function recommendationForRubricCategory(category) {
+  if (category === 'status_clarity') {
+    return 'Clarify state labels, status summaries, and risk indicators so the target user can understand the current condition without external context.';
+  }
   if (category === 'workflow_state_clarity') {
-    return 'Clarify state labels, blocker summaries, and risk/status indicators so the target user can understand the workflow state without CLI context.';
+    return 'Clarify state labels, status summaries, and risk indicators so the target user can understand the declared state without external context.';
+  }
+  if (category === 'action_clarity') {
+    return 'Clarify the next step, owner, or available action so the target user can decide what to do next.';
   }
   if (category === 'next_action_clarity') {
     return 'Clarify the next step, owner, or available action so the target user can decide what to do next.';
   }
   if (category === 'navigation_clarity') {
-    return 'Clarify links, detail affordances, or drill-down labels so the target user can move through the workflow naturally.';
+    return 'Clarify links, detail affordances, or drill-down labels so the target user can move through the experience naturally.';
   }
   if (category === 'information_architecture') {
-    return 'Rework headings, grouping, hierarchy, or summary copy so important workflow information is easier to scan.';
+    return 'Rework headings, grouping, hierarchy, or summary copy so important information is easier to scan.';
   }
   if (category === 'explanation_clarity') {
     return 'Improve explanatory copy so non-expert users can understand why the state matters.';

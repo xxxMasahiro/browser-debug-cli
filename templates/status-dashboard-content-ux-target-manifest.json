@@ -1,0 +1,244 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "status-dashboard-content-ux-example",
+  "baseUrl": "https://example.test/status-dashboard/",
+  "scope": {
+    "sameOrigin": true,
+    "include": [],
+    "exclude": []
+  },
+  "seeds": [
+    "https://example.test/status-dashboard/"
+  ],
+  "expectedRoutes": [
+    "https://example.test/status-dashboard/",
+    "https://example.test/status-dashboard/#/health",
+    "https://example.test/status-dashboard/#/incidents",
+    "https://example.test/status-dashboard/#/actions"
+  ],
+  "pages": [
+    {
+      "name": "Overview",
+      "url": "https://example.test/status-dashboard/",
+      "role": "status_overview",
+      "priority": "high",
+      "expectations": {
+        "text": [
+          "Status"
+        ],
+        "selectors": [
+          "[data-testid=\"status-summary\"]",
+          "[data-testid=\"service-state\"]",
+          "[data-testid=\"health-state\"]"
+        ],
+        "dataBindings": [
+          {
+            "id": "status-summary-copy",
+            "sourceId": "service",
+            "pointer": "/summary",
+            "selector": "[data-testid=\"status-summary\"]",
+            "target": "text",
+            "match": "contains",
+            "severity": "medium"
+          },
+          {
+            "id": "service-ready-state",
+            "sourceId": "service",
+            "pointer": "/state",
+            "selector": "[data-testid=\"service-state\"]",
+            "target": "data-state",
+            "match": "exact",
+            "severity": "medium"
+          },
+          {
+            "id": "health-check-status",
+            "sourceId": "service",
+            "pointer": "/health/status",
+            "selector": "[data-testid=\"health-state\"]",
+            "target": "attribute",
+            "attribute": "data-status",
+            "match": "exact",
+            "severity": "medium"
+          },
+          {
+            "id": "incident-risk",
+            "sourceId": "service",
+            "pointer": "/incident/risk",
+            "selector": "[data-testid=\"incident-risk\"]",
+            "target": "data-risk",
+            "match": "exact",
+            "severity": "medium",
+            "required": false
+          }
+        ],
+        "userQuestions": [
+          {
+            "id": "overview-current-status",
+            "question": "Can the intended user understand the current service condition?",
+            "expectedEvidence": [
+              "ready",
+              "degraded",
+              "unavailable",
+              "healthy"
+            ],
+            "matchMode": "any",
+            "severity": "medium"
+          },
+          {
+            "id": "overview-response-action",
+            "question": "Can the intended user identify the next useful response action?",
+            "expectedEvidence": [
+              "next",
+              "review",
+              "open",
+              "monitor"
+            ],
+            "matchMode": "any",
+            "severity": "medium"
+          }
+        ]
+      }
+    }
+  ],
+  "sourceData": [
+    {
+      "id": "service",
+      "data": {
+        "summary": "Service status is ready for review.",
+        "state": "ready",
+        "health": {
+          "status": "passed"
+        },
+        "incident": {
+          "risk": "low"
+        }
+      }
+    }
+  ],
+  "localContentUxAdvisory": {
+    "enabled": false,
+    "audience": [
+      "operator",
+      "support reviewer"
+    ],
+    "goal": "Help users understand current service condition, risk, and useful next response without reading external logs.",
+    "checks": [
+      "content_contract",
+      "source_data_alignment",
+      "selector_scoped_state",
+      "status_clarity",
+      "information_architecture",
+      "user_journey",
+      "action_clarity",
+      "navigation_clarity",
+      "decision_support",
+      "explanation_clarity"
+    ],
+    "requiredUserQuestions": [
+      {
+        "id": "global-status-awareness",
+        "pageId": "overview",
+        "question": "Can the user tell whether the service needs attention?",
+        "expectedEvidence": [
+          "ready",
+          "degraded",
+          "unavailable",
+          "healthy"
+        ],
+        "matchMode": "any",
+        "severity": "medium"
+      },
+      {
+        "id": "global-action-awareness",
+        "pageId": "overview",
+        "question": "Can the user tell which response action is available?",
+        "expectedEvidence": [
+          "next",
+          "review",
+          "open",
+          "monitor"
+        ],
+        "matchMode": "any",
+        "severity": "medium"
+      }
+    ],
+    "reviewBrief": {
+      "summary": "The overview page should let a target user understand current status, health, risk, and the safest next response.",
+      "userRoles": [
+        "operator",
+        "support reviewer",
+        "maintainer"
+      ],
+      "decisionNeeds": [
+        {
+          "id": "overview-response-readiness",
+          "pageId": "overview",
+          "question": "Can the user decide whether the current status needs intervention?",
+          "expectedEvidence": [
+            "ready",
+            "degraded",
+            "unavailable",
+            "healthy"
+          ],
+          "matchMode": "any",
+          "severity": "medium"
+        }
+      ]
+    },
+    "rubric": [
+      {
+        "id": "status-clarity-rubric",
+        "category": "status_clarity",
+        "pageId": "overview",
+        "criterion": "The page communicates the current service state and risk level.",
+        "expectedEvidence": [
+          "ready",
+          "degraded",
+          "unavailable",
+          "healthy"
+        ],
+        "matchMode": "any",
+        "severity": "medium"
+      },
+      {
+        "id": "action-clarity-rubric",
+        "category": "action_clarity",
+        "pageId": "overview",
+        "criterion": "The page gives the user a clear next response or review decision.",
+        "expectedEvidence": [
+          "next",
+          "review",
+          "open",
+          "monitor"
+        ],
+        "matchMode": "any",
+        "severity": "medium"
+      }
+    ]
+  },
+  "viewportMatrix": [
+    "desktop",
+    "mobile"
+  ],
+  "actionPolicy": {
+    "allow": [
+      "navigation",
+      "state_revealing"
+    ]
+  },
+  "budgets": {
+    "maxRoutes": 50
+  },
+  "artifacts": {
+    "screenshots": true
+  },
+  "masks": [],
+  "regions": [],
+  "appHints": {
+    "reviewGoal": "status_dashboard_first_pass",
+    "notes": [
+      "Replace example URLs and inline sourceData with local, bounded data from the target application.",
+      "Keep localContentUxAdvisory.enabled=false until the manifest owner intentionally opts in."
+    ]
+  }
+}

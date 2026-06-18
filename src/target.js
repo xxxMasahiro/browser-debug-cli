@@ -107,10 +107,10 @@ export function createTargetManifest(options = {}) {
         'content_contract',
         'source_data_alignment',
         'selector_scoped_state',
-        'workflow_state_clarity',
+        'status_clarity',
         'information_architecture',
         'user_journey',
-        'next_action_clarity',
+        'action_clarity',
         'navigation_clarity',
         'decision_support',
         'explanation_clarity'

@@ -90,7 +90,7 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - Target review evidence summaries include bounded element evidence with selectors, text, accessible names, allowed attributes, and rectangles.
 - `pages[].expectations.dataBindings` now evaluates selector-scoped `text`, explicit `attribute`, `data-state`, and `data-risk` targets.
 - `localContentUxAdvisory.requiredUserQuestions` and page `expectations.userQuestions` now provide advisory information-architecture and user-journey checks.
-- `templates/control-center-content-ux-target-manifest.json` provides a reusable disabled-by-default Control Center-style manifest example.
+- `templates/status-dashboard-content-ux-target-manifest.json` provides a reusable disabled-by-default status-dashboard manifest example.
 - The implementation remains generic, local-first, and advisory-only. It does not create review findings, change `metrics.finding_count`, change the existing `action_plan`, change `quality_signals.release_readiness`, read arbitrary source-data files or URLs, add Control Center-specific runtime branches, upload evidence, call models/APIs, automate OAuth/login, reuse existing profiles, add HTTP/socket MCP transport, publish packages, change license, or mutate marketplace state.
 
 ## 2026-06-18 Phase 16 Content UX Handoff Output Handoff
@@ -106,7 +106,7 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 ## 2026-06-18 Phase 17 Content UX Practical Handoff
 
 - Phase 17 is complete for practical local content UX handoff output.
-- `content_ux_findings` now categorize local advisory signals into workflow state clarity, next-action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
+- `content_ux_findings` now categorize local advisory signals into status clarity, action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
 - Target review emits additive `content_ux_page_handoff` with page status, owner-review need, finding count, top categories, and bounded top findings.
 - Target review emits additive `content_ux_manifest_authoring` with manifest-only suggestions for audience, goal, source data, data bindings, user questions, next-action contracts, and navigation contracts.
 - Target init and reusable templates expose the expanded content UX check vocabulary while keeping advisory opt-in disabled by default.
@@ -120,4 +120,7 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - Target review emits additive `content_ux_review_brief` with audience, page-role, and decision-need summaries.
 - Target review emits additive `content_ux_rubric_evaluation` with rubric criteria status, category counts, owner-review counts, and inconclusive counts.
 - Markdown reports include a bounded Content UX Review Brief section.
+- Packaged content UX templates and tests use domain-neutral status-dashboard vocabulary while keeping selector-scoped state/risk advisory coverage.
+- The preferred default content UX categories are `status_clarity` and `action_clarity`; existing manifest rubric categories `workflow_state_clarity` and `next_action_clarity` remain accepted as legacy-compatible aliases.
+- Lesson-specific Dashboard Control Center workflow, Git, CI, blocker, repository-selection, and next-safe-action semantics belong in lesson-owned target manifests or fixtures, not Browser Debug CLI runtime code.
 - The implementation remains generic, local-first, advisory-only, and non-mutating. It does not change review findings, `metrics.finding_count`, the existing `action_plan`, or `quality_signals.release_readiness`; it does not read arbitrary source-data files or URLs, add Control Center-specific runtime branches, upload evidence, call models/APIs, automate OAuth/login, reuse existing profiles, add HTTP/socket MCP transport, publish packages, change license, or mutate marketplace state.

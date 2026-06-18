@@ -105,15 +105,18 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 - Target review evidence summaries now include bounded element evidence for selector-scoped advisory checks.
 - Content UX advisory now evaluates selector-scoped text, explicit attributes, state attributes, and risk attributes from target manifest data bindings.
 - Content UX advisory now evaluates `localContentUxAdvisory.requiredUserQuestions` and page `expectations.userQuestions` as advisory information-architecture and user-journey signals.
-- `templates/control-center-content-ux-target-manifest.json` provides a reusable disabled-by-default Control Center-style manifest example without runtime product-specific branches.
+- `templates/status-dashboard-content-ux-target-manifest.json` provides a reusable disabled-by-default status-dashboard manifest example without runtime product-specific branches.
 - Target review now emits additive `content_ux_findings`, `content_ux_action_plan`, and `content_ux_readiness` only when content UX advisory is enabled.
 - `content_ux_findings` are separate from review `findings`; they do not change `metrics.finding_count`, the existing `action_plan`, or `quality_signals.release_readiness`.
 - Markdown reports now include a bounded Content UX Developer Handoff section without copying source values or full page text.
-- Content UX findings now include local advisory categories for workflow state clarity, next-action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
+- Content UX findings now include local advisory categories for status clarity, action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
 - Target review now emits additive `content_ux_page_handoff` and `content_ux_manifest_authoring` only when content UX advisory is enabled.
 - Markdown reports now include page-level content UX summaries and manifest-authoring suggestion counts in the Content UX Developer Handoff section.
 - Target review now emits additive `content_ux_review_brief` and `content_ux_rubric_evaluation` only when content UX advisory is enabled.
 - Markdown reports now include bounded Content UX Review Brief summaries for page roles, decision needs, and rubric criteria.
+- Packaged content UX templates and tests now use domain-neutral status-dashboard vocabulary while preserving selector-scoped state/risk coverage.
+- `status_clarity` and `action_clarity` are the preferred default content UX categories; existing manifest rubric categories `workflow_state_clarity` and `next_action_clarity` remain accepted as legacy-compatible aliases.
+- Lesson-specific Dashboard Control Center workflow, Git, CI, blocker, repository-selection, and next-safe-action semantics should live in lesson-owned target manifests or fixtures, not Browser Debug CLI runtime code.
 - No arbitrary source-data file or URL loader was added; external references remain ignored advisory signals until a separately approved loader design exists.
 - Model/API review, evidence leaving the local process, HTTP/socket MCP server mode, persistent browser profile reuse, authentication automation, external upload, arbitrary shell execution, destructive cleanup, npm publication, package naming, and license changes remain approval-bound.
 

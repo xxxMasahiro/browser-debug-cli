@@ -73,12 +73,12 @@ Phase 7 review-platform implementation includes focused checks before any releas
 - Parser tests for `review --url`, `review --target`, `schema list`, `schema get`, and MCP adapter entrypoints.
 - Schema tests for envelopes, artifacts, findings, target manifests, review results, and MCP tool metadata.
 - No-browser unit tests for target manifest validation, viewport matrix expansion, action risk classification, redaction, shell-safe action input, and MCP tool output shape.
-- Architecture tests that prevent Control Center-specific runtime literals, persistent browser profile reuse, storage-state persistence, HTTP/socket listeners, arbitrary shell execution, unapproved upload paths, and destructive cleanup commands.
+- Architecture tests that prevent application-specific runtime literals, persistent browser profile reuse, storage-state persistence, HTTP/socket listeners, arbitrary shell execution, unapproved upload paths, and destructive cleanup commands.
 - Browser smoke fixture tests for console errors, empty renders, horizontal overflow, clipped text, missing accessible names, nonblank screenshots, route coverage, viewport coverage, and local artifact placement.
 - Mock comparison tests for local metrics and dimension mismatch `inconclusive` behavior.
 - MCP adapter tests for stdio/local-only behavior, tool allowlist, schema-compatible responses, no shell tool, no cleanup tool, and no external upload by default.
 
-Optional acceptance checks against the Dashboard Control Center and FrameCue Control Center may run only when those local servers are listening. Those checks should use target manifests or fixtures and should not introduce product-specific branches into the runtime.
+Optional acceptance checks against local application servers may run only when those servers are listening. Those checks should use target manifests or fixtures and should not introduce product-specific branches into the runtime.
 
 ## Phase 8 Dogfood and Plugin Checks
 
@@ -100,25 +100,25 @@ Optional acceptance checks against the Dashboard Control Center and FrameCue Con
 - Browser smoke tests cover unlinked manifest `expectedRoutes` being visited as explicit review targets.
 - Browser smoke tests cover `coverage.routes.expected` and `quality_signals.route_coverage.expected_manifest_routes`.
 - Browser smoke tests cover `route_budget_exceeded` skipped routes when `budgets.maxRoutes` prevents full coverage.
-- These checks use local fixture pages so they do not depend on a specific Control Center, framework, localhost port, route name, or UI label.
+- These checks use local fixture pages so they do not depend on a specific application, framework, localhost port, route name, or UI label.
 
 ## Phase 11 Page Expectation Checks
 
 - No-browser tests cover optional manifest `pages` normalization, page priority normalization, page-specific viewport merging, and generated manifests with empty `pages`.
 - Browser smoke tests cover expected visible text, missing expected selectors, page-specific mobile viewport execution, page-level mock metrics, `coverage.pages`, `quality_signals.page_expectations`, local `review_artifact_index` artifacts, and Markdown report page expectation output.
-- These checks use local fixture pages and do not depend on a specific Control Center, framework, localhost port, route name, or UI label.
+- These checks use local fixture pages and do not depend on a specific application, framework, localhost port, route name, or UI label.
 
 ## Phase 12 Rendered-State Dogfood Checks
 
 - Browser smoke tests cover broken visible images, visible loading indicators that remain after the review wait, and empty table/list/grid containers without visible empty-state messaging.
 - Browser smoke tests cover `quality_signals.rendered_state`, `evidence_summary.loading_indicators`, `evidence_summary.empty_containers`, Developer Triage Markdown report output, and target `manifest_suggestions`.
-- These checks use local fixture pages and do not depend on a specific Control Center, framework, localhost port, route name, or UI label.
+- These checks use local fixture pages and do not depend on a specific application, framework, localhost port, route name, or UI label.
 
 ## Phase 13 Dogfood Signal Refinement Checks
 
 - Browser smoke tests cover normal ready/progress business-state text and verify it is not reported as lingering loading UI.
 - Loading indicator evidence remains limited to explicit loading semantics, loading-like attributes, roles, or short status text rather than arbitrary ancestor text.
-- These checks use local fixture pages and do not depend on a specific Control Center, framework, localhost port, route name, or UI label.
+- These checks use local fixture pages and do not depend on a specific application, framework, localhost port, route name, or UI label.
 
 ## Phase 14 Content UX Advisory Checks
 
@@ -127,7 +127,7 @@ Optional acceptance checks against the Dashboard Control Center and FrameCue Con
 - No-browser tests cover pure content UX advisory source-to-screen matching and verify source values are not copied into advisory JSON.
 - Architecture tests verify the advisory module has no Playwright import, filesystem import, target-specific literals, external control channel, arbitrary shell execution, upload path, or destructive cleanup path.
 - Browser smoke tests cover manifest opt-in advisory output, `quality_signals.content_ux`, bounded Markdown report output, and unchanged review findings, `metrics.finding_count`, the existing `action_plan`, and `quality_signals.release_readiness`.
-- These checks use local fixture pages and do not depend on a specific Control Center, framework, localhost port, route name, or UI label.
+- These checks use local fixture pages and do not depend on a specific application, framework, localhost port, route name, or UI label.
 
 ## Phase 15 Content UX Heuristic Checks
 
@@ -135,7 +135,7 @@ Optional acceptance checks against the Dashboard Control Center and FrameCue Con
 - No-browser tests cover `localContentUxAdvisory.requiredUserQuestions` and page `expectations.userQuestions`.
 - Browser smoke tests cover real Playwright element evidence for selector-scoped content UX advisory checks.
 - Browser smoke tests continue to prove enabled advisory output does not change review findings, `metrics.finding_count`, the existing `action_plan`, or `quality_signals.release_readiness`.
-- These checks use local fixture pages and reusable templates instead of runtime branches for a specific Control Center, framework, localhost port, route name, or UI label.
+- These checks use local fixture pages and reusable templates instead of runtime branches for a specific application, framework, localhost port, route name, or UI label.
 
 ## Phase 16 Content UX Handoff Checks
 
@@ -147,7 +147,7 @@ Optional acceptance checks against the Dashboard Control Center and FrameCue Con
 
 ## Phase 17 Content UX Practical Handoff Checks
 
-- No-browser tests cover expanded advisory categories for workflow state clarity, next-action clarity, navigation clarity, information architecture, coverage contracts, and content contracts.
+- No-browser tests cover expanded advisory categories for status clarity, action clarity, navigation clarity, information architecture, coverage contracts, and content contracts.
 - No-browser tests cover `content_ux_page_handoff` grouping by manifest page.
 - No-browser tests cover `content_ux_manifest_authoring` suggestions for missing user questions, next-action contracts, and navigation contracts.
 - Browser smoke tests verify enabled manifests emit `content_ux_page_handoff` and `content_ux_manifest_authoring`.
@@ -179,4 +179,4 @@ Optional acceptance checks against the Dashboard Control Center and FrameCue Con
 - Review findings keep deterministic, heuristic, model-advisory, and owner-required outcomes separate.
 - MCP remains an adapter over the CLI/core contract, not a separate runtime owner.
 - Model/API review remains opt-in and is not part of deterministic local gates.
-- Target-specific Control Center details remain in manifests, fixtures, or acceptance evidence, not generic runtime code.
+- Target-specific application details remain in manifests, fixtures, or acceptance evidence, not generic runtime code.

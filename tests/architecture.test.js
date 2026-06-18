@@ -22,6 +22,8 @@ test('runtime and tests avoid caller-specific implementation literals', async ()
     'src/target.js',
     'src/sessions.js',
     'src/supervisor.js',
+    'templates/review-target-manifest.json',
+    'templates/status-dashboard-content-ux-target-manifest.json',
     '.github/workflows/ci.yml',
     'tests/cli.test.js',
     'tests/browser-smoke.test.js',
@@ -101,6 +103,29 @@ test('review platform keeps local-first and manifest-driven boundaries', async (
   assert.match(target, /createTargetManifest/);
   assert.match(mcp, /tools\/list/);
   assert.match(mcp, /tools\/call/);
+});
+
+test('packaged target templates stay domain-neutral', async () => {
+  const templateFiles = [
+    'templates/review-target-manifest.json',
+    'templates/status-dashboard-content-ux-target-manifest.json'
+  ];
+  const forbidden = [
+    /\bControl Center\b/i,
+    /\bFrameCue\b/i,
+    /\bai-driven-development-lesson\b/i,
+    /\btask-tracker-repository\b/i,
+    /\bworktree\b/i,
+    /\bbranch\b/i,
+    /\bblocker\b/i
+  ];
+
+  for (const file of templateFiles) {
+    const content = await readText(file);
+    for (const pattern of forbidden) {
+      assert.doesNotMatch(content, pattern, `${file} should not contain ${pattern}`);
+    }
+  }
 });
 
 test('plugin metadata keeps local stdio MCP boundaries', async () => {

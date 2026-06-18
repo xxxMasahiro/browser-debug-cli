@@ -211,58 +211,58 @@ test('target manifests and action candidates use generic review abstractions', (
     pages: [{
       name: 'Overview',
       path: '/app#overview',
-      role: 'workflow_overview',
+      role: 'status_overview',
       priority: 'P1',
       viewports: ['mobile', { name: 'tablet', width: 768, height: 1024 }],
       expectations: {
         text: ['Overview'],
         selectors: ['#primary'],
         dataBindings: [{
-          id: 'git-status',
-          sourceId: 'workflow',
-          pointer: '/git/status',
-          selector: '#git-state',
+          id: 'service-status',
+          sourceId: 'service',
+          pointer: '/service/status',
+          selector: '#service-state',
           target: 'data-state'
         }],
         userQuestions: [{
-          id: 'blocked-state',
-          question: 'Can the user tell whether work is blocked?',
-          expectedEvidence: ['not blocked'],
-          selector: '#blocker'
+          id: 'attention-state',
+          question: 'Can the user tell whether the service needs attention?',
+          expectedEvidence: ['ready'],
+          selector: '#risk'
         }]
       },
       mock: 'mocks/overview.png'
     }],
     sourceData: [{
-      id: 'workflow',
-      data: { git: { status: 'clean' } }
+      id: 'service',
+      data: { service: { status: 'ready' } }
     }],
     localContentUxAdvisory: {
       enabled: true,
       audience: ['non-engineer', 'early-career engineer'],
-      goal: 'Help users understand the current workflow state.',
+      goal: 'Help users understand the current service status.',
       requiredUserQuestions: [{
-        id: 'branch-state',
+        id: 'status-state',
         pageId: 'overview',
-        question: 'Can the user identify the active branch?',
-        expectedEvidence: ['main']
+        question: 'Can the user identify the current service status?',
+        expectedEvidence: ['ready']
       }],
       reviewBrief: {
-        summary: 'The overview page should explain current workflow state and next decisions.',
+        summary: 'The overview page should explain current service status and next decisions.',
         userRoles: ['operator'],
         decisionNeeds: [{
           id: 'intervention-decision',
           pageId: 'overview',
           question: 'Can the user decide whether intervention is needed?',
-          expectedEvidence: ['No blockers']
+          expectedEvidence: ['ready']
         }]
       },
       rubric: [{
-        id: 'workflow-state-criterion',
-        category: 'workflow_state_clarity',
+        id: 'status-state-criterion',
+        category: 'status_clarity',
         pageId: 'overview',
-        criterion: 'The page communicates workflow state clearly.',
-        expectedEvidence: ['No blockers']
+        criterion: 'The page communicates status clearly.',
+        expectedEvidence: ['ready']
       }]
     },
     viewportMatrix: ['desktop', { name: 'phone', width: 390, height: 844 }],
@@ -276,17 +276,17 @@ test('target manifests and action candidates use generic review abstractions', (
   assert.equal(normalized.target.viewportMatrix.some((viewport) => viewport.name === 'tablet'), true);
   assert.equal(normalized.target.budgets.maxRoutes, 5);
   assert.equal(normalized.target.pages[0].id, 'overview');
-  assert.equal(normalized.target.pages[0].role, 'workflow_overview');
+  assert.equal(normalized.target.pages[0].role, 'status_overview');
   assert.equal(normalized.target.pages[0].priority, 'high');
   assert.equal(normalized.target.pages[0].expectations.text[0].value, 'Overview');
   assert.equal(normalized.target.pages[0].expectations.selectors[0].value, '#primary');
-  assert.equal(normalized.target.pages[0].expectations.dataBindings[0].sourceId, 'workflow');
+  assert.equal(normalized.target.pages[0].expectations.dataBindings[0].sourceId, 'service');
   assert.equal(normalized.target.pages[0].expectations.dataBindings[0].target, 'data-state');
-  assert.equal(normalized.target.pages[0].expectations.userQuestions[0].id, 'blocked-state');
+  assert.equal(normalized.target.pages[0].expectations.userQuestions[0].id, 'attention-state');
   assert.equal(normalized.target.localContentUxAdvisory.enabled, true);
-  assert.equal(normalized.target.localContentUxAdvisory.requiredUserQuestions[0].id, 'branch-state');
+  assert.equal(normalized.target.localContentUxAdvisory.requiredUserQuestions[0].id, 'status-state');
   assert.equal(normalized.target.localContentUxAdvisory.reviewBrief.decisionNeeds[0].id, 'intervention-decision');
-  assert.equal(normalized.target.localContentUxAdvisory.rubric[0].category, 'workflow_state_clarity');
+  assert.equal(normalized.target.localContentUxAdvisory.rubric[0].category, 'status_clarity');
   assert.equal(normalized.target.localContentUxAdvisory.sourceData[0].available, true);
 
   assert.equal(classifyActionCandidate({ tag: 'a', href: 'https://example.test/app#next' }, 'https://example.test/app'), 'navigation');
@@ -301,11 +301,11 @@ test('local content UX advisory is manifest opt-in and does not expose source va
     pages: [{
       name: 'Overview',
       path: '/app',
-      role: 'workflow_overview',
+      role: 'status_overview',
       expectations: {
         dataBindings: [{
           id: 'run-summary',
-          sourceId: 'workflow',
+          sourceId: 'service',
           pointer: '/status/summary',
           target: 'text',
           severity: 'medium'
@@ -313,13 +313,13 @@ test('local content UX advisory is manifest opt-in and does not expose source va
       }
     }],
     sourceData: [{
-      id: 'workflow',
+      id: 'service',
       data: { status: { summary: 'Current local run is healthy' } }
     }],
     localContentUxAdvisory: {
       enabled: true,
       audience: ['operators'],
-      goal: 'Expose workflow state in a way users can understand.',
+      goal: 'Expose service status in a way users can understand.',
       reviewBrief: {
         summary: 'The overview page should let operators decide whether intervention is needed.',
         userRoles: ['operator'],
@@ -332,9 +332,9 @@ test('local content UX advisory is manifest opt-in and does not expose source va
       },
       rubric: [{
         id: 'state-summary-rubric',
-        category: 'workflow_state_clarity',
+        category: 'status_clarity',
         pageId: 'overview',
-        criterion: 'The page communicates workflow health clearly.',
+        criterion: 'The page communicates service health clearly.',
         expectedEvidence: ['healthy'],
         severity: 'medium'
       }]
@@ -414,17 +414,17 @@ test('local content UX advisory supports selector-scoped state contracts and use
       expectations: {
         dataBindings: [
           {
-            id: 'git-state',
-            sourceId: 'workflow',
-            pointer: '/git/state',
-            selector: '#git',
+            id: 'service-state',
+            sourceId: 'service',
+            pointer: '/service/state',
+            selector: '#service',
             target: 'data-state',
             match: 'exact'
           },
           {
-            id: 'check-status',
-            sourceId: 'workflow',
-            pointer: '/checks/status',
+            id: 'health-status',
+            sourceId: 'service',
+            pointer: '/health/status',
             selector: '#check',
             target: 'attribute',
             attribute: 'data-status',
@@ -432,7 +432,7 @@ test('local content UX advisory supports selector-scoped state contracts and use
           },
           {
             id: 'risk-level',
-            sourceId: 'workflow',
+            sourceId: 'service',
             pointer: '/risk/level',
             selector: '#risk',
             target: 'data-risk',
@@ -440,30 +440,30 @@ test('local content UX advisory supports selector-scoped state contracts and use
           }
         ],
         userQuestions: [{
-          id: 'blocker-awareness',
-          question: 'Can users identify blockers?',
-          expectedEvidence: ['No blockers'],
+          id: 'risk-awareness',
+          question: 'Can users identify current risk?',
+          expectedEvidence: ['Low risk'],
           selector: '#risk'
         }]
       }
     }],
     sourceData: [{
-      id: 'workflow',
+      id: 'service',
       data: {
-        git: { state: 'clean' },
-        checks: { status: 'complete' },
+        service: { state: 'ready' },
+        health: { status: 'complete' },
         risk: { level: 'minor' }
       }
     }],
     localContentUxAdvisory: {
       enabled: true,
       audience: ['operators'],
-      goal: 'Explain workflow status and blockers.',
+      goal: 'Explain service status and risk.',
       requiredUserQuestions: [{
-        id: 'branch-awareness',
+        id: 'environment-awareness',
         pageId: 'status',
-        question: 'Can users identify the active branch?',
-        expectedEvidence: ['main']
+        question: 'Can users identify the active environment?',
+        expectedEvidence: ['Production']
       }]
     }
   });
@@ -476,12 +476,12 @@ test('local content UX advisory supports selector-scoped state contracts and use
       manifest_page_id: 'status',
       viewport: { name: 'desktop' },
       evidenceSummary: {
-        visible_text: 'Branch main. No blockers.',
+        visible_text: 'Production environment. Low risk.',
         visible_text_length: 25,
         elements: [
-          { selector: '#git', text: 'Worktree state', accessible_name: 'Worktree state', attributes: { 'data-state': 'clean' } },
-          { selector: '#check', text: 'Checks', accessible_name: 'Checks', attributes: { 'data-status': 'complete' } },
-          { selector: '#risk', text: 'No blockers', accessible_name: 'No blockers', attributes: { 'data-risk': 'minor' } }
+          { selector: '#service', text: 'Service state', accessible_name: 'Service state', attributes: { 'data-state': 'ready' } },
+          { selector: '#check', text: 'Health check', accessible_name: 'Health check', attributes: { 'data-status': 'complete' } },
+          { selector: '#risk', text: 'Low risk', accessible_name: 'Low risk', attributes: { 'data-risk': 'minor' } }
         ]
       }
     }]
@@ -500,7 +500,7 @@ test('local content UX advisory supports selector-scoped state contracts and use
   assert.deepEqual(advisory.findings, []);
   assert.equal(advisory.action_plan.status, 'passed');
   assert.equal(advisory.readiness.status, 'passed');
-  assert.doesNotMatch(JSON.stringify(advisory), /"clean"|"complete"|"minor"/);
+  assert.doesNotMatch(JSON.stringify(advisory), /"ready"|"complete"|"minor"/);
 
   const mismatch = buildLocalContentUxAdvisory({
     target,
@@ -509,11 +509,11 @@ test('local content UX advisory supports selector-scoped state contracts and use
       manifest_page_id: 'status',
       viewport: { name: 'desktop' },
       evidenceSummary: {
-        visible_text: 'Branch main.',
+        visible_text: 'Environment unknown.',
         visible_text_length: 12,
         elements: [
-          { selector: '#git', text: 'Worktree state', attributes: { 'data-state': 'dirty' } },
-          { selector: '#check', text: 'Checks', attributes: { 'data-status': 'failed' } },
+          { selector: '#service', text: 'Service state', attributes: { 'data-state': 'offline' } },
+          { selector: '#check', text: 'Health check', attributes: { 'data-status': 'failed' } },
           { selector: '#risk', text: 'Unknown', attributes: { 'data-risk': 'high' } }
         ]
       }
@@ -521,12 +521,12 @@ test('local content UX advisory supports selector-scoped state contracts and use
   });
   assert.equal(mismatch.status, 'needs_owner_review');
   assert.equal(mismatch.counts.data_binding_mismatches, 3);
-  assert.equal(mismatch.counts.user_questions_unanswered, 1);
+  assert.equal(mismatch.counts.user_questions_unanswered, 2);
   assert.ok(mismatch.signals.some((signal) => signal.id === 'content_ux_source_state_not_matched'));
   assert.ok(mismatch.signals.some((signal) => signal.id === 'content_ux_user_question_not_answered'));
-  assert.equal(mismatch.findings.length, 4);
+  assert.equal(mismatch.findings.length, 5);
   assert.ok(mismatch.findings.some((finding) => finding.category === 'content_contract'));
-  assert.ok(mismatch.findings.some((finding) => finding.category === 'workflow_state_clarity'));
+  assert.ok(mismatch.findings.some((finding) => finding.category === 'status_clarity'));
   assert.ok(mismatch.findings.some((finding) => finding.category === 'information_architecture'));
   assert.equal(mismatch.action_plan.total_action_items, mismatch.findings.length);
   assert.equal(mismatch.action_plan.status, 'needs_content_owner_review');
@@ -535,8 +535,8 @@ test('local content UX advisory supports selector-scoped state contracts and use
   assert.equal(mismatch.readiness.status, 'needs_content_owner_review');
   assert.equal(mismatch.readiness.content_owner_review_required, true);
   assert.equal(mismatch.readiness.page_handoff.pages_with_findings, 1);
-  assert.equal(mismatch.page_handoff.pages.find((page) => page.page_id === 'status').top_categories.includes('workflow_state_clarity'), true);
-  assert.doesNotMatch(JSON.stringify(mismatch), /"clean"|"complete"|"minor"/);
+  assert.equal(mismatch.page_handoff.pages.find((page) => page.page_id === 'status').top_categories.includes('status_clarity'), true);
+  assert.doesNotMatch(JSON.stringify(mismatch), /"ready"|"complete"|"minor"/);
 
   const questionOnly = normalizeTargetManifest({
     baseUrl: 'https://example.test/app',
@@ -614,7 +614,7 @@ test('local content UX advisory supports selector-scoped state contracts and use
       }
     }]
   });
-  assert.ok(userJourneyGapAdvisory.findings.some((finding) => finding.category === 'next_action_clarity'));
+  assert.ok(userJourneyGapAdvisory.findings.some((finding) => finding.category === 'action_clarity'));
   assert.ok(userJourneyGapAdvisory.findings.some((finding) => finding.category === 'navigation_clarity'));
   assert.equal(userJourneyGapAdvisory.page_handoff.summary.pages_with_findings, 1);
   assert.ok(userJourneyGapAdvisory.manifest_authoring.suggestions.some((suggestion) => suggestion.type === 'strengthen_next_action_contracts'));

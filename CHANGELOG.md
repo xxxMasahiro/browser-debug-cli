@@ -51,14 +51,16 @@ All notable local development changes are tracked here before public release.
 - Added no-browser and browser smoke coverage proving content UX advisory does not change review findings, metrics, existing action plans, or release readiness.
 - Added selector-scoped content UX advisory checks for text, explicit attributes, data-state, and data-risk evidence.
 - Added required user-question advisory checks for information architecture and user journey review.
-- Added a reusable disabled-by-default Control Center-style content UX target manifest template.
+- Added a reusable disabled-by-default status-dashboard content UX target manifest template.
 - Added separate `content_ux_findings`, `content_ux_action_plan`, and `content_ux_readiness` target-review outputs without changing review findings, metrics, existing action plans, or release readiness.
 - Added bounded Content UX Developer Handoff Markdown report output.
-- Added expanded content UX advisory categories for workflow state clarity, next-action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
+- Added expanded content UX advisory categories for status clarity, action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
 - Added separate `content_ux_page_handoff` and `content_ux_manifest_authoring` target-review outputs.
 - Added page-level content UX and manifest-authoring summaries to Markdown target reports.
 - Added separate `content_ux_review_brief` and `content_ux_rubric_evaluation` target-review outputs for manifest-declared audience, page role, decision-need, and rubric checks.
 - Added Content UX Review Brief summaries to Markdown target reports and reusable manifest templates without changing existing review findings, metrics, action plans, or release readiness.
+- Replaced the packaged content UX example manifest with a domain-neutral status-dashboard template while preserving selector-scoped state/risk coverage.
+- Switched generated/default content UX advisory categories to `status_clarity` and `action_clarity` while keeping legacy rubric category aliases accepted for existing manifests.
 
 ## Release Status
 

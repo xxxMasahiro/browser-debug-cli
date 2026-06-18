@@ -18,7 +18,7 @@ The goal is to provide an agent-independent Playwright interface that can observ
 - Suggest manifest improvements when a target review needs pinned routes, named page expectations, or a larger route budget.
 - Opt into local content UX advisory from a target manifest to compare bounded inline source facts, selector-scoped UI state, and required user-question evidence without changing review gates.
 - Emit separate `content_ux_findings`, `content_ux_action_plan`, and `content_ux_readiness` handoff data while preserving existing review findings, action plans, metrics, and release readiness.
-- Review content UX findings by page, workflow state clarity, next-action clarity, navigation clarity, information architecture, and manifest-authoring gaps.
+- Review content UX findings by page, status clarity, action clarity, navigation clarity, information architecture, and manifest-authoring gaps.
 - Evaluate manifest-declared content UX review briefs and rubric criteria with separate `content_ux_review_brief` and `content_ux_rubric_evaluation` outputs.
 - Use the same CLI/core contract from a local stdio MCP adapter when an MCP client is useful.
 

@@ -29,7 +29,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Prepare for OSS distribution through local Git, GitHub publication with `gh`, CI, and npm packaging in later phases.
 - Prepare a CLI-first review platform that can later expose the same review core through an MCP stdio adapter without making MCP the required runtime.
 - Support evidence-backed UI review findings for browser health, layout integrity, interaction quality, accessibility basics, and mock fidelity.
-- Support generic target manifests so site review can cover local applications such as Control Centers without hard-coded product-specific branches.
+- Support generic target manifests so site review can cover local applications and dashboards without hard-coded product-specific branches.
 - Treat manifest `expectedRoutes` as reviewable local targets so known app routes can be covered even when route discovery cannot find them from anchors or navigation candidates.
 - Support optional manifest `pages` entries so named pages can define expected visible text, expected selectors, page-specific viewport coverage, and page-specific mock metrics without runtime product branches.
 - Support manifest opt-in content UX advisory data so whole-application reviews can compare declared source facts with reviewed page text, selector-scoped UI state, and required user-question evidence without changing deterministic review findings or local gates.
@@ -55,7 +55,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Do not create public repositories, remotes, remote CI execution, or npm publication paths as part of package/runtime design.
 - Do not reimplement Playwright or clone the full Playwright MCP tool surface.
 - Do not claim subjective visual judgment as deterministic proof; subjective or model-assisted review findings must remain advisory unless backed by deterministic evidence and owner acceptance.
-- Do not hard-code Dashboard Control Center, FrameCue Control Center, localhost ports, route names, or product-specific UI labels into the generic runtime.
+- Do not hard-code individual application names, localhost ports, route names, or product-specific UI labels into the generic runtime.
 - Do not send screenshots, traces, raw DOM, source text, console logs, network evidence, or reports to a model or external service without explicit opt-in and security documentation.
 - Do not treat content UX advisory as deterministic product approval, a replacement for owner judgment, or a release gate.
 - Do not treat content UX review brief or rubric output as model judgment, aesthetic approval, deterministic product approval, or a release gate.
@@ -130,7 +130,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Completed: content UX advisory supports selector-scoped `text`, `attribute`, `data-state`, and `data-risk` bindings plus required user-question checks for information architecture and user-journey handoff.
 - Completed: content UX advisory is additive, local-only, creates only separate `content_ux_findings`, does not create review findings, does not change `metrics.finding_count`, does not change `action_plan`, and does not change `quality_signals.release_readiness`.
 - Completed: target review emits separate `content_ux_action_plan` and `content_ux_readiness` outputs so content-owner handoff can advance without changing existing release readiness or action-plan semantics.
-- Completed: content UX advisory categorizes advisory findings for workflow state clarity, next-action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope.
+- Completed: content UX advisory categorizes advisory findings for status clarity, action clarity, navigation clarity, information architecture, source alignment, content contracts, coverage contracts, and review scope while still accepting legacy manifest category aliases.
 - Completed: target review emits separate `content_ux_page_handoff` and `content_ux_manifest_authoring` outputs for page-level triage and manifest authoring guidance.
 - Completed: target review emits separate `content_ux_review_brief` and `content_ux_rubric_evaluation` outputs for manifest-declared audience, page roles, decision needs, and rubric criteria.
 - Completed: mock comparison is optional and conservative; dimension mismatches, missing baselines, or unsupported images produce `inconclusive` review metrics rather than false pass/fail certainty.
@@ -144,7 +144,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Completed: edited manifests can add optional `pages` entries for expected page state and per-page mock metrics.
 - Completed: edited manifests can opt into content UX advisory by declaring bounded inline `sourceData`, `localContentUxAdvisory`, and page `expectations.dataBindings`.
 - Completed: edited manifests can add `localContentUxAdvisory.reviewBrief`, `localContentUxAdvisory.rubric`, and page `role` fields for advisory review-brief and rubric evaluation.
-- Completed: reusable target manifest templates include a generic Control Center-style content UX advisory example without adding runtime product-specific branches.
+- Completed: reusable target manifest templates include a generic status-dashboard content UX advisory example without adding runtime product-specific branches.
 - Completed: target review can emit a Markdown report with action plan and local advisory sections.
 - Completed: Markdown reports include quality signal summaries so developers can triage local review output without reading raw JSON first.
 - Completed: MCP tool allowlists include target manifest initialization and target review without adding shell, cleanup, HTTP/socket, external upload, or profile-reuse tools.
