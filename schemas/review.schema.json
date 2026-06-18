@@ -10,6 +10,7 @@
     "metrics": { "type": "object" },
     "action_plan": { "type": "object" },
     "review_advisory": { "type": "object" },
+    "manifest_suggestions": { "type": "array" },
     "quality_signals": { "type": "object" },
     "evidence_summary": { "type": "object" },
     "artifact_index": { "type": "object" },

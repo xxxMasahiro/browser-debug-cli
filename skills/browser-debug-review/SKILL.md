@@ -19,8 +19,9 @@ Use this skill when a user wants local browser observation, route coverage, UI r
 6. Run a site review for route and viewport coverage:
    `browser-debug review --target <manifest> --report --json`
 7. Use `quality_signals.route_coverage` to decide whether to raise route budgets, split manifests, or add missing expected routes.
-8. Use `quality_signals.page_expectations` and `artifact_index` to decide whether expected page states, mocks, or evidence bundles need follow-up.
-9. Use the returned `action_plan`, `review_advisory`, `quality_signals`, findings, and artifact paths for developer handoff.
+8. Use `quality_signals.page_expectations`, `quality_signals.rendered_state`, and `artifact_index` to decide whether expected page states, loaded/empty UI states, mocks, or evidence bundles need follow-up.
+9. Use `manifest_suggestions` to identify manifest-only rerun improvements such as adding named pages, pinning routes, or raising route budgets.
+10. Use the returned `action_plan`, `review_advisory`, `quality_signals`, findings, and artifact paths for developer handoff.
 
 ## Boundaries
 
@@ -28,4 +29,5 @@ Use this skill when a user wants local browser observation, route coverage, UI r
 - Do not upload artifacts, reuse browser profiles, automate authentication, store credentials, or start HTTP/socket MCP transports without explicit approval.
 - `review_advisory` is a local heuristic signal. It is not human aesthetic approval and it is not model output.
 - `quality_signals.model_review_boundary.external_evidence_transfer` must remain `false` unless an explicit approved model-review workflow exists.
+- `manifest_suggestions` are local advisory hints and do not mutate target manifests automatically.
 - Prefer target manifests, route budgets, expected routes, and viewport matrices over app-specific runtime branches.

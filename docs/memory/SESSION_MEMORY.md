@@ -62,3 +62,14 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - Phase 11 is complete for optional manifest `pages`, page-specific viewports, deterministic expected text and selector checks, page-level mock metrics, local `review_artifact_index` artifacts, `coverage.pages`, and `quality_signals.page_expectations`.
 - The implementation remains generic and local-first. No Control Center-specific runtime branches, external upload, model/API review, OAuth/login automation, existing-profile reuse, HTTP/socket MCP transport, npm publication, license change, or marketplace mutation was added.
 - Current local verification includes `npm test`, `npm run test:browser`, product-local checks, release readiness checks, and parent workflow authority checks.
+
+## 2026-06-18 Phase 12 Rendered-State Dogfood Handoff
+
+- Phase 12 is complete for generic rendered-state dogfood hardening.
+- Layout evidence records image load state, visible loading indicators, and empty table/list/grid containers.
+- Review findings flag broken visible images, lingering loading indicators after the review wait, and empty data containers without visible empty-state messaging.
+- Single-URL and target quality signals include rendered-state summaries.
+- Markdown reports include a Developer Triage section and rendered-state quality signal status.
+- Target review output includes manifest suggestions for missing page expectations, unpinned expected routes, exhausted route budgets, failed page checks, and rendered-state gaps.
+- Browser smoke coverage verifies rendered-state findings, evidence summaries, developer triage reports, and manifest suggestions.
+- The implementation remains generic and local-first. No Control Center-specific runtime branches, external upload, model/API review, OAuth/login automation, existing-profile reuse, HTTP/socket MCP transport, npm publication, license change, or marketplace mutation was added.

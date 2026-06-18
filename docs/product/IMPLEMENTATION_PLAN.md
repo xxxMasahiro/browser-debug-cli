@@ -317,6 +317,42 @@ Phase 11 completes the five-step local implementation path for practical whole-a
 - Completed: no-browser tests verify manifest page normalization and generated target manifest shape.
 - Completed as boundary: live Control Center review should run only when URLs are provided and listening; fixture tests cover the generic runtime path when no live target is available.
 
+### Phase 12: Rendered-State Dogfood Hardening
+
+Phase 12 completes the six-step local dogfood hardening path for making real application reviews more useful without adding target-specific runtime branches. It adds generic rendered-state evidence, developer triage report summaries, manifest suggestions, and fixture-backed validation. It remains local-first and does not add external upload, model/API calls, authentication automation, existing-browser-profile reuse, HTTP/socket MCP transport, marketplace mutation, license changes, or npm publication.
+
+#### Phase 12a: Target Availability Boundary
+
+- Completed as workflow boundary: live application URLs remain runtime inputs or local manifest data, not compiled runtime defaults.
+- Completed as workflow boundary: when no live target URL is provided, fixture-based browser smoke tests verify the generic dogfood review path.
+
+#### Phase 12b: Rendered-State Evidence
+
+- Completed: layout evidence now records visible image load state, loading indicators, and empty table/list/grid containers.
+- Completed: review findings now flag broken visible images, lingering loading indicators after the review wait, and empty data containers without visible empty-state messaging.
+- Completed: single-URL and target quality signals now include `rendered_state` summaries for developer triage.
+
+#### Phase 12c: Developer Triage Reports
+
+- Completed: Markdown review reports now include a Developer Triage section with actionable finding counts, severity counts, category counts, route coverage, and page expectation summaries when available.
+- Completed: Markdown review reports include rendered-state quality signal status.
+
+#### Phase 12d: Manifest Suggestions
+
+- Completed: target review output now includes additive `manifest_suggestions`.
+- Completed: manifest suggestions cover missing named page expectations, unpinned discovered routes, exhausted route budgets, failed page expectations, and rendered-state gaps.
+- Completed as boundary: suggestions do not mutate manifest files automatically and do not add target-specific application logic.
+
+#### Phase 12e: Dogfood Fixture Validation
+
+- Completed: browser smoke coverage verifies broken-image, lingering-loading, empty-data-container, rendered-state quality signal, evidence summary, and Markdown report output.
+- Completed: target browser smoke coverage verifies manifest suggestions in JSON and Markdown report output.
+
+#### Phase 12f: Sync and Release-Safe Boundaries
+
+- Completed: requirements, specification, implementation plan, task tracker, handoff, README, changelog, and test manifest are synchronized with the rendered-state dogfood hardening slice.
+- Completed as boundary: model/API review, evidence leaving the local process, HTTP/socket MCP server mode, authentication automation, external upload, existing-profile reuse, public package naming, license changes, plugin marketplace registration, npm publication, and destructive cleanup remain approval-bound.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -338,6 +374,7 @@ Phase 11 completes the five-step local implementation path for practical whole-a
 - Phase 9 checks cover local quality signals, heading hierarchy evidence, image alt findings, contrast findings, overlap findings, mobile target sizing, developer handoff, local release readiness, report summaries, and disabled model-review boundaries.
 - Phase 10 checks cover unlinked expected route execution, expected route coverage artifacts, route budget skip accounting, and target quality signal route-budget warnings.
 - Phase 11 checks cover manifest page expectation normalization, page-specific viewport execution, expected text and selector checks, page-level mock metrics, local review artifact indexes, and page expectation quality signals.
+- Phase 12 checks cover rendered-state evidence for broken images, lingering loading indicators, empty data containers, developer triage report summaries, manifest suggestions, and fixture-backed target review report output.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, and destructive cleanup commands.
 
 ## Recovery Path

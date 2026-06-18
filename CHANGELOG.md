@@ -42,6 +42,9 @@ All notable local development changes are tracked here before public release.
 - Added optional target manifest `pages` for named page expectations, page-specific viewports, and page-specific mock metrics.
 - Added review `evidence_summary`, local `review_artifact_index` artifacts, and `quality_signals.page_expectations`.
 - Added browser smoke coverage for manifest page expectations, page-specific mock metrics, review artifact indexes, and page expectation report output.
+- Added rendered-state review evidence and findings for broken visible images, lingering loading indicators, and empty data containers without visible empty-state messaging.
+- Added rendered-state quality signals, Developer Triage Markdown report summaries, and target manifest suggestions for dogfood reruns.
+- Added browser smoke coverage for rendered-state findings, evidence summaries, developer triage reports, and manifest suggestions.
 
 ## Release Status
 

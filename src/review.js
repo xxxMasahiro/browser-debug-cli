@@ -437,6 +437,7 @@ export async function runTargetReview(options = {}, context = {}) {
   const qualitySignals = buildTargetQualitySignals({ findings, coverage });
   const actionPlan = buildActionPlan(findings, { coverage });
   const reviewAdvisory = buildTargetReviewAdvisory({ findings, coverage, qualitySignals });
+  const manifestSuggestions = buildManifestSuggestions({ target, coverage, qualitySignals });
   const data = redact({
     review: {
       schema_version: SCHEMA_VERSION,
@@ -462,6 +463,7 @@ export async function runTargetReview(options = {}, context = {}) {
     }),
     action_plan: actionPlan,
     review_advisory: reviewAdvisory,
+    manifest_suggestions: manifestSuggestions,
     quality_signals: qualitySignals,
     environment: {
       artifact_root: artifactRootInput,
@@ -990,10 +992,70 @@ async function collectLayoutEvidence(page, actionCandidates, baseUrl) {
       .slice(0, 80)
       .map((element) => ({
         selector: selectorFor(element),
+        src: element.getAttribute('src') || null,
+        current_src: element.currentSrc || null,
         alt: trim(element.getAttribute('alt') || '', 300),
         decorative: element.getAttribute('role') === 'presentation' || element.getAttribute('aria-hidden') === 'true',
+        complete: element.complete,
+        natural_width: element.naturalWidth,
+        natural_height: element.naturalHeight,
+        loading: element.getAttribute('loading') || null,
         rect: rectFor(element)
       }));
+    const loadingIndicators = [...document.querySelectorAll('[aria-busy="true"], [role="progressbar"], [role="status"], [data-loading], [data-testid], [class], [id]')]
+      .filter(isVisible)
+      .filter((element) => {
+        const descriptor = [
+          element.id,
+          element.className,
+          element.getAttribute('data-testid'),
+          element.getAttribute('aria-label'),
+          element.getAttribute('role'),
+          element.getAttribute('aria-busy'),
+          element.innerText || element.textContent
+        ].join(' ');
+        return /\b(aria-busy|loading|loader|spinner|skeleton|progress|please wait|waiting)\b/i.test(descriptor);
+      })
+      .slice(0, 30)
+      .map((element) => ({
+        selector: selectorFor(element),
+        tag: element.tagName.toLowerCase(),
+        role: element.getAttribute('role') || null,
+        aria_busy: element.getAttribute('aria-busy') || null,
+        text: trim(element.innerText || element.textContent || '', 160),
+        rect: rectFor(element)
+      }));
+    const emptyStatePattern = /\b(no\s+(items|results|data|records|rows|entries)|empty|nothing\s+to\s+show|not\s+found|create\s+your\s+first)\b/i;
+    const dataContainers = [...document.querySelectorAll('table, ul, ol, [role="table"], [role="grid"], [role="list"], [role="listbox"], [data-empty-check]')]
+      .filter(isVisible)
+      .slice(0, 80)
+      .map((element) => {
+        const role = element.getAttribute('role') || null;
+        const tag = element.tagName.toLowerCase();
+        const rows = tag === 'table' || role === 'table' || role === 'grid'
+          ? [...element.querySelectorAll('tbody tr, [role="row"]')].filter((row) => row.closest('thead') === null).length
+          : 0;
+        const items = role === 'list' || role === 'listbox' || tag === 'ul' || tag === 'ol'
+          ? [...element.querySelectorAll('li, [role="listitem"], [role="option"]')].filter(isVisible).length
+          : 0;
+        const text = trim(element.innerText || element.textContent || '', 300);
+        return {
+          selector: selectorFor(element),
+          tag,
+          role,
+          rect: rectFor(element),
+          text,
+          row_count: rows,
+          item_count: items,
+          has_empty_state_text: emptyStatePattern.test(text)
+        };
+      })
+      .filter((element) => {
+        const isTableLike = element.tag === 'table' || element.role === 'table' || element.role === 'grid';
+        const isListLike = element.role === 'list' || element.role === 'listbox';
+        return ((isTableLike && element.row_count === 0) || (isListLike && element.item_count === 0))
+          && !element.has_empty_state_text;
+      });
     const overlaps = [];
     const overlapNodes = nodes.slice(0, 80);
     for (let leftIndex = 0; leftIndex < overlapNodes.length; leftIndex += 1) {
@@ -1042,6 +1104,8 @@ async function collectLayoutEvidence(page, actionCandidates, baseUrl) {
       headings,
       landmarks,
       images,
+      loading_indicators: loadingIndicators,
+      empty_containers: dataContainers,
       overlaps: overlaps.slice(0, 40),
       elements,
       anchors: [...document.querySelectorAll('a[href]')].slice(0, 120).map((anchor) => ({
@@ -1412,6 +1476,66 @@ function createFindings({ id, url, viewport, observation, layout, screenshotArti
     });
   }
 
+  for (const image of brokenImages(layout).slice(0, 10)) {
+    add({
+      category: 'browser_health',
+      severity: 'medium',
+      confidence: 'high',
+      source: 'deterministic',
+      selector: image.selector,
+      rect: image.rect,
+      route,
+      viewport,
+      message: `Image ${image.selector} appears broken or unfinished after page load.`,
+      evidence: {
+        selector: image.selector,
+        src: image.current_src || image.src,
+        complete: image.complete,
+        natural_width: image.natural_width,
+        natural_height: image.natural_height
+      },
+      artifacts: screenshotArtifact ? [screenshotArtifact.path] : [],
+      repro: [`Open ${route} at ${viewport.width}x${viewport.height}.`, `Inspect image load state for ${image.selector}.`],
+      owner_decision_required: false
+    });
+  }
+
+  for (const indicator of (layout.loading_indicators ?? []).slice(0, 8)) {
+    add({
+      category: 'layout_integrity',
+      severity: 'medium',
+      confidence: 'medium',
+      source: 'heuristic',
+      selector: indicator.selector,
+      rect: indicator.rect,
+      route,
+      viewport,
+      message: `Visible loading indicator ${indicator.selector} remained after the review wait.`,
+      evidence: indicator,
+      artifacts: screenshotArtifact ? [screenshotArtifact.path] : [],
+      repro: [`Open ${route} at ${viewport.width}x${viewport.height}.`, `Inspect whether ${indicator.selector} is intentionally still loading.`],
+      owner_decision_required: true
+    });
+  }
+
+  for (const container of (layout.empty_containers ?? []).slice(0, 8)) {
+    add({
+      category: 'layout_integrity',
+      severity: 'low',
+      confidence: 'medium',
+      source: 'heuristic',
+      selector: container.selector,
+      rect: container.rect,
+      route,
+      viewport,
+      message: `Data container ${container.selector} appears empty without a visible empty-state message.`,
+      evidence: container,
+      artifacts: screenshotArtifact ? [screenshotArtifact.path] : [],
+      repro: [`Open ${route} at ${viewport.width}x${viewport.height}.`, `Inspect empty-state rendering for ${container.selector}.`],
+      owner_decision_required: true
+    });
+  }
+
   for (const overlap of (layout.overlaps ?? []).slice(0, 10)) {
     add({
       category: 'layout_integrity',
@@ -1523,6 +1647,14 @@ function relativeLuminance(color) {
   return 0.2126 * channel(color.red) + 0.7152 * channel(color.green) + 0.0722 * channel(color.blue);
 }
 
+function brokenImages(layout) {
+  return (layout.images ?? []).filter((image) => (
+    !image.decorative
+    && (image.src || image.current_src)
+    && (image.complete === false || image.natural_width === 0 || image.natural_height === 0)
+  ));
+}
+
 function buildEvidenceSummary({ observation, layout, screenshotArtifact }) {
   return redact({
     url: observation.final_url,
@@ -1533,6 +1665,8 @@ function buildEvidenceSummary({ observation, layout, screenshotArtifact }) {
     headings: layout.headings ?? [],
     landmarks: layout.landmarks ?? [],
     images: layout.images ?? [],
+    loading_indicators: layout.loading_indicators ?? [],
+    empty_containers: layout.empty_containers ?? [],
     actions: (layout.actions ?? []).map((action) => ({
       id: action.id,
       selector: action.selector,
@@ -1694,6 +1828,9 @@ function buildQualitySignals({ findings, layout, viewport, screenshotArtifact, m
     return needsName && !element.accessible_name && !element.text;
   });
   const missingImageAlt = (layout.images ?? []).filter((image) => !image.decorative && !image.alt);
+  const imageLoadFailures = brokenImages(layout);
+  const loadingIndicators = layout.loading_indicators ?? [];
+  const emptyContainers = layout.empty_containers ?? [];
   const contrastFindings = findings.filter((finding) => /contrast/i.test(finding.message ?? ''));
   const actionable = actionableFindings(findings);
   const gate = releaseGateForFindings(actionable);
@@ -1712,11 +1849,24 @@ function buildQualitySignals({ findings, layout, viewport, screenshotArtifact, m
       ]
     },
     responsive_layout: {
-      status: layout.page.horizontal_overflow || clippedElements.length > 0 || (layout.overlaps ?? []).length > 0 ? 'needs_attention' : 'passed',
+      status: layout.page.horizontal_overflow || clippedElements.length > 0 || (layout.overlaps ?? []).length > 0 || emptyContainers.length > 0 ? 'needs_attention' : 'passed',
       horizontal_overflow: Boolean(layout.page.horizontal_overflow),
       clipped_element_count: clippedElements.length,
       overlap_pair_count: (layout.overlaps ?? []).length,
+      empty_container_warning_count: emptyContainers.length,
       mobile_touch_target_warning_count: mobileTargets.length
+    },
+    rendered_state: {
+      status: imageLoadFailures.length > 0 || loadingIndicators.length > 0 || emptyContainers.length > 0 ? 'needs_attention' : 'passed',
+      visible_text_length: layout.page.visible_text_length,
+      broken_image_count: imageLoadFailures.length,
+      loading_indicator_count: loadingIndicators.length,
+      empty_container_warning_count: emptyContainers.length,
+      signals: [
+        ...(imageLoadFailures.length > 0 ? ['broken_or_unfinished_images'] : []),
+        ...(loadingIndicators.length > 0 ? ['visible_loading_indicators_after_wait'] : []),
+        ...(emptyContainers.length > 0 ? ['empty_data_containers_without_empty_state'] : [])
+      ]
     },
     interaction_affordance: {
       status: smallTargets.length > 0 || mobileTargets.length > 0 ? 'needs_attention' : 'passed',
@@ -1730,6 +1880,7 @@ function buildQualitySignals({ findings, layout, viewport, screenshotArtifact, m
       missing_accessible_name_count: missingNames.length,
       duplicate_id_count: (layout.duplicate_ids ?? []).length,
       missing_image_alt_count: missingImageAlt.length,
+      image_load_failure_count: imageLoadFailures.length,
       low_contrast_text_count: contrastFindings.length,
       main_landmark_count: (layout.landmarks ?? []).filter((landmark) => landmark.tag === 'main' || landmark.role === 'main').length
     },
@@ -1752,6 +1903,7 @@ function buildTargetQualitySignals({ findings, coverage }) {
   const routeBudgetExceeded = coverage.routes.skipped.some((route) => route.reason === 'route_budget_exceeded');
   const pageFailures = coverage.pages?.failed?.length ?? 0;
   const pageSkips = coverage.pages?.skipped?.length ?? 0;
+  const renderedState = renderedStateFindingCounts(findings);
   return {
     reviewer: 'local_quality_signals',
     status: gate.status === 'pass' && coverage.routes.failed.length === 0 && coverage.routes.expected_missing.length === 0 && !routeBudgetExceeded && pageFailures === 0 && pageSkips === 0
@@ -1781,6 +1933,13 @@ function buildTargetQualitySignals({ findings, coverage }) {
       status: coverage.viewports.length > 0 ? 'passed' : 'needs_attention',
       viewports: coverage.viewports.map((viewport) => viewport.name),
       viewport_count: coverage.viewports.length
+    },
+    rendered_state: {
+      status: renderedState.total > 0 ? 'needs_attention' : 'passed',
+      broken_image_findings: renderedState.broken_images,
+      loading_indicator_findings: renderedState.loading_indicators,
+      empty_container_findings: renderedState.empty_containers,
+      total_findings: renderedState.total
     },
     finding_summary: {
       status: actionable.length > 0 ? 'needs_attention' : 'passed',
@@ -1867,6 +2026,30 @@ function countBy(items, field) {
     counts[key] = (counts[key] ?? 0) + 1;
   }
   return counts;
+}
+
+function renderedStateFindingCounts(findings) {
+  const counts = {
+    broken_images: 0,
+    loading_indicators: 0,
+    empty_containers: 0
+  };
+  for (const finding of findings) {
+    const message = String(finding.message ?? '').toLowerCase();
+    if (message.includes('appears broken or unfinished')) {
+      counts.broken_images += 1;
+    }
+    if (message.includes('loading indicator')) {
+      counts.loading_indicators += 1;
+    }
+    if (message.includes('empty without a visible empty-state')) {
+      counts.empty_containers += 1;
+    }
+  }
+  return {
+    ...counts,
+    total: counts.broken_images + counts.loading_indicators + counts.empty_containers
+  };
 }
 
 function withFindingId(reviewId, finding, index) {
@@ -1964,6 +2147,15 @@ function buildReviewAdvisory({ findings, layout, screenshotArtifact, mockMetrics
   if (qualitySignals?.responsive_layout?.overlap_pair_count > 0) {
     signals.push('Responsive layout signals indicate visible overlap risk.');
   }
+  if (qualitySignals?.rendered_state?.broken_image_count > 0) {
+    signals.push('Rendered-state signals indicate visible images failed to load.');
+  }
+  if (qualitySignals?.rendered_state?.loading_indicator_count > 0) {
+    signals.push('Rendered-state signals indicate visible loading UI remained after the review wait.');
+  }
+  if (qualitySignals?.rendered_state?.empty_container_warning_count > 0) {
+    signals.push('Rendered-state signals indicate empty data containers may need explicit empty states.');
+  }
   if (qualitySignals?.accessibility_structure?.missing_image_alt_count > 0) {
     signals.push('Accessibility structure signals indicate image semantics need attention.');
   }
@@ -2007,6 +2199,9 @@ function buildTargetReviewAdvisory({ findings, coverage, qualitySignals }) {
   if (findings.length > 0) {
     signals.push('At least one visited route produced review findings.');
   }
+  if (qualitySignals?.rendered_state?.total_findings > 0) {
+    signals.push(`${qualitySignals.rendered_state.total_findings} rendered-state findings need developer review.`);
+  }
   if (qualitySignals?.route_coverage?.visited_route_viewports < qualitySignals?.route_coverage?.expected_route_viewports) {
     signals.push('Route and viewport coverage did not reach every discovered route viewport pair.');
   }
@@ -2023,6 +2218,52 @@ function buildTargetReviewAdvisory({ findings, coverage, qualitySignals }) {
       'Subjective design approval still requires an approved human or model review layer.'
     ]
   };
+}
+
+function buildManifestSuggestions({ target, coverage, qualitySignals }) {
+  const suggestions = [];
+  if (target.pages.length === 0) {
+    suggestions.push({
+      type: 'add_page_expectations',
+      severity: 'info',
+      message: 'No manifest pages are defined for named UI-state checks.',
+      recommendation: 'Add pages entries for critical routes with expected text, selectors, and page-specific viewports.'
+    });
+  }
+  if (target.expectedRoutes.length === 0 && coverage.routes.discovered.length > 1) {
+    suggestions.push({
+      type: 'pin_expected_routes',
+      severity: 'info',
+      message: 'The review discovered multiple routes but no expectedRoutes are pinned in the manifest.',
+      recommendation: 'Add important routes to expectedRoutes so regressions are caught even when navigation changes.'
+    });
+  }
+  const budgetSkips = coverage.routes.skipped.filter((route) => route.reason === 'route_budget_exceeded').length;
+  if (budgetSkips > 0) {
+    suggestions.push({
+      type: 'raise_or_split_route_budget',
+      severity: 'medium',
+      message: `${budgetSkips} routes were skipped because budgets.maxRoutes was exhausted.`,
+      recommendation: 'Raise budgets.maxRoutes or split the target into smaller manifests for focused reruns.'
+    });
+  }
+  if ((coverage.pages?.failed?.length ?? 0) > 0) {
+    suggestions.push({
+      type: 'fix_page_expectations_or_page_state',
+      severity: 'medium',
+      message: `${coverage.pages.failed.length} manifest page checks failed.`,
+      recommendation: 'Fix the rendered page state or update stale expected text and selectors after owner review.'
+    });
+  }
+  if (qualitySignals?.rendered_state?.total_findings > 0) {
+    suggestions.push({
+      type: 'add_rendered_state_expectations',
+      severity: 'low',
+      message: 'Rendered-state findings were observed during target review.',
+      recommendation: 'Add page expectations or fixtures that cover loaded, empty, and media-rich states for the affected routes.'
+    });
+  }
+  return suggestions;
 }
 
 function summarizeImplementationFocus(findings) {
@@ -2082,6 +2323,22 @@ function releaseGateForFindings(findings) {
 function guidanceForFinding(finding) {
   const message = String(finding.message ?? '').toLowerCase();
   if (finding.category === 'browser_health') {
+    if (message.includes('image') && message.includes('broken')) {
+      return {
+        impact: 'Broken visible media can make the page look unfinished and can hide important product context.',
+        recommendation: 'Fix the image source, bundling path, or fallback rendering and rerun the same review.',
+        fix_candidates: [
+          'Verify the resolved asset URL and static file configuration.',
+          'Add a fallback state for images that may legitimately fail or be unavailable.'
+        ],
+        implementation_notes: {
+          html: ['Confirm the image element has the intended src and alt text.'],
+          css: [],
+          javascript: ['Check asset import, build output, and runtime path resolution for the image source.'],
+          test: ['Add a browser assertion that important images finish loading with non-zero natural dimensions.']
+        }
+      };
+    }
     return {
       impact: 'Runtime or network failures can make the page unreliable before UI quality is judged.',
       recommendation: 'Repair the underlying runtime, response, or network failure and rerun the same review.',
@@ -2142,6 +2399,38 @@ function guidanceForFinding(finding) {
         css: ['Inspect position, z-index, grid/flex sizing, margins, and breakpoint rules for the overlapping selectors.'],
         javascript: [],
         test: ['Keep the failing viewport in the target manifest and rerun review after the layout change.']
+      }
+    };
+  }
+  if (finding.category === 'layout_integrity' && message.includes('loading indicator')) {
+    return {
+      impact: 'A persistent loading state can block users from understanding whether content is ready or stuck.',
+      recommendation: 'Confirm the loading indicator is dismissed after data is ready, or add clear loaded/empty/error states.',
+      fix_candidates: [
+        'Check unresolved promises, pending data fetches, and state transitions for the route.',
+        'Render a stable empty or error state when content cannot be loaded.'
+      ],
+      implementation_notes: {
+        html: ['Ensure loading regions expose meaningful status text only while loading is active.'],
+        css: ['Avoid leaving skeleton or spinner classes visible after data is ready.'],
+        javascript: ['Audit loading state transitions and async error handling for the route.'],
+        test: ['Add a browser test that waits for the loading indicator to disappear.']
+      }
+    };
+  }
+  if (finding.category === 'layout_integrity' && message.includes('empty-state')) {
+    return {
+      impact: 'Empty data containers without an explicit state can look broken even when the application is working.',
+      recommendation: 'Render a visible empty state or seed the reviewed page with representative data.',
+      fix_candidates: [
+        'Add empty-state copy or an action for list, table, or grid components.',
+        'If the page should contain data, fix the data source or fixture setup before review.'
+      ],
+      implementation_notes: {
+        html: ['Add semantic empty-state content near the empty container.'],
+        css: ['Give the empty state stable spacing so the layout does not collapse.'],
+        javascript: ['Separate loading, empty, error, and populated states in the owner component.'],
+        test: ['Cover empty and populated states for the affected data container.']
       }
     };
   }
@@ -2494,6 +2783,7 @@ async function writeReviewArtifactIndex({
       local_release_gate: qualitySignals?.release_readiness?.local_gate ?? null,
       route_coverage: qualitySignals?.route_coverage?.status ?? null,
       page_expectations: qualitySignals?.page_expectations?.status ?? null,
+      rendered_state: qualitySignals?.rendered_state?.status ?? null,
       model_review_enabled: qualitySignals?.model_review_boundary?.status !== 'not_enabled'
     },
     coverage_summary: coverage ? {
@@ -2612,6 +2902,22 @@ function renderReviewReport(data, artifacts) {
     }
     lines.push('');
   }
+  lines.push('## Developer Triage', '');
+  lines.push(`- Actionable findings: ${data.action_plan?.total_actionable_findings ?? data.findings.length}`);
+  if (data.metrics?.by_severity) {
+    lines.push(`- Severity counts: ${formatCounts(data.metrics.by_severity)}`);
+  }
+  if (data.metrics?.by_category) {
+    lines.push(`- Category counts: ${formatCounts(data.metrics.by_category)}`);
+  }
+  if (data.coverage) {
+    lines.push(`- Route coverage: ${data.coverage.routes.visited.length} visited, ${data.coverage.routes.skipped.length} skipped, ${data.coverage.routes.failed.length} failed`);
+    lines.push(`- Page expectations: ${data.coverage.pages?.checked?.length ?? 0} checked, ${data.coverage.pages?.failed?.length ?? 0} failed`);
+  }
+  if (data.artifact_index?.path) {
+    lines.push(`- Artifact index: ${data.artifact_index.path}`);
+  }
+  lines.push('');
   if (data.review_advisory?.visual_assessment?.length) {
     lines.push('## Local Review Advisory', '');
     for (const signal of data.review_advisory.visual_assessment) {
@@ -2628,6 +2934,9 @@ function renderReviewReport(data, artifacts) {
     if (data.quality_signals.responsive_layout) {
       lines.push(`- Responsive layout: ${data.quality_signals.responsive_layout.status}`);
     }
+    if (data.quality_signals.rendered_state) {
+      lines.push(`- Rendered state: ${data.quality_signals.rendered_state.status}`);
+    }
     if (data.quality_signals.interaction_affordance) {
       lines.push(`- Interaction affordance: ${data.quality_signals.interaction_affordance.status}`);
     }
@@ -2642,6 +2951,13 @@ function renderReviewReport(data, artifacts) {
     }
     if (data.quality_signals.release_readiness) {
       lines.push(`- Local release gate: ${data.quality_signals.release_readiness.local_gate}`);
+    }
+    lines.push('');
+  }
+  if (data.manifest_suggestions?.length) {
+    lines.push('## Manifest Suggestions', '');
+    for (const suggestion of data.manifest_suggestions) {
+      lines.push(`- ${suggestion.severity.toUpperCase()} ${suggestion.type}: ${suggestion.recommendation}`);
     }
     lines.push('');
   }
@@ -2671,6 +2987,14 @@ function renderReviewReport(data, artifacts) {
     lines.push(`- ${artifact.type}: ${artifact.path}`);
   }
   return `${lines.join('\n')}\n`;
+}
+
+function formatCounts(counts) {
+  const entries = Object.entries(counts ?? {}).filter(([, count]) => count > 0);
+  if (entries.length === 0) {
+    return 'none';
+  }
+  return entries.map(([key, count]) => `${key}=${count}`).join(', ');
 }
 
 function dedupeByUrl(items) {

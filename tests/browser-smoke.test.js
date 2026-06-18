@@ -371,6 +371,55 @@ test('review reports deterministic layout and browser-health findings', { skip: 
   assert.match(reportText, /Local release gate/);
 });
 
+test('review reports rendered-state evidence for media loading and empty data UI', { skip: !runBrowserSmoke }, async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-rendered-state-smoke-'));
+  await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
+  const fixture = path.join(cwd, 'rendered-state.html');
+  await writeFile(fixture, [
+    '<!doctype html>',
+    '<html lang="en">',
+    '<head><title>Rendered State Smoke</title></head>',
+    '<body>',
+    '<main>',
+    '<h1>Rendered State</h1>',
+    '<img id="broken-image" src="./missing-chart.png" alt="Revenue chart" style="width:80px;height:48px">',
+    '<div id="loading-panel" aria-busy="true">Loading reports</div>',
+    '<table id="orders"><thead><tr><th>Order</th></tr></thead><tbody></tbody></table>',
+    '</main>',
+    '</body>',
+    '</html>'
+  ].join('\n'), 'utf8');
+
+  const result = await executeCli([
+    'review',
+    '--url',
+    `file://${fixture}`,
+    '--screenshot',
+    '--report',
+    '--timeout',
+    '10000',
+    '--json'
+  ], { cwd });
+
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.data.quality_signals.rendered_state.status, 'needs_attention');
+  assert.equal(body.data.quality_signals.rendered_state.broken_image_count >= 1, true);
+  assert.equal(body.data.quality_signals.rendered_state.loading_indicator_count >= 1, true);
+  assert.equal(body.data.quality_signals.rendered_state.empty_container_warning_count >= 1, true);
+  assert.ok(body.data.findings.some((finding) => /appears broken or unfinished/.test(finding.message)));
+  assert.ok(body.data.findings.some((finding) => /loading indicator/.test(finding.message)));
+  assert.ok(body.data.findings.some((finding) => /empty without a visible empty-state/.test(finding.message)));
+  assert.equal(body.data.evidence_summary.loading_indicators.length >= 1, true);
+  assert.equal(body.data.evidence_summary.empty_containers.length >= 1, true);
+
+  const report = body.artifacts.find((artifact) => artifact.type === 'report');
+  assert.ok(report);
+  const reportText = await readFile(path.join(cwd, report.path), 'utf8');
+  assert.match(reportText, /Developer Triage/);
+  assert.match(reportText, /Rendered state: needs_attention/);
+});
+
 test('target review discovers same-origin routes and records coverage', { skip: !runBrowserSmoke }, async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-target-review-smoke-'));
   await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
@@ -442,11 +491,13 @@ test('target review discovers same-origin routes and records coverage', { skip: 
   assert.equal(body.data.quality_signals.route_coverage.status, 'passed');
   assert.equal(body.data.quality_signals.route_coverage.expected_manifest_routes, 1);
   assert.equal(body.data.quality_signals.model_review_boundary.external_evidence_transfer, false);
+  assert.ok(body.data.manifest_suggestions.some((suggestion) => suggestion.type === 'add_page_expectations'));
   const report = body.artifacts.find((artifact) => artifact.type === 'report');
   assert.ok(report);
   await access(path.join(cwd, report.path));
   const reportText = await readFile(path.join(cwd, report.path), 'utf8');
   assert.match(reportText, /Quality Signals/);
+  assert.match(reportText, /Manifest Suggestions/);
 });
 
 test('target review records route budget skips for unvisited discovered routes', { skip: !runBrowserSmoke }, async () => {

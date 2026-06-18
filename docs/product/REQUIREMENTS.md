@@ -34,9 +34,11 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Support optional manifest `pages` entries so named pages can define expected visible text, expected selectors, page-specific viewport coverage, and page-specific mock metrics without runtime product branches.
 - Keep review findings developer-facing, reproducible, and tied to selectors, rectangles, routes, viewports, artifacts, confidence, severity, and reproduction steps.
 - Produce a local review artifact index that groups review JSON, layout JSON, screenshots, mock metrics, coverage, reports, evidence classes, local boundaries, and rerun guidance for developer handoff.
+- Detect generic rendered-state risks such as broken visible images, lingering loading indicators after the review wait, and empty data containers without visible empty-state messaging.
 - Generate reusable target manifests so whole-application review can start from a URL without hand-writing the full manifest.
+- Suggest target manifest improvements when dogfood review evidence shows missing page expectations, unpinned discovered routes, exhausted route budgets, failed page checks, or rendered-state gaps.
 - Provide action plans, implementation-focused fix candidates, and local heuristic advisory signals that help developers decide what to fix first.
-- Provide structured local quality signals for visual hierarchy, responsive layout, interaction affordance, accessibility structure, evidence completeness, local release readiness, and model-review boundaries.
+- Provide structured local quality signals for visual hierarchy, rendered state, responsive layout, interaction affordance, accessibility structure, evidence completeness, local release readiness, and model-review boundaries.
 - Provide local plugin metadata so Codex can discover the CLI/MCP review workflow without making remote services mandatory.
 
 ## Non-Goals
@@ -110,9 +112,11 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Completed: findings include `category`, `severity`, `confidence`, `selector`, `rect`, `evidence`, `artifacts`, and `repro` data.
 - Completed: findings include developer-facing enrichment fields such as `priority`, `impact`, `recommendation`, `fix_candidates`, and `implementation_notes`.
 - Completed: review results include `action_plan` and `review_advisory` to prioritize remediation and summarize local heuristic visual review signals.
-- Completed: review results include `quality_signals` for heading hierarchy, landmarks, image alt text, contrast, overlap, mobile target sizing, route coverage, evidence completeness, release readiness, developer handoff, and the disabled model-review boundary.
+- Completed: review results include `quality_signals` for heading hierarchy, rendered state, landmarks, image alt text, contrast, overlap, mobile target sizing, route coverage, evidence completeness, release readiness, developer handoff, and the disabled model-review boundary.
 - Completed: target review results include `quality_signals.page_expectations` for expected page counts, checked pages, failed pages, skipped pages, and missing text or selector expectations.
 - Completed: review results include local artifact indexes that summarize evidence classes and rerun guidance without uploading artifacts.
+- Completed: local rendered-state review findings flag broken visible images, lingering loading indicators, and empty data containers without visible empty-state messaging.
+- Completed: target review output includes manifest suggestions for adding named page expectations, pinning expected routes, raising or splitting route budgets, and covering rendered-state gaps.
 - Completed: mock comparison is optional and conservative; dimension mismatches, missing baselines, or unsupported images produce `inconclusive` review metrics rather than false pass/fail certainty.
 - Completed: MCP support is implemented as a thin local stdio adapter over the same core, not as a separate product runtime, network service, or default dependency.
 - Completed: model or vision review remains outside deterministic local review checks and has not been implemented.

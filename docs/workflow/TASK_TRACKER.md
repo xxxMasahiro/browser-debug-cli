@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Phase 5 local MVP runtime implementation is complete after Phase 1 and Phase 2a. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally. Phase 7 local review-platform implementation is complete for deterministic review, target manifests, route/viewport coverage, risk classification, conservative mock metrics, local stdio MCP adapter, schema registry, and package API/file-set readiness. Phase 8 local dogfood/plugin-readiness work is complete for target manifest generation, developer action plans, local heuristic review advisory data, target Markdown reports, plugin metadata, MCP target tools, reusable manifest template, and package file-set readiness without publication. Phase 9 local review-quality work is complete for quality signals, expanded local heuristics, developer handoff, local release decision support, and explicit model-review boundaries. Phase 10 local dogfood route-readiness work is complete for expected-route execution, expected-route coverage artifacts, route-budget skip accounting, and fixture-backed validation without target-specific runtime branches. Phase 11 local page-expectation review work is complete for optional manifest pages, page-specific viewports, deterministic page-state checks, page-level mock metrics, local review artifact indexes, and fixture-backed validation.
+Phase 5 local MVP runtime implementation is complete after Phase 1 and Phase 2a. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally. Phase 7 local review-platform implementation is complete for deterministic review, target manifests, route/viewport coverage, risk classification, conservative mock metrics, local stdio MCP adapter, schema registry, and package API/file-set readiness. Phase 8 local dogfood/plugin-readiness work is complete for target manifest generation, developer action plans, local heuristic review advisory data, target Markdown reports, plugin metadata, MCP target tools, reusable manifest template, and package file-set readiness without publication. Phase 9 local review-quality work is complete for quality signals, expanded local heuristics, developer handoff, local release decision support, and explicit model-review boundaries. Phase 10 local dogfood route-readiness work is complete for expected-route execution, expected-route coverage artifacts, route-budget skip accounting, and fixture-backed validation without target-specific runtime branches. Phase 11 local page-expectation review work is complete for optional manifest pages, page-specific viewports, deterministic page-state checks, page-level mock metrics, local review artifact indexes, and fixture-backed validation. Phase 12 local rendered-state dogfood hardening is complete for broken-image, lingering-loading, empty-data-container, developer triage report, manifest suggestion, and fixture-backed validation support.
 
 This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and HANDOFF workflow-state pair synchronized whenever task state changes.
 
@@ -96,10 +96,16 @@ This file is paired with `docs/workflow/HANDOFF.md`. Keep the TASK_TRACKER and H
 - [x] Target quality signals now include `page_expectations` counts for checked pages, failed pages, skipped pages, and missing expectations.
 - [x] Single-URL and target reviews write local `review_artifact_index` artifacts with evidence classes, rerun guidance, and local safety boundaries.
 - [x] Browser smoke coverage verifies page expectation checks, page-specific mock metrics, artifact indexes, and report output.
+- [x] Layout evidence records image load state, visible loading indicators, and empty table/list/grid containers.
+- [x] Review findings flag broken visible images, lingering loading indicators after the review wait, and empty data containers without visible empty-state messaging.
+- [x] Single-URL and target quality signals include rendered-state summaries.
+- [x] Markdown reports include a Developer Triage section and rendered-state quality signal status.
+- [x] Target review output includes manifest suggestions for missing page expectations, unpinned expected routes, route-budget exhaustion, failed page checks, and rendered-state gaps.
+- [x] Browser smoke coverage verifies rendered-state findings, evidence summaries, developer triage reports, and manifest suggestions.
 
 ## Remaining Work
 
-No remaining local Phase 11 implementation work is currently planned.
+No remaining local Phase 12 implementation work is currently planned.
 
 ## Future Approval-Bound Work
 
