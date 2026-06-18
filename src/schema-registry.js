@@ -144,6 +144,37 @@ const schemas = Object.freeze({
     },
     additionalProperties: true
   }),
+  agent_request_status: Object.freeze({
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: 'https://browser-debug.local/schemas/agent-request-status.schema.json',
+    title: 'Browser Debug CLI Agent Request Status',
+    type: 'object',
+    required: ['schema_version', 'package_id', 'package_path', 'status', 'gate_effect', 'api_call_performed', 'automatic_upload', 'existing_review_mutated'],
+    properties: {
+      schema_version: { type: 'string' },
+      package_id: { type: ['string', 'null'] },
+      package_path: { type: 'string' },
+      prompt_path: { type: ['string', 'null'] },
+      receipt_path: { type: ['string', 'null'] },
+      review_artifact_index_path: { type: ['string', 'null'] },
+      review_id: { type: ['string', 'null'] },
+      task: { type: ['string', 'null'] },
+      status: { enum: ['waiting_for_agent', 'advisory_imported'] },
+      created_at: { type: ['string', 'null'] },
+      surface: { type: ['object', 'null'] },
+      result_paths: { type: 'array' },
+      latest_result_path: { type: ['string', 'null'] },
+      advisory_findings: { type: 'number' },
+      owner_decision_requests: { type: 'number' },
+      gate_effect: { enum: ['none'] },
+      external_evidence_transfer: { type: 'boolean' },
+      api_call_performed: { type: 'boolean' },
+      automatic_upload: { type: 'boolean' },
+      existing_review_mutated: { type: 'boolean' },
+      next_step: { type: 'string' }
+    },
+    additionalProperties: true
+  }),
   agent_advisory_result: Object.freeze({
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: 'https://browser-debug.local/schemas/agent-advisory-result.schema.json',

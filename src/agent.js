@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import {
   artifactObject,
   artifactRelPath,
   createArtifactId,
   ensureArtifactRoot,
+  resolveArtifactRoot,
   writeJsonArtifact,
   writeTextArtifact
 } from './artifacts.js';
@@ -118,6 +119,31 @@ export async function runAgentSurfacesList() {
       boundary: commonBoundary()
     },
     warnings: [],
+    errors: [],
+    artifacts: []
+  };
+}
+
+export async function runAgentRequestsList(options = {}, context = {}) {
+  const cwd = context.cwd ?? process.cwd();
+  const artifactRootInput = options['artifact-root'] ?? DEFAULT_ARTIFACT_ROOT;
+  const packageRead = await readAgentPackages(cwd, artifactRootInput, options.package);
+  if (!packageRead.ok) {
+    return errorResult(packageRead.error.code, packageRead.error.message, packageRead.error.details);
+  }
+  const resultRead = await readAgentResults(cwd, artifactRootInput);
+  const statuses = packageRead.packages.map((agentPackage) => requestStatusFromPackage(agentPackage, resultRead.results));
+  const summary = summarizeRequestStatuses(statuses);
+  const warnings = [...packageRead.warnings, ...resultRead.warnings];
+
+  return {
+    status: 'ok',
+    data: {
+      agent_requests: statuses,
+      summary,
+      boundary: commonBoundary()
+    },
+    warnings,
     errors: [],
     artifacts: []
   };
@@ -490,6 +516,155 @@ function normalizeAgentAdvisoryResult({ id, now, packageData, packetPath, input,
     warnings,
     boundary: commonBoundary()
   });
+}
+
+async function readAgentPackages(cwd, artifactRootInput, packagePath) {
+  if (packagePath) {
+    const input = await readWorkspaceJson(cwd, packagePath, 'agent package');
+    if (!input.ok) {
+      return input;
+    }
+    return {
+      ok: true,
+      packages: [{
+        packet: input.value,
+        package_path: input.relativePath
+      }],
+      warnings: []
+    };
+  }
+
+  const root = resolveArtifactRoot(cwd, artifactRootInput);
+  const packageRoot = path.join(root, 'agent-packages');
+  const entries = await readDirectoryOrEmpty(packageRoot);
+  const packages = [];
+  const warnings = [];
+  for (const entry of entries.filter((candidate) => candidate.isDirectory())) {
+    const relPath = artifactRelPath(artifactRootInput, 'agent-packages', entry.name, 'packet.json');
+    const filePath = path.join(packageRoot, entry.name, 'packet.json');
+    try {
+      packages.push({
+        packet: JSON.parse(await readFile(filePath, 'utf8')),
+        package_path: relPath
+      });
+    } catch (error) {
+      warnings.push({
+        code: 'AGENT_PACKAGE_INDEX_READ_FAILED',
+        message: 'Could not read an agent package packet while listing requests.',
+        details: { path: relPath, reason: error.message }
+      });
+    }
+  }
+  return { ok: true, packages, warnings };
+}
+
+async function readAgentResults(cwd, artifactRootInput) {
+  const root = resolveArtifactRoot(cwd, artifactRootInput);
+  const resultRoot = path.join(root, 'agent-results');
+  const entries = await readDirectoryOrEmpty(resultRoot);
+  const results = [];
+  const warnings = [];
+  for (const entry of entries.filter((candidate) => candidate.isFile() && candidate.name.endsWith('.json'))) {
+    const relPath = artifactRelPath(artifactRootInput, 'agent-results', entry.name);
+    const filePath = path.join(resultRoot, entry.name);
+    try {
+      results.push({
+        result: JSON.parse(await readFile(filePath, 'utf8')),
+        result_path: relPath
+      });
+    } catch (error) {
+      warnings.push({
+        code: 'AGENT_RESULT_INDEX_READ_FAILED',
+        message: 'Could not read an agent advisory result while listing requests.',
+        details: { path: relPath, reason: error.message }
+      });
+    }
+  }
+  return { results, warnings };
+}
+
+async function readDirectoryOrEmpty(directory) {
+  try {
+    return await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+}
+
+function requestStatusFromPackage(agentPackage, results) {
+  const packet = agentPackage.packet;
+  const matches = results
+    .filter(({ result }) => result.package_id === packet.id || result.package_path === agentPackage.package_path)
+    .sort((left, right) => String(right.result.imported_at ?? '').localeCompare(String(left.result.imported_at ?? '')));
+  const latest = matches[0] ?? null;
+  const status = latest ? 'advisory_imported' : 'waiting_for_agent';
+  return {
+    schema_version: SCHEMA_VERSION,
+    package_id: stringOrNull(packet.id),
+    package_path: agentPackage.package_path,
+    prompt_path: stringOrNull(packet.prompt?.path),
+    receipt_path: packet.id ? artifactRelPath(packageRootFromPath(agentPackage.package_path), 'receipts', `${packet.id}.json`) : null,
+    review_artifact_index_path: stringOrNull(packet.source?.review_artifact_index_path),
+    review_id: stringOrNull(packet.source?.review_id),
+    task: stringOrNull(packet.task),
+    status,
+    created_at: stringOrNull(packet.created_at),
+    surface: packet.surface && typeof packet.surface === 'object' ? surfaceSummaryFromPacket(packet.surface) : null,
+    result_paths: matches.map((match) => match.result_path),
+    latest_result_path: latest?.result_path ?? null,
+    advisory_findings: Array.isArray(latest?.result.agent_advisory_findings) ? latest.result.agent_advisory_findings.length : 0,
+    owner_decision_requests: Array.isArray(latest?.result.owner_decision_requests) ? latest.result.owner_decision_requests.length : 0,
+    gate_effect: 'none',
+    external_evidence_transfer: Boolean(packet.disclosure_policy?.external_evidence_transfer),
+    api_call_performed: false,
+    automatic_upload: false,
+    existing_review_mutated: false,
+    next_step: status === 'waiting_for_agent'
+      ? `Ask the configured local agent to read ${agentPackage.package_path} and ${packet.prompt?.path ?? 'the generated prompt'}, then run agent ingest.`
+      : `Run browser-debug agent report --review-index ${packet.source?.review_artifact_index_path ?? '<review-index>'} --agent-result ${latest.result_path} --json.`
+  };
+}
+
+function summarizeRequestStatuses(statuses) {
+  const summary = {
+    total: statuses.length,
+    waiting_for_agent: 0,
+    advisory_imported: 0,
+    external_evidence_transfer: false,
+    api_call_performed: false,
+    automatic_upload: false,
+    existing_review_mutated: false
+  };
+  for (const status of statuses) {
+    if (status.status === 'waiting_for_agent') {
+      summary.waiting_for_agent += 1;
+    }
+    if (status.status === 'advisory_imported') {
+      summary.advisory_imported += 1;
+    }
+    summary.external_evidence_transfer = summary.external_evidence_transfer || status.external_evidence_transfer;
+  }
+  return summary;
+}
+
+function packageRootFromPath(packagePath) {
+  const parts = String(packagePath).split('/agent-packages/');
+  return parts[0] || DEFAULT_ARTIFACT_ROOT;
+}
+
+function surfaceSummaryFromPacket(surface) {
+  return {
+    id: optionalString(surface.id, 120),
+    kind: optionalString(surface.kind, 80),
+    transport: optionalString(surface.transport, 80),
+    status: optionalString(surface.status, 80),
+    external_evidence_transfer: Boolean(surface.external_evidence_transfer),
+    credential_mode: optionalString(surface.credential_mode, 120),
+    implemented: surface.implemented === true
+  };
 }
 
 function normalizeAgentFinding(finding, index, resultId) {

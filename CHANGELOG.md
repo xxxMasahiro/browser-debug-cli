@@ -69,6 +69,7 @@ All notable local development changes are tracked here before public release.
 - Added explicit `resource artifacts cleanup --execute` scoped to selected regular files under the configured artifact root with local cleanup receipts.
 - Added local `agent surfaces list`, `agent package`, `agent ingest`, and `agent report` commands for subscription/local agent handoff and advisory result import without API calls, automatic upload, credential storage, or changes to deterministic review gates.
 - Added agent advisory schemas, local package/import receipts, no-browser tests, and architecture boundaries for advisory-only agent output.
+- Added local `agent requests list` status output and schema so dashboards and local automation can track pending/imported advisory handoffs without API calls, uploads, credential storage, MCP agent execution, or review gate changes.
 
 ## Release Status
 

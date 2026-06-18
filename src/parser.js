@@ -361,11 +361,14 @@ function parseAgent(args, globals) {
     return parseError('agent', globals.json, {
       code: 'MISSING_SUBCOMMAND',
       message: 'agent requires a subcommand.',
-      details: { subcommands: ['surfaces', 'package', 'ingest', 'report'] }
+      details: { subcommands: ['surfaces', 'requests', 'package', 'ingest', 'report'] }
     });
   }
   if (subcommand === 'surfaces') {
     return parseAgentSurfaces(args.slice(1), globals);
+  }
+  if (subcommand === 'requests') {
+    return parseAgentRequests(args.slice(1), globals);
   }
   if (subcommand === 'package') {
     return parseAgentPackage(args.slice(1), globals);
@@ -379,7 +382,7 @@ function parseAgent(args, globals) {
   return parseError('agent', globals.json, {
     code: 'UNKNOWN_SUBCOMMAND',
     message: `Unknown agent subcommand: ${subcommand}`,
-    details: { subcommands: ['surfaces', 'package', 'ingest', 'report'] }
+    details: { subcommands: ['surfaces', 'requests', 'package', 'ingest', 'report'] }
   });
 }
 
@@ -393,6 +396,29 @@ function parseAgentSurfaces(args, globals) {
     });
   }
   return parseNoArgCommand('agent surfaces list', args.slice(1), globals);
+}
+
+function parseAgentRequests(args, globals) {
+  const subcommand = args[0];
+  if (subcommand !== 'list') {
+    return parseError('agent requests', globals.json, {
+      code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+      message: subcommand ? `Unknown agent requests subcommand: ${subcommand}` : 'agent requests requires a subcommand.',
+      details: { subcommands: ['list'] }
+    });
+  }
+  const parsed = parseOptions('agent requests list', args.slice(1), globals.json);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  if (parsed.positionals.length > 0) {
+    return parseError('agent requests list', globals.json, {
+      code: 'UNEXPECTED_ARGUMENT',
+      message: 'agent requests list does not accept positional arguments.',
+      details: { argument: parsed.positionals[0] }
+    });
+  }
+  return { ok: true, command: 'agent requests list', json: globals.json, options: parsed.options };
 }
 
 function parseAgentPackage(args, globals) {
@@ -780,6 +806,7 @@ function plannedCommands() {
     'resource artifacts plan',
     'resource artifacts cleanup',
     'agent surfaces list',
+    'agent requests list',
     'agent package',
     'agent ingest',
     'agent report',

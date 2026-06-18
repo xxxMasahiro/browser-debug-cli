@@ -1,5 +1,5 @@
 import { CLI_NAME, DEFAULT_ARTIFACT_ROOT, PACKAGE_VERSION, PLANNED_COMMANDS } from './constants.js';
-import { runAgentIngest, runAgentPackage, runAgentReport, runAgentSurfacesList } from './agent.js';
+import { runAgentIngest, runAgentPackage, runAgentReport, runAgentRequestsList, runAgentSurfacesList } from './agent.js';
 import { daemonStatus, startDaemon, stopDaemon } from './daemon.js';
 import { runDoctor } from './doctor.js';
 import { createEnvelope, createErrorEnvelope, stringifyEnvelope } from './envelope.js';
@@ -122,6 +122,10 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'agent surfaces list') {
       return runtimeResult(parsed.command, await (context.agentSurfacesListRunner ?? runAgentSurfacesList)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent requests list') {
+      return runtimeResult(parsed.command, await (context.agentRequestsListRunner ?? runAgentRequestsList)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'agent package') {
@@ -361,6 +365,18 @@ function usageText(topic) {
       '  --older-than <dur>       Select regular artifact files older than the duration.',
       '  --dry-run                Show cleanup candidates without deleting files.',
       '  --execute                Delete selected regular files under the artifact root and write a receipt.'
+    ].join('\n');
+  }
+
+  if (topic === 'agent' || topic === 'agent requests' || topic === 'agent requests list') {
+    return [
+      `Usage: ${CLI_NAME} agent surfaces list [--json]`,
+      `       ${CLI_NAME} agent package --review-index <review-artifact-index> [--surface <id>] [--json]`,
+      `       ${CLI_NAME} agent requests list [--package <agent-package>] [--json]`,
+      `       ${CLI_NAME} agent ingest --package <agent-package> --input <agent-result-json> [--json]`,
+      `       ${CLI_NAME} agent report --review-index <review-artifact-index> --agent-result <agent-result> [--json]`,
+      '',
+      'Agent commands create local advisory handoff artifacts, list local request status, and import untrusted advisory JSON without provider API calls.'
     ].join('\n');
   }
 

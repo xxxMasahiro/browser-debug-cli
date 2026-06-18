@@ -19,6 +19,7 @@ const ARTIFACT_DIRS = [
   'review-artifacts',
   'agent-packages',
   'agent-results',
+  'agent-requests',
   'receipts'
 ];
 

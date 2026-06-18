@@ -309,6 +309,7 @@ test('schema commands expose machine-readable contracts', async () => {
   const agentSchemaPairs = [
     ['agent_surface', '../schemas/agent-surface.schema.json'],
     ['agent_task_package', '../schemas/agent-task-package.schema.json'],
+    ['agent_request_status', '../schemas/agent-request-status.schema.json'],
     ['agent_advisory_result', '../schemas/agent-advisory-result.schema.json'],
     ['agent_disclosure_policy', '../schemas/agent-disclosure-policy.schema.json']
   ];
@@ -410,6 +411,22 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   const prompt = await readFile(path.join(cwd, '.browser-debug', 'agent-packages', 'agent-package-fixed', 'prompt.md'), 'utf8');
   assert.match(prompt, /Required output shape/);
 
+  const waitingRequests = await executeCli(['agent', 'requests', 'list', '--json'], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(waitingRequests.exitCode, 0);
+  const waitingRequestsBody = JSON.parse(waitingRequests.stdout);
+  assert.equal(waitingRequestsBody.command, 'agent requests list');
+  assert.equal(waitingRequestsBody.data.summary.total, 1);
+  assert.equal(waitingRequestsBody.data.summary.waiting_for_agent, 1);
+  assert.equal(waitingRequestsBody.data.summary.api_call_performed, false);
+  assert.equal(waitingRequestsBody.data.summary.automatic_upload, false);
+  assert.equal(waitingRequestsBody.data.agent_requests[0].status, 'waiting_for_agent');
+  assert.equal(waitingRequestsBody.data.agent_requests[0].package_path, '.browser-debug/agent-packages/agent-package-fixed/packet.json');
+  assert.equal(waitingRequestsBody.data.agent_requests[0].gate_effect, 'none');
+  assert.equal(waitingRequestsBody.data.agent_requests[0].existing_review_mutated, false);
+
   const advisoryInput = JSON.stringify({
     agent_advisory_findings: [{
       id: 'visual-density',
@@ -475,6 +492,26 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   const receipt = JSON.parse(await readFile(path.join(cwd, '.browser-debug', 'receipts', 'agent-result-fixed.json'), 'utf8'));
   assert.equal(receipt.raw_response_stored, false);
   assert.equal(receipt.api_call_performed, false);
+
+  const importedRequests = await executeCli([
+    'agent',
+    'requests',
+    'list',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(importedRequests.exitCode, 0);
+  const importedRequestsBody = JSON.parse(importedRequests.stdout);
+  assert.equal(importedRequestsBody.data.summary.total, 1);
+  assert.equal(importedRequestsBody.data.summary.advisory_imported, 1);
+  assert.equal(importedRequestsBody.data.agent_requests[0].status, 'advisory_imported');
+  assert.equal(importedRequestsBody.data.agent_requests[0].latest_result_path, '.browser-debug/agent-results/agent-result-fixed.json');
+  assert.equal(importedRequestsBody.data.agent_requests[0].advisory_findings, 1);
+  assert.equal(importedRequestsBody.data.agent_requests[0].api_call_performed, false);
 
   const reported = await executeCli([
     'agent',

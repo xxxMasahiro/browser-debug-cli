@@ -665,6 +665,16 @@ Phase 25 adds local agent advisory package, ingest, and report contracts for sub
 - Completed: API-provider support is represented only as a future approval-bound surface. No provider SDK, network request, endpoint selection, token handling, or external evidence transfer was implemented.
 - Completed: package API exports the local agent advisory helpers for future dashboard integration.
 
+### Phase 26: Local Agent Request Status
+
+Phase 26 adds a local read-only status index for agent advisory handoff automation. It preserves the Phase 25 package/ingest/report behavior and remains provider-neutral, local-first, advisory-only, and additive. It does not add direct provider API calls, automatic upload, credential storage, MCP agent execution, external listeners, browser launch, review artifact mutation, or changes to deterministic review findings, `metrics.finding_count`, existing `action_plan`, or `quality_signals.release_readiness`.
+
+- Completed: `agent requests list --json` reports local advisory packages as `waiting_for_agent` or `advisory_imported` by reading `.browser-debug/agent-packages/` and `.browser-debug/agent-results/` metadata.
+- Completed: `agent requests list --package <path> --json` narrows status to one workspace-relative package path using the existing local path boundary.
+- Completed: request status output includes package, prompt, receipt, source review index, surface, imported result paths, advisory counts, next-step text, and explicit boundary flags.
+- Completed: machine-readable schema coverage includes `agent_request_status`, and package API exports `runAgentRequestsList`.
+- Completed: no-browser tests cover pending/imported status transitions, schema parity, unchanged gate semantics, no provider API calls, no automatic upload, and no review artifact mutation.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -700,6 +710,7 @@ Phase 25 adds local agent advisory package, ingest, and report contracts for sub
 - Phase 23 checks cover artifact usage planning, dry-run cleanup proposals, MCP plan-only wiring, and no-delete boundaries.
 - Phase 24 checks cover explicit artifact-root-only cleanup receipts and architecture boundaries that prevent host cache/swap mutation, shell execution, privileged helpers, external upload, profile reuse, arbitrary process control, and MCP cleanup execution.
 - Phase 25 checks cover agent surface listing, evidence package generation, prompt and receipt artifacts, advisory result ingest, advisory report generation, schema parity, API-boundary status, unchanged deterministic gate semantics, and architecture boundaries that prevent provider API calls, automatic upload, credential storage, external listeners, shell execution, profile reuse, MCP agent execution, and review artifact mutation.
+- Phase 26 checks cover local agent request status listing, pending/imported transitions, single-package filtering, request status schema parity, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, and no review artifact mutation.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
 
 ## Recovery Path
