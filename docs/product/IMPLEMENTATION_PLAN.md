@@ -353,6 +353,22 @@ Phase 12 completes the six-step local dogfood hardening path for making real app
 - Completed: requirements, specification, implementation plan, task tracker, handoff, README, changelog, and test manifest are synchronized with the rendered-state dogfood hardening slice.
 - Completed as boundary: model/API review, evidence leaving the local process, HTTP/socket MCP server mode, authentication automation, external upload, existing-profile reuse, public package naming, license changes, plugin marketplace registration, npm publication, and destructive cleanup remain approval-bound.
 
+### Phase 13: Dogfood Signal Refinement
+
+Phase 13 completes the local dogfood refinement found while reviewing real Control Center pages. It keeps the review engine generic and avoids application-specific branches while reducing false-positive rendered-state findings.
+
+#### Phase 13a: Loading Signal Precision
+
+- Completed: loading indicator evidence no longer treats normal ready/progress business-state text as lingering loading UI.
+- Completed: loading indicator matching remains active for explicit loading semantics, loading-like attributes, roles, class/id/test identifiers, and short status copy.
+- Completed: browser smoke coverage verifies ready/progress business text does not produce `loading_indicator_count` or loading-indicator findings.
+
+#### Phase 13b: Dogfood Recheck Boundary
+
+- Completed: local dogfood rechecks confirmed API/proxy startup issues are reported as browser-health findings, and corrected startup removes those findings.
+- Completed: corrected FrameCue Control Center review no longer reports loading indicators for ready/progress business-state copy.
+- Completed as boundary: remaining Control Center findings are target UI findings or owner-review heuristics, not target-specific Browser Debug CLI runtime branches.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -375,6 +391,7 @@ Phase 12 completes the six-step local dogfood hardening path for making real app
 - Phase 10 checks cover unlinked expected route execution, expected route coverage artifacts, route budget skip accounting, and target quality signal route-budget warnings.
 - Phase 11 checks cover manifest page expectation normalization, page-specific viewport execution, expected text and selector checks, page-level mock metrics, local review artifact indexes, and page expectation quality signals.
 - Phase 12 checks cover rendered-state evidence for broken images, lingering loading indicators, empty data containers, developer triage report summaries, manifest suggestions, and fixture-backed target review report output.
+- Phase 13 checks cover loading-indicator precision for ready/progress business-state text and local dogfood rechecks against Control Center pages without target-specific runtime branches.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, and destructive cleanup commands.
 
 ## Recovery Path

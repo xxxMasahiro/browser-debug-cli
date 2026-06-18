@@ -1002,20 +1002,63 @@ async function collectLayoutEvidence(page, actionCandidates, baseUrl) {
         loading: element.getAttribute('loading') || null,
         rect: rectFor(element)
       }));
-    const loadingIndicators = [...document.querySelectorAll('[aria-busy="true"], [role="progressbar"], [role="status"], [data-loading], [data-testid], [class], [id]')]
+    const loadingIndicatorSelector = [
+      '[aria-busy="true"]',
+      '[role="progressbar"]',
+      '[role="status"]',
+      '[data-loading]',
+      '[data-testid*="loading" i]',
+      '[data-testid*="loader" i]',
+      '[data-testid*="spinner" i]',
+      '[data-testid*="skeleton" i]',
+      '[data-testid*="progress" i]',
+      '[class*="loading" i]',
+      '[class*="loader" i]',
+      '[class*="spinner" i]',
+      '[class*="skeleton" i]',
+      '[class*="progress" i]',
+      '[id*="loading" i]',
+      '[id*="loader" i]',
+      '[id*="spinner" i]',
+      '[id*="skeleton" i]',
+      '[id*="progress" i]'
+    ].join(', ');
+    const loadingAttributePattern = /\b(aria-busy|loading|loader|spinner|skeleton|progress|progressbar|progress-bar|busy|pending)\b/i;
+    const loadingTextPattern = /\b(loading|loader|spinner|skeleton|please wait|waiting|fetching|processing|initializing)\b/i;
+    const textNodeContent = (element) => trim(
+      [...element.childNodes]
+        .filter((node) => node.nodeType === Node.TEXT_NODE)
+        .map((node) => node.textContent || '')
+        .join(' '),
+      160
+    );
+    const isLoadingIndicator = (element) => {
+      const role = element.getAttribute('role') || '';
+      const ariaBusy = element.getAttribute('aria-busy') || '';
+      const dataLoading = element.getAttribute('data-loading');
+      const className = typeof element.className === 'string' ? element.className : element.getAttribute('class') || '';
+      const identityDescriptor = [
+        element.id,
+        className,
+        element.getAttribute('data-testid'),
+        role,
+        ariaBusy,
+        dataLoading
+      ].join(' ');
+      const labelDescriptor = element.getAttribute('aria-label') || '';
+      if (ariaBusy === 'true' || role === 'progressbar') return true;
+      if (dataLoading !== null && dataLoading !== 'false') return true;
+      if (loadingAttributePattern.test(identityDescriptor)) return true;
+      if (loadingTextPattern.test(labelDescriptor)) return true;
+      const directText = textNodeContent(element);
+      const visibleText = trim(element.innerText || element.textContent || '', 160);
+      const textCandidate = directText || visibleText;
+      if (role === 'status' && loadingTextPattern.test(textCandidate)) return true;
+      return element.childElementCount <= 2 && textCandidate.length <= 140 && loadingTextPattern.test(textCandidate);
+    };
+    const loadingIndicators = [...document.querySelectorAll(loadingIndicatorSelector)]
       .filter(isVisible)
-      .filter((element) => {
-        const descriptor = [
-          element.id,
-          element.className,
-          element.getAttribute('data-testid'),
-          element.getAttribute('aria-label'),
-          element.getAttribute('role'),
-          element.getAttribute('aria-busy'),
-          element.innerText || element.textContent
-        ].join(' ');
-        return /\b(aria-busy|loading|loader|spinner|skeleton|progress|please wait|waiting)\b/i.test(descriptor);
-      })
+      .filter(isLoadingIndicator)
       .slice(0, 30)
       .map((element) => ({
         selector: selectorFor(element),

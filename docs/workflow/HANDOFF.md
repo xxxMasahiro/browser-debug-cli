@@ -2,7 +2,7 @@
 
 ## Current State
 
-Browser Debug CLI has completed Phase 1, Phase 2a package/runtime design verification, the Phase 5 local MVP runtime slice, the Phase 7 local review-platform implementation, the Phase 8 local dogfood/plugin-readiness implementation, the Phase 9 local review-quality implementation, the Phase 10 local dogfood route-readiness implementation, the Phase 11 local page-expectation review implementation, and the Phase 12 local rendered-state dogfood hardening implementation. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally.
+Browser Debug CLI has completed Phase 1, Phase 2a package/runtime design verification, the Phase 5 local MVP runtime slice, the Phase 7 local review-platform implementation, the Phase 8 local dogfood/plugin-readiness implementation, the Phase 9 local review-quality implementation, the Phase 10 local dogfood route-readiness implementation, the Phase 11 local page-expectation review implementation, the Phase 12 local rendered-state dogfood hardening implementation, and the Phase 13 local dogfood signal refinement implementation. Phase 0 scaffold and document sync are complete, local Git is initialized, the initial scaffold commit exists, local CI configuration is present, and product-gate evidence has been recorded locally.
 
 This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and TASK_TRACKER workflow-state pair synchronized whenever task state changes.
 
@@ -94,11 +94,13 @@ This file is paired with `docs/workflow/TASK_TRACKER.md`. Keep the HANDOFF and T
 - Markdown reports now include a Developer Triage section and rendered-state quality signal status.
 - Target review output now includes manifest suggestions for missing page expectations, unpinned expected routes, exhausted route budgets, failed page checks, and rendered-state gaps.
 - Browser smoke coverage verifies rendered-state findings, evidence summaries, developer triage reports, and manifest suggestions.
+- Loading indicator evidence now ignores normal ready/progress business-state text unless explicit loading semantics or loading-like attributes are present.
+- Browser smoke coverage verifies ready/progress business-state text is not reported as lingering loading UI.
 - Model/API review, evidence leaving the local process, HTTP/socket MCP server mode, persistent browser profile reuse, authentication automation, external upload, arbitrary shell execution, destructive cleanup, npm publication, package naming, and license changes remain approval-bound.
 
 ## Next Step
 
-No remaining local Phase 12 implementation work is currently planned. Ask for explicit approval before authentication automation, external daemon control channels, external upload, evidence leaving the local process, model/API review, HTTP/socket MCP server mode, existing-browser-profile reuse, credential storage, plugin marketplace registration, license change, public package naming, npm publication, or destructive cleanup.
+No remaining local Phase 13 implementation work is currently planned. Ask for explicit approval before authentication automation, external daemon control channels, external upload, evidence leaving the local process, model/API review, HTTP/socket MCP server mode, existing-browser-profile reuse, credential storage, plugin marketplace registration, license change, public package naming, npm publication, or destructive cleanup.
 
 ## Restart Notes
 

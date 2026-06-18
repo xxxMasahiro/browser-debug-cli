@@ -97,7 +97,7 @@ Implemented review components:
 
 - `playwright-runtime`: shared browser, context, page, action, screenshot, and trace execution.
 - `evidence-model`: normalized DOM, accessibility, bounding box, computed style, console, network, viewport, and artifact evidence.
-- `review-engine`: deterministic and bounded heuristic rules for browser health, rendered state, layout integrity, interaction quality, accessibility basics, mock fidelity, evidence quality, heading hierarchy, landmarks, image alt text, broken visible images, lingering loading indicators, empty data containers, contrast, overlap, and mobile target sizing.
+- `review-engine`: deterministic and bounded heuristic rules for browser health, rendered state, layout integrity, interaction quality, accessibility basics, mock fidelity, evidence quality, heading hierarchy, landmarks, image alt text, broken visible images, explicit or semantically marked lingering loading indicators, empty data containers, contrast, overlap, and mobile target sizing.
 - `site-review`: target manifest loading, route discovery, viewport matrix execution, action risk policy, budgets, and coverage reporting.
 - `reporter`: JSON and Markdown issue reports with artifact references, reproduction steps, prioritized action plans, developer triage summaries, manifest suggestions, local artifact indexes, local heuristic advisory data, and implementation-focused fix candidates.
 - `schema`: machine-readable contracts for envelopes, findings, artifacts, target manifests, reports, and MCP tool I/O.
@@ -137,7 +137,7 @@ owner_decision_required
 The initial deterministic categories are:
 
 - `browser_health`: console errors, page errors, failed requests, navigation failures, broken visible images, and timeout warnings.
-- `layout_integrity`: empty render, horizontal overflow, clipped text, lingering loading indicators, empty data containers without empty-state messaging, overlapping visible elements, zero-size important elements, and off-viewport primary controls.
+- `layout_integrity`: empty render, horizontal overflow, clipped text, explicit lingering loading indicators, empty data containers without empty-state messaging, overlapping visible elements, zero-size important elements, and off-viewport primary controls.
 - `interaction_quality`: actionability, focus visibility, hover/focus evidence, target size, mobile touch-target sizing, disabled state, and basic keyboard path signals.
 - `accessibility_basics`: missing accessible names, unlabeled form controls, duplicate IDs, heading hierarchy issues, missing main landmarks, missing image alt text, low text contrast, and basic ARIA/name issues.
 - `mock_fidelity`: optional screenshot-to-mock metrics, masked regions, and conservative inconclusive states.

@@ -115,7 +115,8 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Completed: review results include `quality_signals` for heading hierarchy, rendered state, landmarks, image alt text, contrast, overlap, mobile target sizing, route coverage, evidence completeness, release readiness, developer handoff, and the disabled model-review boundary.
 - Completed: target review results include `quality_signals.page_expectations` for expected page counts, checked pages, failed pages, skipped pages, and missing text or selector expectations.
 - Completed: review results include local artifact indexes that summarize evidence classes and rerun guidance without uploading artifacts.
-- Completed: local rendered-state review findings flag broken visible images, lingering loading indicators, and empty data containers without visible empty-state messaging.
+- Completed: local rendered-state review findings flag broken visible images, explicit or semantically marked lingering loading indicators, and empty data containers without visible empty-state messaging.
+- Completed: loading indicator detection ignores normal ready/progress business-state text unless explicit loading semantics or loading-like attributes are present.
 - Completed: target review output includes manifest suggestions for adding named page expectations, pinning expected routes, raising or splitting route budgets, and covering rendered-state gaps.
 - Completed: mock comparison is optional and conservative; dimension mismatches, missing baselines, or unsupported images produce `inconclusive` review metrics rather than false pass/fail certainty.
 - Completed: MCP support is implemented as a thin local stdio adapter over the same core, not as a separate product runtime, network service, or default dependency.

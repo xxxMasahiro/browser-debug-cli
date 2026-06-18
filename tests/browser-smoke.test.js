@@ -420,6 +420,48 @@ test('review reports rendered-state evidence for media loading and empty data UI
   assert.match(reportText, /Rendered state: needs_attention/);
 });
 
+test('review does not treat ready and progress business text as lingering loading UI', { skip: !runBrowserSmoke }, async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-ready-state-smoke-'));
+  await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
+  const fixture = path.join(cwd, 'ready-state.html');
+  await writeFile(fixture, [
+    '<!doctype html>',
+    '<html lang="en">',
+    '<head><title>Ready State Smoke</title></head>',
+    '<body>',
+    '<div id="root">',
+    '<main>',
+    '<h1>Run Status</h1>',
+    '<section aria-labelledby="run-title">',
+    '<h2 id="run-title">Current Run</h2>',
+    '<p>Status ready</p>',
+    '<p>Progress 3 / 3</p>',
+    '<p>adapter-ready</p>',
+    '<div role="status" aria-label="Progress 3 / 3">Ready for review</div>',
+    '<p>Review state is ready for developer handoff.</p>',
+    '</section>',
+    '</main>',
+    '</div>',
+    '</body>',
+    '</html>'
+  ].join('\n'), 'utf8');
+
+  const result = await executeCli([
+    'review',
+    '--url',
+    `file://${fixture}`,
+    '--timeout',
+    '10000',
+    '--json'
+  ], { cwd });
+
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.data.quality_signals.rendered_state.loading_indicator_count, 0);
+  assert.equal(body.data.evidence_summary.loading_indicators.length, 0);
+  assert.equal(body.data.findings.some((finding) => /loading indicator/.test(finding.message)), false);
+});
+
 test('target review discovers same-origin routes and records coverage', { skip: !runBrowserSmoke }, async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-target-review-smoke-'));
   await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');

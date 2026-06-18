@@ -104,6 +104,12 @@ Optional acceptance checks against the Dashboard Control Center and FrameCue Con
 - Browser smoke tests cover `quality_signals.rendered_state`, `evidence_summary.loading_indicators`, `evidence_summary.empty_containers`, Developer Triage Markdown report output, and target `manifest_suggestions`.
 - These checks use local fixture pages and do not depend on a specific Control Center, framework, localhost port, route name, or UI label.
 
+## Phase 13 Dogfood Signal Refinement Checks
+
+- Browser smoke tests cover normal ready/progress business-state text and verify it is not reported as lingering loading UI.
+- Loading indicator evidence remains limited to explicit loading semantics, loading-like attributes, roles, or short status text rather than arbitrary ancestor text.
+- These checks use local fixture pages and do not depend on a specific Control Center, framework, localhost port, route name, or UI label.
+
 ## Release Readiness Checks
 
 `CHANGELOG.md`, `.github/workflows/ci.yml`, `ops/CI_MANIFEST.tsv`, and `docs/workflow/RELEASE.md` are release-readiness files. They do not authorize publish actions. npm credentials, license changes, and `npm publish` remain approval-bound.

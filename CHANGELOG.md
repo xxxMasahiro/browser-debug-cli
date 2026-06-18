@@ -45,6 +45,7 @@ All notable local development changes are tracked here before public release.
 - Added rendered-state review evidence and findings for broken visible images, lingering loading indicators, and empty data containers without visible empty-state messaging.
 - Added rendered-state quality signals, Developer Triage Markdown report summaries, and target manifest suggestions for dogfood reruns.
 - Added browser smoke coverage for rendered-state findings, evidence summaries, developer triage reports, and manifest suggestions.
+- Refined loading indicator detection so normal ready/progress business-state text is not reported as lingering loading UI unless explicit loading semantics or loading-like attributes are present.
 
 ## Release Status
 
