@@ -49,6 +49,9 @@ All notable local development changes are tracked here before public release.
 - Added manifest opt-in content UX advisory with bounded inline `sourceData`, page `expectations.dataBindings`, `local_content_ux_advisory`, and `quality_signals.content_ux`.
 - Added schema registry/file parity coverage for review and target manifest contracts.
 - Added no-browser and browser smoke coverage proving content UX advisory does not change findings, metrics, action plans, or release readiness.
+- Added selector-scoped content UX advisory checks for text, explicit attributes, data-state, and data-risk evidence.
+- Added required user-question advisory checks for information architecture and user journey review.
+- Added a reusable disabled-by-default Control Center-style content UX target manifest template.
 
 ## Release Status
 

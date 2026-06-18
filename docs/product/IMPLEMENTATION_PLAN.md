@@ -404,6 +404,41 @@ Phase 14 adds a local content UX advisory layer for the gap identified during do
 - Completed: browser smoke tests verify opt-in advisory output and prove the enabled advisory does not alter existing findings, metrics, action plans, or release readiness.
 - Completed: architecture tests cover the pure advisory module and continue to block target-specific literals, browser profile reuse, storage-state persistence, external listeners, arbitrary shell execution, unapproved uploads, and destructive cleanup.
 
+### Phase 15: Content UX Heuristic Strengthening
+
+Phase 15 completes the five-step local implementation path for making content and UX advisory more useful for Control Center-style applications without adding model/API review, evidence transfer, target-specific runtime branches, arbitrary source-data file reads, HTTP/socket MCP transport, authentication automation, existing-profile reuse, package publication, license changes, marketplace mutation, or existing-feature tradeoffs.
+
+#### Phase 15a: Selector-Scoped Content Contracts
+
+- Completed: target review evidence summaries now include bounded element evidence with selector, text, accessible name, allowed attributes, and rectangle data.
+- Completed: `pages[].expectations.dataBindings[]` can evaluate selector-scoped `text` bindings against a specific element instead of only full page text.
+- Completed: existing manifest behavior remains compatible when no selector is provided.
+
+#### Phase 15b: Attribute, State, and Risk Bindings
+
+- Completed: content UX advisory now evaluates `target="attribute"` with an explicit attribute name.
+- Completed: content UX advisory now evaluates `target="data-state"` against selector-scoped state attributes such as `data-state`, `data-status`, and common `aria-*` state attributes.
+- Completed: content UX advisory now evaluates `target="data-risk"` against selector-scoped risk attributes such as `data-risk`, `data-severity`, `aria-invalid`, and `aria-disabled`.
+- Completed: source values and full page text are not copied into advisory output or Markdown reports.
+
+#### Phase 15c: Information Architecture and User Journey Advisory
+
+- Completed: `localContentUxAdvisory.requiredUserQuestions[]` and `pages[].expectations.userQuestions[]` can declare questions the intended user should be able to answer from reviewed page evidence.
+- Completed: advisory counts now include required user questions, answered questions, unanswered questions, and inconclusive questions.
+- Completed: unanswered questions remain advisory signals and do not create findings or alter release gates.
+
+#### Phase 15d: Reusable Control Center-Style Manifest Example
+
+- Completed: added `templates/control-center-content-ux-target-manifest.json` as a generic, disabled-by-default manifest example for Control Center-style workflow dashboards.
+- Completed: generated and reusable target manifests now expose disabled advisory scaffolding with content contract, source alignment, selector-scoped state, information architecture, and user journey checks.
+- Completed as boundary: Control Center-specific URLs, product names, labels, and ports remain outside runtime code.
+
+#### Phase 15e: Tests, Safety Boundaries, and Loader Deferral
+
+- Completed: no-browser tests cover selector-scoped text, attribute, state, risk, and required user-question advisory logic.
+- Completed: browser smoke tests cover real Playwright element evidence for selector-scoped advisory checks and prove findings, metrics, action plans, and release readiness are unchanged.
+- Completed: arbitrary source-data file and URL loaders remain unimplemented and approval-bound; external references continue to be recorded as ignored advisory inputs.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -428,6 +463,7 @@ Phase 14 adds a local content UX advisory layer for the gap identified during do
 - Phase 12 checks cover rendered-state evidence for broken images, lingering loading indicators, empty data containers, developer triage report summaries, manifest suggestions, and fixture-backed target review report output.
 - Phase 13 checks cover loading-indicator precision for ready/progress business-state text and local dogfood rechecks against Control Center pages without target-specific runtime branches.
 - Phase 14 checks cover schema registry/file parity, manifest opt-in content UX advisory, bounded inline source data, source-to-screen text binding checks, source-value non-disclosure, report output, advisory purity, and unchanged findings, metrics, action plans, and release readiness.
+- Phase 15 checks cover selector-scoped content UX advisory bindings, attribute/state/risk targets, required user-question advisory checks, reusable Control Center-style manifest templates, source-value non-disclosure, and unchanged findings, metrics, action plans, and release readiness.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, and destructive cleanup commands.
 
 ## Recovery Path

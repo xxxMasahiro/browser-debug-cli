@@ -19,8 +19,12 @@
     "goal": null,
     "checks": [
       "content_contract",
-      "source_data_alignment"
-    ]
+      "source_data_alignment",
+      "selector_scoped_state",
+      "information_architecture",
+      "user_journey"
+    ],
+    "requiredUserQuestions": []
   },
   "viewportMatrix": [
     "desktop",

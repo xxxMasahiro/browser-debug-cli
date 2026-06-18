@@ -1,0 +1,186 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "control-center-content-ux-example",
+  "baseUrl": "https://example.test/control-center/",
+  "scope": {
+    "sameOrigin": true,
+    "include": [],
+    "exclude": []
+  },
+  "seeds": [
+    "https://example.test/control-center/"
+  ],
+  "expectedRoutes": [
+    "https://example.test/control-center/",
+    "https://example.test/control-center/#/workflow",
+    "https://example.test/control-center/#/git",
+    "https://example.test/control-center/#/checks"
+  ],
+  "pages": [
+    {
+      "name": "Overview",
+      "url": "https://example.test/control-center/",
+      "priority": "high",
+      "expectations": {
+        "text": [
+          "Workflow"
+        ],
+        "selectors": [
+          "[data-testid=\"workflow-summary\"]",
+          "[data-testid=\"git-state\"]",
+          "[data-testid=\"check-state\"]"
+        ],
+        "dataBindings": [
+          {
+            "id": "workflow-summary-copy",
+            "sourceId": "workflow",
+            "pointer": "/summary",
+            "selector": "[data-testid=\"workflow-summary\"]",
+            "target": "text",
+            "match": "contains",
+            "severity": "medium"
+          },
+          {
+            "id": "git-clean-state",
+            "sourceId": "workflow",
+            "pointer": "/git/state",
+            "selector": "[data-testid=\"git-state\"]",
+            "target": "data-state",
+            "match": "exact",
+            "severity": "medium"
+          },
+          {
+            "id": "check-run-status",
+            "sourceId": "workflow",
+            "pointer": "/checks/status",
+            "selector": "[data-testid=\"check-state\"]",
+            "target": "attribute",
+            "attribute": "data-status",
+            "match": "exact",
+            "severity": "medium"
+          },
+          {
+            "id": "blocker-risk",
+            "sourceId": "workflow",
+            "pointer": "/risk/level",
+            "selector": "[data-testid=\"risk-banner\"]",
+            "target": "data-risk",
+            "match": "exact",
+            "severity": "medium",
+            "required": false
+          }
+        ],
+        "userQuestions": [
+          {
+            "id": "overview-current-state",
+            "question": "Can the intended user understand what is happening right now?",
+            "expectedEvidence": [
+              "current",
+              "workflow",
+              "blocked",
+              "passed"
+            ],
+            "matchMode": "any",
+            "severity": "medium"
+          },
+          {
+            "id": "overview-next-action",
+            "question": "Can the intended user identify the next useful action?",
+            "expectedEvidence": [
+              "next",
+              "rerun",
+              "fix",
+              "review"
+            ],
+            "matchMode": "any",
+            "severity": "medium"
+          }
+        ]
+      }
+    }
+  ],
+  "sourceData": [
+    {
+      "id": "workflow",
+      "data": {
+        "summary": "Workflow state is ready for review.",
+        "git": {
+          "state": "clean"
+        },
+        "checks": {
+          "status": "passed"
+        },
+        "risk": {
+          "level": "low"
+        }
+      }
+    }
+  ],
+  "localContentUxAdvisory": {
+    "enabled": false,
+    "audience": [
+      "non-engineer",
+      "early-career engineer"
+    ],
+    "goal": "Help users understand workflow progress, blockers, Git state, and check results without reading CLI output.",
+    "checks": [
+      "content_contract",
+      "source_data_alignment",
+      "selector_scoped_state",
+      "information_architecture",
+      "user_journey"
+    ],
+    "requiredUserQuestions": [
+      {
+        "id": "global-blocker-awareness",
+        "pageId": "overview",
+        "question": "Can the user tell whether anything is blocked?",
+        "expectedEvidence": [
+          "blocked",
+          "passed",
+          "failed",
+          "ready"
+        ],
+        "matchMode": "any",
+        "severity": "medium"
+      },
+      {
+        "id": "global-git-awareness",
+        "pageId": "overview",
+        "question": "Can the user tell whether the worktree is clean or dirty?",
+        "expectedEvidence": [
+          "clean",
+          "dirty",
+          "uncommitted"
+        ],
+        "matchMode": "any",
+        "severity": "medium"
+      }
+    ]
+  },
+  "viewportMatrix": [
+    "desktop",
+    "mobile"
+  ],
+  "actionPolicy": {
+    "allow": [
+      "navigation",
+      "state_revealing"
+    ]
+  },
+  "budgets": {
+    "maxRoutes": 50
+  },
+  "artifacts": {
+    "screenshots": true
+  },
+  "masks": [],
+  "regions": [],
+  "appHints": {
+    "reviewGoal": "control_center_first_pass",
+    "notes": [
+      "Replace example URLs and inline sourceData with local, bounded data from the target application.",
+      "Keep localContentUxAdvisory.enabled=false until the manifest owner intentionally opts in."
+    ]
+  }
+}

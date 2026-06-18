@@ -19,7 +19,7 @@ The Phase 2a design baseline uses Node.js 20 or newer, ESM modules, and a local 
 - Site review layer: discovers routes, runs viewport matrices, applies action risk policy, and emits coverage.
 - Artifact index layer: groups local review artifacts, evidence classes, rerun guidance, and local safety boundaries for developer handoff.
 - Manifest suggestion layer: turns target review coverage and rendered-state evidence into local suggestions for better reruns without editing runtime code for specific applications.
-- Content UX advisory layer: evaluates manifest opt-in source-to-screen content contracts from existing target review evidence without creating findings or changing release gates.
+- Content UX advisory layer: evaluates manifest opt-in source-to-screen content contracts, selector-scoped state contracts, and required user-question evidence from existing target review evidence without creating findings or changing release gates.
 - Schema layer: defines stable JSON contracts for envelopes, artifacts, target manifests, findings, reports, and adapter I/O.
 - Adapter layer: keeps CLI as the source of truth and later exposes the same core through an MCP stdio adapter.
 
@@ -101,7 +101,7 @@ Implemented review components:
 - `review-engine`: deterministic and bounded heuristic rules for browser health, rendered state, layout integrity, interaction quality, accessibility basics, mock fidelity, evidence quality, heading hierarchy, landmarks, image alt text, broken visible images, explicit or semantically marked lingering loading indicators, empty data containers, contrast, overlap, and mobile target sizing.
 - `site-review`: target manifest loading, route discovery, viewport matrix execution, action risk policy, budgets, and coverage reporting.
 - `reporter`: JSON and Markdown issue reports with artifact references, reproduction steps, prioritized action plans, developer triage summaries, manifest suggestions, local artifact indexes, local heuristic advisory data, and implementation-focused fix candidates.
-- `content-ux-advisory`: pure local helper that reads normalized manifest data and target review summaries, then returns advisory source-to-screen signals without Playwright, filesystem access, or artifact reads.
+- `content-ux-advisory`: pure local helper that reads normalized manifest data and target review summaries, then returns advisory source-to-screen, selector-scoped state, and user-question signals without Playwright, filesystem access, or artifact reads.
 - `schema`: machine-readable contracts for envelopes, findings, artifacts, target manifests, reports, and MCP tool I/O.
 - `cli-adapter`: the primary command surface for review workflows.
 - `mcp-adapter`: a thin local stdio adapter over the same core through `browser-debug-mcp`.
@@ -213,7 +213,7 @@ model_review_boundary
 
 The `model_review_boundary` signal must remain `not_enabled` with `external_evidence_transfer=false` until a separately approved model or vision review layer exists. Local release readiness is a review gate over the current evidence only; it does not authorize package publication, license changes, marketplace registration, npm publication, or evidence upload.
 
-For target reviews, `quality_signals.route_coverage` includes expected manifest route counts, visited route-viewport counts, skipped route counts, and route-budget-exceeded counts so agents can decide whether to raise the route budget, split a manifest, or rerun the review. `quality_signals.page_expectations` includes expected page counts, checked pages, failed pages, skipped pages, missing text expectations, and missing selector expectations so agents can identify page-state mismatches before human or model approval. `quality_signals.content_ux` is present only for manifest opt-in advisory runs and summarizes source-to-screen advisory counts without affecting release readiness. `quality_signals.rendered_state` summarizes broken-image, loading-indicator, and empty-container findings across visited route viewports.
+For target reviews, `quality_signals.route_coverage` includes expected manifest route counts, visited route-viewport counts, skipped route counts, and route-budget-exceeded counts so agents can decide whether to raise the route budget, split a manifest, or rerun the review. `quality_signals.page_expectations` includes expected page counts, checked pages, failed pages, skipped pages, missing text expectations, and missing selector expectations so agents can identify page-state mismatches before human or model approval. `quality_signals.content_ux` is present only for manifest opt-in advisory runs and summarizes source-to-screen, selector-scoped binding, and required user-question advisory counts without affecting release readiness. `quality_signals.rendered_state` summarizes broken-image, loading-indicator, and empty-container findings across visited route viewports.
 
 `manifest_suggestions` is an additive target-review output. It suggests manifest-only improvements such as adding named page expectations, pinning important expected routes, raising or splitting exhausted route budgets, reviewing failed page expectations, and adding fixtures or page expectations for rendered-state gaps. Suggestions are advisory and never mutate manifest files automatically.
 
@@ -229,14 +229,18 @@ localContentUxAdvisory.enabled
 localContentUxAdvisory.audience
 localContentUxAdvisory.goal
 localContentUxAdvisory.checks
+localContentUxAdvisory.requiredUserQuestions[]
 pages[].expectations.dataBindings[]
+pages[].expectations.userQuestions[]
 ```
 
-`sourceData` supports bounded inline JSON entries with `id`, `data`, optional `required`, and optional `maxSizeBytes`. The local Phase 14 implementation does not read arbitrary manifest paths or remote source URLs. If a source entry declares a `path` or `url`, the advisory records that the external reference was ignored and asks the owner to provide bounded inline data or approve a future loader design.
+`sourceData` supports bounded inline JSON entries with `id`, `data`, optional `required`, and optional `maxSizeBytes`. The local implementation does not read arbitrary manifest paths or remote source URLs. If a source entry declares a `path` or `url`, the advisory records that the external reference was ignored and asks the owner to provide bounded inline data or approve a future loader design.
 
-Each `dataBindings` entry can declare `id`, `sourceId`, JSON Pointer `pointer`, optional `selector`, `target`, `match`, and `severity`. The current implementation evaluates `target="text"` against the reviewed page text. Reserved target kinds such as `attribute`, `data-state`, and `data-risk` are normalized but reported as advisory-inconclusive until a later generic evidence contract supports them.
+Each `dataBindings` entry can declare `id`, `sourceId`, JSON Pointer `pointer`, optional `selector`, `target`, `attribute`, `match`, `severity`, and `required`. `target="text"` checks either reviewed page text or selector-scoped element text when `selector` is provided. `target="attribute"` requires a selector and an attribute name from the bounded element-evidence allowlist. `target="data-state"` checks selector-scoped state attributes such as `data-state`, `data-status`, `aria-current`, `aria-selected`, `aria-expanded`, or `aria-pressed`. `target="data-risk"` checks selector-scoped risk attributes such as `data-risk`, `data-severity`, `aria-invalid`, or `aria-disabled`.
 
-The output includes status, counts, advisory signals, source-data availability counts, limitations, and `quality_signals.content_ux`. It does not copy source values, full page text, raw DOM, screenshots, console payloads, or network payloads into the advisory output or Markdown report. It is advisory-only: it must not create review findings, change `metrics.finding_count`, change `action_plan`, change `quality_signals.release_readiness`, or authorize external evidence transfer.
+`requiredUserQuestions` and page-level `userQuestions` can declare `id`, `question`, optional `pageId`, optional `selector`, `expectedEvidence`, `matchMode`, `textMatch`, `severity`, and `required`. The advisory checks whether the reviewed page text or selector-scoped element text contains enough evidence for the target user to answer the declared question. This is a local heuristic information-architecture signal, not subjective product approval.
+
+The output includes status, counts, advisory signals, source-data availability counts, user-question counts, limitations, and `quality_signals.content_ux`. It does not copy source values, full page text, raw DOM, screenshots, console payloads, or network payloads into the advisory output or Markdown report. It is advisory-only: it must not create review findings, change `metrics.finding_count`, change `action_plan`, change `quality_signals.release_readiness`, or authorize external evidence transfer.
 
 ## Local Artifact Index Contract
 

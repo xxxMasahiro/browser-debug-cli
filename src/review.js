@@ -22,7 +22,8 @@ import { redact, redactUrl, truncateText } from './redaction.js';
 import {
   buildLocalContentUxAdvisory,
   normalizeContentDataBindings,
-  normalizeContentUxAdvisoryConfig
+  normalizeContentUxAdvisoryConfig,
+  normalizeContentUserQuestions
 } from './content-ux-advisory.js';
 
 const DEFAULT_VIEWPORT = Object.freeze({ name: 'laptop', width: 1280, height: 720 });
@@ -755,6 +756,15 @@ function normalizeManifestPage(entry, index, baseUrl) {
         ?? raw.dataBindings
         ?? raw.data_bindings
         ?? []
+      ),
+      userQuestions: normalizeContentUserQuestions(
+        expectations.userQuestions
+        ?? expectations.requiredUserQuestions
+        ?? expectations.user_questions
+        ?? raw.userQuestions
+        ?? raw.requiredUserQuestions
+        ?? [],
+        id
       )
     },
     mock: typeof raw.mock === 'string' && raw.mock ? raw.mock : null,
@@ -964,6 +974,28 @@ async function collectLayoutEvidence(page, actionCandidates, baseUrl) {
       }, {})
     ).filter(([, count]) => count > 1).map(([id, count]) => ({ id, count }));
     const elementSelector = 'a, button, input, select, textarea, [role], h1, h2, h3, h4, h5, h6, p, label, main, nav, header, footer, aside, section, article, img, [tabindex], [data-testid]';
+    const safeAttributes = [
+      'aria-label',
+      'aria-current',
+      'aria-selected',
+      'aria-expanded',
+      'aria-pressed',
+      'aria-disabled',
+      'aria-invalid',
+      'data-state',
+      'data-status',
+      'data-risk',
+      'data-severity',
+      'data-testid',
+      'title',
+      'placeholder'
+    ];
+    const attributesFor = (element) => Object.fromEntries(
+      safeAttributes
+        .map((name) => [name, element.getAttribute(name)])
+        .filter(([, value]) => value !== null && value !== '')
+        .map(([name, value]) => [name, trim(value, 240)])
+    );
     const nodes = [...document.querySelectorAll(elementSelector)]
       .filter(isVisible)
       .slice(0, 180);
@@ -975,6 +1007,7 @@ async function collectLayoutEvidence(page, actionCandidates, baseUrl) {
           role: element.getAttribute('role') || null,
           text: trim(element.innerText || element.textContent || ''),
           accessible_name: trim(accessibleName(element), 300),
+          attributes: attributesFor(element),
           rect: rectFor(element),
           focusable: element.matches('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'),
           disabled: Boolean(element.disabled || element.getAttribute('aria-disabled') === 'true'),
@@ -1740,6 +1773,15 @@ function buildEvidenceSummary({ observation, layout, screenshotArtifact }) {
     visible_text: truncateText(observation.page?.visible_text ?? '', 4000),
     visible_text_length: layout.page.visible_text_length,
     selectors: [...new Set((layout.elements ?? []).map((element) => element.selector).filter(Boolean))].slice(0, 240),
+    elements: (layout.elements ?? []).map((element) => ({
+      selector: element.selector,
+      tag: element.tag,
+      role: element.role,
+      text: truncateText(element.text ?? '', 300),
+      accessible_name: truncateText(element.accessible_name ?? '', 300),
+      attributes: element.attributes ?? {},
+      rect: element.rect
+    })).slice(0, 160),
     headings: layout.headings ?? [],
     landmarks: layout.landmarks ?? [],
     images: layout.images ?? [],
@@ -1782,7 +1824,8 @@ function evaluateManifestPage({
       missing_text: missingText,
       expected_selector_count: page.expectations.selectors.length,
       missing_selectors: missingSelectors,
-      data_binding_count: page.expectations.dataBindings?.length ?? 0
+      data_binding_count: page.expectations.dataBindings?.length ?? 0,
+      user_question_count: page.expectations.userQuestions?.length ?? 0
     },
     mock_status: mockMetrics?.status ?? (page.mock ? 'not_evaluated' : 'not_provided'),
     evidence: {

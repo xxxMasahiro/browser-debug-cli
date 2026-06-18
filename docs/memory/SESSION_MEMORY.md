@@ -83,3 +83,12 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - The advisory module is pure local code without Playwright, filesystem reads, artifact reads, external transfer, or target-specific runtime branches.
 - Schema registry/file parity, source-value non-disclosure, report output, and browser-smoke invariance are covered by tests.
 - The implementation remains generic and local-first. No arbitrary source-data file or URL loader, Control Center-specific runtime branch, external upload, model/API review, OAuth/login automation, existing-profile reuse, HTTP/socket MCP transport, npm publication, license change, or marketplace mutation was added.
+
+## 2026-06-18 Phase 15 Content UX Heuristic Strengthening Handoff
+
+- Phase 15 is complete for selector-scoped local content UX advisory.
+- Target review evidence summaries include bounded element evidence with selectors, text, accessible names, allowed attributes, and rectangles.
+- `pages[].expectations.dataBindings` now evaluates selector-scoped `text`, explicit `attribute`, `data-state`, and `data-risk` targets.
+- `localContentUxAdvisory.requiredUserQuestions` and page `expectations.userQuestions` now provide advisory information-architecture and user-journey checks.
+- `templates/control-center-content-ux-target-manifest.json` provides a reusable disabled-by-default Control Center-style manifest example.
+- The implementation remains generic, local-first, and advisory-only. It does not create findings, change `metrics.finding_count`, change `action_plan`, change `quality_signals.release_readiness`, read arbitrary source-data files or URLs, add Control Center-specific runtime branches, upload evidence, call models/APIs, automate OAuth/login, reuse existing profiles, add HTTP/socket MCP transport, publish packages, change license, or mutate marketplace state.

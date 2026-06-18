@@ -101,7 +101,14 @@ export function createTargetManifest(options = {}) {
       enabled: false,
       audience: [],
       goal: null,
-      checks: ['content_contract', 'source_data_alignment']
+      checks: [
+        'content_contract',
+        'source_data_alignment',
+        'selector_scoped_state',
+        'information_architecture',
+        'user_journey'
+      ],
+      requiredUserQuestions: []
     },
     viewportMatrix: options.viewport ? [options.viewport] : ['desktop', 'mobile'],
     actionPolicy: {

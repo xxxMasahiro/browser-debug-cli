@@ -220,7 +220,14 @@ test('target manifests and action candidates use generic review abstractions', (
           id: 'git-status',
           sourceId: 'workflow',
           pointer: '/git/status',
-          target: 'text'
+          selector: '#git-state',
+          target: 'data-state'
+        }],
+        userQuestions: [{
+          id: 'blocked-state',
+          question: 'Can the user tell whether work is blocked?',
+          expectedEvidence: ['not blocked'],
+          selector: '#blocker'
         }]
       },
       mock: 'mocks/overview.png'
@@ -232,7 +239,13 @@ test('target manifests and action candidates use generic review abstractions', (
     localContentUxAdvisory: {
       enabled: true,
       audience: ['non-engineer', 'early-career engineer'],
-      goal: 'Help users understand the current workflow state.'
+      goal: 'Help users understand the current workflow state.',
+      requiredUserQuestions: [{
+        id: 'branch-state',
+        pageId: 'overview',
+        question: 'Can the user identify the active branch?',
+        expectedEvidence: ['main']
+      }]
     },
     viewportMatrix: ['desktop', { name: 'phone', width: 390, height: 844 }],
     budgets: { maxRoutes: 5 }
@@ -249,7 +262,10 @@ test('target manifests and action candidates use generic review abstractions', (
   assert.equal(normalized.target.pages[0].expectations.text[0].value, 'Overview');
   assert.equal(normalized.target.pages[0].expectations.selectors[0].value, '#primary');
   assert.equal(normalized.target.pages[0].expectations.dataBindings[0].sourceId, 'workflow');
+  assert.equal(normalized.target.pages[0].expectations.dataBindings[0].target, 'data-state');
+  assert.equal(normalized.target.pages[0].expectations.userQuestions[0].id, 'blocked-state');
   assert.equal(normalized.target.localContentUxAdvisory.enabled, true);
+  assert.equal(normalized.target.localContentUxAdvisory.requiredUserQuestions[0].id, 'branch-state');
   assert.equal(normalized.target.localContentUxAdvisory.sourceData[0].available, true);
 
   assert.equal(classifyActionCandidate({ tag: 'a', href: 'https://example.test/app#next' }, 'https://example.test/app'), 'navigation');
@@ -316,6 +332,161 @@ test('local content UX advisory is manifest opt-in and does not expose source va
   assert.equal(mismatched.counts.data_binding_mismatches, 1);
   assert.ok(mismatched.signals.some((signal) => signal.id === 'content_ux_source_text_not_visible'));
   assert.doesNotMatch(JSON.stringify(mismatched), /Current local run is healthy/);
+});
+
+test('local content UX advisory supports selector-scoped state contracts and user questions', () => {
+  const normalized = normalizeTargetManifest({
+    baseUrl: 'https://example.test/app',
+    pages: [{
+      name: 'Status',
+      path: '/app',
+      expectations: {
+        dataBindings: [
+          {
+            id: 'git-state',
+            sourceId: 'workflow',
+            pointer: '/git/state',
+            selector: '#git',
+            target: 'data-state',
+            match: 'exact'
+          },
+          {
+            id: 'check-status',
+            sourceId: 'workflow',
+            pointer: '/checks/status',
+            selector: '#check',
+            target: 'attribute',
+            attribute: 'data-status',
+            match: 'exact'
+          },
+          {
+            id: 'risk-level',
+            sourceId: 'workflow',
+            pointer: '/risk/level',
+            selector: '#risk',
+            target: 'data-risk',
+            match: 'exact'
+          }
+        ],
+        userQuestions: [{
+          id: 'blocker-awareness',
+          question: 'Can users identify blockers?',
+          expectedEvidence: ['No blockers'],
+          selector: '#risk'
+        }]
+      }
+    }],
+    sourceData: [{
+      id: 'workflow',
+      data: {
+        git: { state: 'clean' },
+        checks: { status: 'complete' },
+        risk: { level: 'minor' }
+      }
+    }],
+    localContentUxAdvisory: {
+      enabled: true,
+      audience: ['operators'],
+      goal: 'Explain workflow status and blockers.',
+      requiredUserQuestions: [{
+        id: 'branch-awareness',
+        pageId: 'status',
+        question: 'Can users identify the active branch?',
+        expectedEvidence: ['main']
+      }]
+    }
+  });
+  assert.equal(normalized.ok, true);
+  const target = normalized.target;
+  const advisory = buildLocalContentUxAdvisory({
+    target,
+    routeReviews: [{
+      route: { url: target.pages[0].url },
+      manifest_page_id: 'status',
+      viewport: { name: 'desktop' },
+      evidenceSummary: {
+        visible_text: 'Branch main. No blockers.',
+        visible_text_length: 25,
+        elements: [
+          { selector: '#git', text: 'Worktree state', accessible_name: 'Worktree state', attributes: { 'data-state': 'clean' } },
+          { selector: '#check', text: 'Checks', accessible_name: 'Checks', attributes: { 'data-status': 'complete' } },
+          { selector: '#risk', text: 'No blockers', accessible_name: 'No blockers', attributes: { 'data-risk': 'minor' } }
+        ]
+      }
+    }]
+  });
+
+  assert.equal(advisory.status, 'passed');
+  assert.equal(advisory.counts.data_binding_checks, 3);
+  assert.equal(advisory.counts.selector_scoped_binding_checks, 3);
+  assert.equal(advisory.counts.attribute_binding_checks, 1);
+  assert.equal(advisory.counts.state_binding_checks, 1);
+  assert.equal(advisory.counts.risk_binding_checks, 1);
+  assert.equal(advisory.counts.data_binding_matches, 3);
+  assert.equal(advisory.counts.required_user_questions, 2);
+  assert.equal(advisory.counts.user_questions_answered, 2);
+  assert.equal(advisory.quality_signal.required_user_questions, 2);
+  assert.doesNotMatch(JSON.stringify(advisory), /"clean"|"complete"|"minor"/);
+
+  const mismatch = buildLocalContentUxAdvisory({
+    target,
+    routeReviews: [{
+      route: { url: target.pages[0].url },
+      manifest_page_id: 'status',
+      viewport: { name: 'desktop' },
+      evidenceSummary: {
+        visible_text: 'Branch main.',
+        visible_text_length: 12,
+        elements: [
+          { selector: '#git', text: 'Worktree state', attributes: { 'data-state': 'dirty' } },
+          { selector: '#check', text: 'Checks', attributes: { 'data-status': 'failed' } },
+          { selector: '#risk', text: 'Unknown', attributes: { 'data-risk': 'high' } }
+        ]
+      }
+    }]
+  });
+  assert.equal(mismatch.status, 'needs_owner_review');
+  assert.equal(mismatch.counts.data_binding_mismatches, 3);
+  assert.equal(mismatch.counts.user_questions_unanswered, 1);
+  assert.ok(mismatch.signals.some((signal) => signal.id === 'content_ux_source_state_not_matched'));
+  assert.ok(mismatch.signals.some((signal) => signal.id === 'content_ux_user_question_not_answered'));
+  assert.doesNotMatch(JSON.stringify(mismatch), /"clean"|"complete"|"minor"/);
+
+  const questionOnly = normalizeTargetManifest({
+    baseUrl: 'https://example.test/app',
+    pages: [{
+      name: 'Question Only',
+      path: '/app',
+      expectations: {
+        userQuestions: [{
+          id: 'next-action',
+          question: 'Can users identify the next action?',
+          expectedEvidence: ['Run checks']
+        }]
+      }
+    }],
+    localContentUxAdvisory: {
+      enabled: true,
+      audience: ['operators'],
+      goal: 'Explain next actions.'
+    }
+  });
+  const questionOnlyAdvisory = buildLocalContentUxAdvisory({
+    target: questionOnly.target,
+    routeReviews: [{
+      route: { url: questionOnly.target.pages[0].url },
+      manifest_page_id: 'question-only',
+      viewport: { name: 'desktop' },
+      evidenceSummary: {
+        visible_text: 'Run checks before release.',
+        visible_text_length: 26,
+        elements: []
+      }
+    }]
+  });
+  assert.equal(questionOnlyAdvisory.counts.pages_without_content_contract, 1);
+  assert.equal(questionOnlyAdvisory.counts.required_user_questions, 1);
+  assert.equal(questionOnlyAdvisory.counts.user_questions_answered, 1);
 });
 
 test('target init writes a reusable local target manifest artifact', async () => {

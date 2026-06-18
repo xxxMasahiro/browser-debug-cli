@@ -2,9 +2,12 @@ import { redact, truncateText } from './redaction.js';
 
 const DEFAULT_MAX_SOURCE_BYTES = 32768;
 const SIGNAL_LIMIT = 80;
-const SUPPORTED_BINDING_TARGETS = new Set(['text']);
-const KNOWN_BINDING_TARGETS = new Set(['text', 'attribute', 'data-state', 'data-risk']);
+const SUPPORTED_BINDING_TARGETS = new Set(['text', 'attribute', 'data-state', 'data-risk']);
+const KNOWN_BINDING_TARGETS = SUPPORTED_BINDING_TARGETS;
 const SEVERITIES = new Set(['info', 'low', 'medium', 'high', 'critical']);
+const DEFAULT_STATE_ATTRIBUTES = ['data-state', 'data-status', 'aria-current', 'aria-selected', 'aria-expanded', 'aria-pressed'];
+const DEFAULT_RISK_ATTRIBUTES = ['data-risk', 'data-severity', 'aria-invalid', 'aria-disabled'];
+const SAFE_ATTRIBUTE_NAME = /^[a-zA-Z_][a-zA-Z0-9_:.:-]{0,119}$/;
 
 export function normalizeContentUxAdvisoryConfig(configValue = {}, sourceDataValue = undefined) {
   const raw = configValue && typeof configValue === 'object' && !Array.isArray(configValue) ? configValue : {};
@@ -16,6 +19,9 @@ export function normalizeContentUxAdvisoryConfig(configValue = {}, sourceDataVal
     checks: normalizeChecks(raw.checks),
     audience: normalizeAudience(raw.audience ?? raw.audiences),
     goal: raw.goal || raw.purpose ? truncateText(raw.goal ?? raw.purpose, 500) : null,
+    requiredUserQuestions: normalizeContentUserQuestions(
+      raw.requiredUserQuestions ?? raw.required_user_questions ?? raw.userQuestions ?? raw.questions ?? []
+    ),
     sourceData,
     boundaries: {
       local_only: true,
@@ -30,6 +36,13 @@ export function normalizeContentDataBindings(value = []) {
   const entries = Array.isArray(value) ? value : [value].filter(Boolean);
   return entries
     .map((entry, index) => normalizeContentDataBinding(entry, index))
+    .filter(Boolean);
+}
+
+export function normalizeContentUserQuestions(value = [], fallbackPageId = null) {
+  const entries = Array.isArray(value) ? value : [value].filter(Boolean);
+  return entries
+    .map((entry, index) => normalizeContentUserQuestion(entry, index, fallbackPageId))
     .filter(Boolean);
 }
 
@@ -50,6 +63,14 @@ export function buildLocalContentUxAdvisory({ target, routeReviews = [] } = {}) 
     data_binding_matches: 0,
     data_binding_mismatches: 0,
     data_binding_inconclusive: 0,
+    selector_scoped_binding_checks: 0,
+    attribute_binding_checks: 0,
+    state_binding_checks: 0,
+    risk_binding_checks: 0,
+    required_user_questions: 0,
+    user_questions_answered: 0,
+    user_questions_unanswered: 0,
+    user_questions_inconclusive: 0,
     pages_without_content_contract: 0
   };
   const sourceIndex = new Map(config.sourceData.map((source) => [source.id, source]));
@@ -110,7 +131,6 @@ export function buildLocalContentUxAdvisory({ target, routeReviews = [] } = {}) 
         evidence: { page_id: page.id, route: page.url },
         recommendation: 'Add expectations.dataBindings for source facts that must be visible or clearly represented on this page.'
       });
-      continue;
     }
 
     const reviews = matchingRouteReviews(routeReviews, page);
@@ -124,11 +144,29 @@ export function buildLocalContentUxAdvisory({ target, routeReviews = [] } = {}) 
         evidence: { page_id: page.id, route: page.url },
         recommendation: 'Raise the route budget, check manifest scope, or split the target manifest so the page is reviewed.'
       });
+      evaluateUserQuestions({
+        signals,
+        counts,
+        questions: page.expectations?.userQuestions ?? [],
+        reviews,
+        page,
+        source: 'page_expectations'
+      });
       continue;
     }
 
     for (const binding of bindings) {
       counts.data_binding_checks += 1;
+      if (binding.selector) {
+        counts.selector_scoped_binding_checks += 1;
+      }
+      if (binding.target === 'attribute') {
+        counts.attribute_binding_checks += 1;
+      } else if (binding.target === 'data-state') {
+        counts.state_binding_checks += 1;
+      } else if (binding.target === 'data-risk') {
+        counts.risk_binding_checks += 1;
+      }
       const source = sourceIndex.get(binding.sourceId);
       if (!source) {
         counts.data_binding_inconclusive += 1;
@@ -154,19 +192,6 @@ export function buildLocalContentUxAdvisory({ target, routeReviews = [] } = {}) 
         });
         continue;
       }
-      if (!SUPPORTED_BINDING_TARGETS.has(binding.target)) {
-        counts.data_binding_inconclusive += 1;
-        addBindingSignal(signals, binding, page, {
-          id: 'content_ux_binding_target_unsupported',
-          severity: 'low',
-          confidence: 'high',
-          message: `Content binding "${binding.id}" uses target "${binding.target}", which is reserved but not evaluated yet.`,
-          evidence: { source_id: binding.sourceId, pointer: binding.pointer, target: binding.target },
-          recommendation: 'Use target "text" for the current local advisory layer, or keep this binding as a future reserved contract.'
-        });
-        continue;
-      }
-
       const pointed = readJsonPointer(source.data, binding.pointer);
       if (!pointed.found) {
         counts.data_binding_inconclusive += 1;
@@ -195,28 +220,50 @@ export function buildLocalContentUxAdvisory({ target, routeReviews = [] } = {}) 
         continue;
       }
 
-      const matched = reviews.some((review) => textMatched(review.evidenceSummary?.visible_text, expectedText, binding.match));
-      if (matched) {
+      const bindingResult = evaluateBindingTarget({ binding, reviews, expectedText });
+      if (bindingResult.status === 'matched') {
         counts.data_binding_matches += 1;
-      } else {
+      } else if (bindingResult.status === 'mismatched') {
         counts.data_binding_mismatches += 1;
         addBindingSignal(signals, binding, page, {
-          id: 'content_ux_source_text_not_visible',
+          id: bindingResult.signalId,
           severity: binding.severity,
           confidence: 'medium',
-          message: `Content binding "${binding.id}" source text was not found in the reviewed page text.`,
-          evidence: {
-            source_id: binding.sourceId,
-            pointer: binding.pointer,
-            match: binding.match,
-            reviewed_viewports: reviews.map((review) => review.viewport?.name ?? 'unknown'),
-            reviewed_visible_text_lengths: reviews.map((review) => review.evidenceSummary?.visible_text_length ?? 0)
-          },
-          recommendation: 'Check whether the source fact is missing from the UI, hidden behind an unreviewed state, or represented with different wording that needs owner approval.'
+          message: bindingResult.message,
+          evidence: bindingResult.evidence,
+          recommendation: bindingResult.recommendation
+        });
+      } else {
+        counts.data_binding_inconclusive += 1;
+        addBindingSignal(signals, binding, page, {
+          id: bindingResult.signalId,
+          severity: binding.required ? binding.severity : 'info',
+          confidence: 'high',
+          message: bindingResult.message,
+          evidence: bindingResult.evidence,
+          recommendation: bindingResult.recommendation
         });
       }
     }
+
+    evaluateUserQuestions({
+      signals,
+      counts,
+      questions: page.expectations?.userQuestions ?? [],
+      reviews,
+      page,
+      source: 'page_expectations'
+    });
   }
+
+  evaluateUserQuestions({
+    signals,
+    counts,
+    questions: config.requiredUserQuestions,
+    reviews: routeReviews,
+    page: null,
+    source: 'local_content_ux_advisory'
+  });
 
   const status = statusForSignals(signals);
   return redact({
@@ -245,11 +292,14 @@ export function buildLocalContentUxAdvisory({ target, routeReviews = [] } = {}) 
       data_binding_checks: counts.data_binding_checks,
       data_binding_mismatches: counts.data_binding_mismatches,
       data_binding_inconclusive: counts.data_binding_inconclusive,
+      required_user_questions: counts.required_user_questions,
+      user_questions_unanswered: counts.user_questions_unanswered,
+      user_questions_inconclusive: counts.user_questions_inconclusive,
       external_evidence_transfer: false
     },
     limitations: [
       'This advisory is manifest opt-in and does not change findings, metrics, action plans, or release gates.',
-      'The local advisory layer checks declared source-to-screen contracts and bounded heuristics; it is not model output or final product approval.',
+      'The local advisory layer checks declared source-to-screen contracts, selector-scoped evidence, and required user-question coverage; it is not model output or final product approval.',
       'Inline source data is used only in-process and source values are not copied into advisory messages or Markdown reports.',
       'External source references are recorded but not read by this phase.'
     ]
@@ -332,7 +382,7 @@ function normalizeContentDataBinding(entry, index) {
     pointer: normalizeJsonPointer(pointer),
     selector: entry.selector ? truncateText(String(entry.selector), 240) : null,
     target,
-    attribute: entry.attribute ? truncateText(String(entry.attribute), 120) : null,
+    attribute: normalizeAttributeName(entry.attribute ?? entry.attr ?? entry.attributeName ?? entry.attribute_name),
     match: ['contains', 'exact'].includes(entry.match) ? entry.match : 'contains',
     severity: SEVERITIES.has(entry.severity) ? entry.severity : 'medium',
     required: entry.required !== false
@@ -342,6 +392,54 @@ function normalizeContentDataBinding(entry, index) {
 function normalizeBindingTarget(value) {
   const target = String(value ?? 'text').trim().toLowerCase();
   return KNOWN_BINDING_TARGETS.has(target) ? target : 'text';
+}
+
+function normalizeContentUserQuestion(entry, index, fallbackPageId) {
+  const raw = typeof entry === 'string' ? { question: entry } : entry;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null;
+  }
+  const question = raw.question ?? raw.prompt ?? raw.text ?? raw.value;
+  if (!question) {
+    return null;
+  }
+  const expectedEvidence = normalizeEvidencePhrases(
+    raw.expectedEvidence
+    ?? raw.expected_evidence
+    ?? raw.evidence
+    ?? raw.answers
+    ?? raw.answer
+    ?? raw.keywords
+    ?? []
+  );
+  const pageId = raw.pageId ?? raw.page_id ?? raw.page ?? fallbackPageId;
+  const matchMode = String(raw.matchMode ?? raw.match_mode ?? raw.mode ?? 'any').toLowerCase();
+  return {
+    id: safeId(raw.id ?? raw.name ?? `question-${index + 1}`, `question-${index + 1}`),
+    question: truncateText(String(question).replace(/\s+/g, ' ').trim(), 240),
+    pageId: pageId ? safeId(pageId, String(pageId)) : null,
+    selector: raw.selector ? truncateText(String(raw.selector), 240) : null,
+    expectedEvidence,
+    matchMode: matchMode === 'all' ? 'all' : 'any',
+    textMatch: ['contains', 'exact'].includes(raw.textMatch ?? raw.text_match) ? (raw.textMatch ?? raw.text_match) : 'contains',
+    severity: SEVERITIES.has(raw.severity) ? raw.severity : 'medium',
+    required: raw.required !== false
+  };
+}
+
+function normalizeEvidencePhrases(value) {
+  const entries = Array.isArray(value) ? value : [value].filter(Boolean);
+  return [...new Set(entries
+    .map((entry) => truncateText(String(entry).replace(/\s+/g, ' ').trim(), 240))
+    .filter(Boolean))];
+}
+
+function normalizeAttributeName(value) {
+  if (!value) {
+    return null;
+  }
+  const name = String(value).trim();
+  return SAFE_ATTRIBUTE_NAME.test(name) ? name.toLowerCase() : null;
 }
 
 function normalizeJsonPointer(value) {
@@ -410,6 +508,251 @@ function textMatched(visibleText, expectedText, match) {
   return haystack.includes(needle);
 }
 
+function evaluateBindingTarget({ binding, reviews, expectedText }) {
+  if (!SUPPORTED_BINDING_TARGETS.has(binding.target)) {
+    return inconclusiveBinding({
+      binding,
+      signalId: 'content_ux_binding_target_unsupported',
+      message: `Content binding "${binding.id}" uses unsupported target "${binding.target}".`,
+      evidence: { target: binding.target },
+      recommendation: 'Use a supported target: text, attribute, data-state, or data-risk.'
+    });
+  }
+
+  if (binding.target !== 'text' && !binding.selector) {
+    return inconclusiveBinding({
+      binding,
+      signalId: 'content_ux_binding_selector_required',
+      message: `Content binding "${binding.id}" requires a selector for target "${binding.target}".`,
+      evidence: { target: binding.target },
+      recommendation: 'Add a stable selector so the advisory can compare the source fact with a specific UI element.'
+    });
+  }
+  if (binding.target === 'attribute' && !binding.attribute) {
+    return inconclusiveBinding({
+      binding,
+      signalId: 'content_ux_binding_attribute_required',
+      message: `Content binding "${binding.id}" requires an attribute name for target "attribute".`,
+      evidence: { target: binding.target },
+      recommendation: 'Add an attribute such as data-status, aria-current, or aria-expanded to the binding contract.'
+    });
+  }
+
+  const reviewedViewports = reviews.map((review) => review.viewport?.name ?? 'unknown');
+  if (binding.target === 'text' && !binding.selector) {
+    const matched = reviews.some((review) => textMatched(review.evidenceSummary?.visible_text, expectedText, binding.match));
+    if (matched) {
+      return { status: 'matched' };
+    }
+    return {
+      status: 'mismatched',
+      signalId: 'content_ux_source_text_not_visible',
+      message: `Content binding "${binding.id}" source text was not found in the reviewed page text.`,
+      evidence: {
+        source_id: binding.sourceId,
+        pointer: binding.pointer,
+        match: binding.match,
+        target: binding.target,
+        reviewed_viewports: reviewedViewports,
+        reviewed_visible_text_lengths: reviews.map((review) => review.evidenceSummary?.visible_text_length ?? 0)
+      },
+      recommendation: 'Check whether the source fact is missing from the UI, hidden behind an unreviewed state, or represented with different wording that needs owner approval.'
+    };
+  }
+
+  const elementMatches = reviews.flatMap((review) => matchingElements(review, binding.selector).map((element) => ({ review, element })));
+  if (elementMatches.length === 0) {
+    return {
+      status: 'mismatched',
+      signalId: 'content_ux_binding_selector_not_found',
+      message: `Content binding "${binding.id}" selector was not found in reviewed element evidence.`,
+      evidence: {
+        source_id: binding.sourceId,
+        pointer: binding.pointer,
+        selector: binding.selector,
+        target: binding.target,
+        reviewed_viewports: reviewedViewports
+      },
+      recommendation: 'Check whether the selector is stale, hidden at the reviewed viewport, or should be added to page expectations.'
+    };
+  }
+
+  const candidates = candidateValuesForBinding(binding, elementMatches);
+  if (candidates.length === 0) {
+    return {
+      status: 'mismatched',
+      signalId: 'content_ux_binding_candidate_missing',
+      message: `Content binding "${binding.id}" found the selector but no comparable ${binding.target} evidence.`,
+      evidence: {
+        source_id: binding.sourceId,
+        pointer: binding.pointer,
+        selector: binding.selector,
+        target: binding.target,
+        attribute: binding.attribute,
+        candidate_count: 0,
+        reviewed_viewports: reviewedViewports
+      },
+      recommendation: 'Add stable visible text or state attributes to the UI element, or adjust the binding target after owner review.'
+    };
+  }
+
+  if (candidates.some((candidate) => textMatched(candidate.value, expectedText, binding.match))) {
+    return { status: 'matched' };
+  }
+  return {
+    status: 'mismatched',
+    signalId: signalIdForBindingTarget(binding.target),
+    message: `Content binding "${binding.id}" source value did not match the reviewed ${binding.target} evidence.`,
+    evidence: {
+      source_id: binding.sourceId,
+      pointer: binding.pointer,
+      selector: binding.selector,
+      target: binding.target,
+      attribute: binding.attribute,
+      match: binding.match,
+      candidate_count: candidates.length,
+      candidate_attributes: [...new Set(candidates.map((candidate) => candidate.attribute).filter(Boolean))],
+      reviewed_viewports: reviewedViewports
+    },
+    recommendation: 'Check whether the UI state, attribute contract, or source mapping is stale before treating this as a product content issue.'
+  };
+}
+
+function inconclusiveBinding({ signalId, message, evidence, recommendation }) {
+  return {
+    status: 'inconclusive',
+    signalId,
+    message,
+    evidence,
+    recommendation
+  };
+}
+
+function matchingElements(review, selector) {
+  if (!selector) {
+    return [];
+  }
+  return (review.evidenceSummary?.elements ?? []).filter((element) => element.selector === selector);
+}
+
+function candidateValuesForBinding(binding, elementMatches) {
+  const candidates = [];
+  for (const { review, element } of elementMatches) {
+    if (binding.target === 'text') {
+      for (const value of [element.text, element.accessible_name]) {
+        if (value) {
+          candidates.push({ value, viewport: review.viewport?.name ?? 'unknown' });
+        }
+      }
+      continue;
+    }
+    if (binding.target === 'attribute') {
+      const value = element.attributes?.[binding.attribute];
+      if (value !== undefined && value !== null && value !== '') {
+        candidates.push({ value, attribute: binding.attribute, viewport: review.viewport?.name ?? 'unknown' });
+      }
+      continue;
+    }
+    const attributeNames = binding.target === 'data-state'
+      ? (binding.attribute ? [binding.attribute] : DEFAULT_STATE_ATTRIBUTES)
+      : (binding.attribute ? [binding.attribute] : DEFAULT_RISK_ATTRIBUTES);
+    for (const attribute of attributeNames) {
+      const value = element.attributes?.[attribute];
+      if (value !== undefined && value !== null && value !== '') {
+        candidates.push({ value, attribute, viewport: review.viewport?.name ?? 'unknown' });
+      }
+    }
+  }
+  return candidates;
+}
+
+function signalIdForBindingTarget(target) {
+  if (target === 'attribute') {
+    return 'content_ux_source_attribute_not_matched';
+  }
+  if (target === 'data-state') {
+    return 'content_ux_source_state_not_matched';
+  }
+  if (target === 'data-risk') {
+    return 'content_ux_source_risk_not_matched';
+  }
+  return 'content_ux_source_text_not_visible';
+}
+
+function evaluateUserQuestions({ signals, counts, questions, reviews, page, source }) {
+  for (const question of questions ?? []) {
+    if (page && question.pageId && !questionAppliesToPage(question, page)) {
+      continue;
+    }
+    counts.required_user_questions += 1;
+    if (question.expectedEvidence.length === 0) {
+      counts.user_questions_inconclusive += 1;
+      addQuestionSignal(signals, question, page, {
+        id: 'content_ux_user_question_evidence_missing',
+        severity: question.required ? question.severity : 'info',
+        confidence: 'high',
+        message: `User question "${question.id}" has no expected evidence contract.`,
+        evidence: { source, selector: question.selector, required: question.required },
+        recommendation: 'Add expectedEvidence keywords that should be visible when this question can be answered from the reviewed page.'
+      });
+      continue;
+    }
+    const questionReviews = page ? reviews : reviews.filter((review) => !question.pageId || reviewMatchesQuestionPage(review, question));
+    if (questionReviews.length === 0) {
+      counts.user_questions_inconclusive += 1;
+      addQuestionSignal(signals, question, page, {
+        id: 'content_ux_user_question_page_not_reviewed',
+        severity: question.required ? question.severity : 'info',
+        confidence: 'high',
+        message: `User question "${question.id}" could not be checked because no matching page was reviewed.`,
+        evidence: { source, page_id: question.pageId, required: question.required },
+        recommendation: 'Raise the route budget, add the page to expectedRoutes or pages, or split the manifest so this question is reviewed.'
+      });
+      continue;
+    }
+    const matched = questionEvidenceMatched(question, questionReviews);
+    if (matched) {
+      counts.user_questions_answered += 1;
+    } else {
+      counts.user_questions_unanswered += 1;
+      addQuestionSignal(signals, question, page, {
+        id: 'content_ux_user_question_not_answered',
+        severity: question.severity,
+        confidence: 'medium',
+        message: `Required user question "${question.id}" was not supported by reviewed page evidence.`,
+        evidence: {
+          source,
+          selector: question.selector,
+          page_id: question.pageId,
+          expected_evidence_count: question.expectedEvidence.length,
+          match_mode: question.matchMode,
+          reviewed_viewports: questionReviews.map((review) => review.viewport?.name ?? 'unknown'),
+          reviewed_visible_text_lengths: questionReviews.map((review) => review.evidenceSummary?.visible_text_length ?? 0)
+        },
+        recommendation: 'Improve headings, summary copy, state labels, navigation cues, or detail links so the target user can answer this question from the page.'
+      });
+    }
+  }
+}
+
+function questionAppliesToPage(question, page) {
+  return !question.pageId || question.pageId === page.id || question.pageId === safeId(page.name, page.id);
+}
+
+function reviewMatchesQuestionPage(review, question) {
+  return !question.pageId || question.pageId === review.manifest_page_id;
+}
+
+function questionEvidenceMatched(question, reviews) {
+  const matches = question.expectedEvidence.map((expected) => reviews.some((review) => {
+    const candidates = question.selector
+      ? matchingElements(review, question.selector).flatMap((element) => [element.text, element.accessible_name])
+      : [review.evidenceSummary?.visible_text];
+    return candidates.some((candidate) => textMatched(candidate, expected, question.textMatch));
+  }));
+  return question.matchMode === 'all' ? matches.every(Boolean) : matches.some(Boolean);
+}
+
 function addSignal(signals, signal) {
   signals.push({
     confidence: 'medium',
@@ -429,6 +772,21 @@ function addBindingSignal(signals, binding, page, signal) {
       match: binding.match
     },
     page: pageReference(page),
+    ...signal
+  });
+}
+
+function addQuestionSignal(signals, question, page, signal) {
+  addSignal(signals, {
+    question: {
+      id: question.id,
+      text: question.question,
+      page_id: question.pageId,
+      selector: question.selector,
+      expected_evidence_count: question.expectedEvidence.length,
+      match_mode: question.matchMode
+    },
+    ...(page ? { page: pageReference(page) } : {}),
     ...signal
   });
 }

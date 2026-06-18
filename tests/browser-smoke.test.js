@@ -689,7 +689,9 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
     '<body>',
     '<main>',
     '<h1>Overview</h1>',
-    '<p id="summary">Operations summary ready</p>',
+    '<p id="summary" data-state="ready">Operations summary ready</p>',
+    '<p id="checks" data-status="passed">Checks passed</p>',
+    '<p id="risk" data-risk="low">No blockers</p>',
     '<button id="primary">Open Details</button>',
     '</main>',
     '</body>',
@@ -706,7 +708,36 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
           id: 'summary-copy',
           sourceId: 'workflow',
           pointer: '/status/summary',
+          selector: '#summary',
           target: 'text'
+        }, {
+          id: 'summary-state',
+          sourceId: 'workflow',
+          pointer: '/status/state',
+          selector: '#summary',
+          target: 'data-state',
+          match: 'exact'
+        }, {
+          id: 'check-status',
+          sourceId: 'workflow',
+          pointer: '/checks/status',
+          selector: '#checks',
+          target: 'attribute',
+          attribute: 'data-status',
+          match: 'exact'
+        }, {
+          id: 'risk-level',
+          sourceId: 'workflow',
+          pointer: '/risk/level',
+          selector: '#risk',
+          target: 'data-risk',
+          match: 'exact'
+        }],
+        userQuestions: [{
+          id: 'blocker-awareness',
+          question: 'Can the user tell whether there are blockers?',
+          expectedEvidence: ['No blockers'],
+          selector: '#risk'
         }]
       }
     }],
@@ -719,12 +750,22 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
     ...baseManifest,
     sourceData: [{
       id: 'workflow',
-      data: { status: { summary: 'Operations summary ready' } }
+      data: {
+        status: { summary: 'Operations summary ready', state: 'ready' },
+        checks: { status: 'passed' },
+        risk: { level: 'low' }
+      }
     }],
     localContentUxAdvisory: {
       enabled: true,
       audience: ['operators'],
-      goal: 'Explain the current workflow state at a glance.'
+      goal: 'Explain the current workflow state at a glance.',
+      requiredUserQuestions: [{
+        id: 'summary-awareness',
+        pageId: 'overview-page',
+        question: 'Can the user understand the current summary?',
+        expectedEvidence: ['Operations summary']
+      }]
     }
   }), 'utf8');
 
@@ -755,6 +796,13 @@ test('target content UX advisory is opt-in and does not alter review gates', { s
   assert.equal(disabledBody.data.quality_signals.content_ux, undefined);
   assert.equal(enabledBody.data.local_content_ux_advisory.status, 'passed');
   assert.equal(enabledBody.data.quality_signals.content_ux.status, 'passed');
+  assert.equal(enabledBody.data.local_content_ux_advisory.counts.data_binding_checks, 4);
+  assert.equal(enabledBody.data.local_content_ux_advisory.counts.selector_scoped_binding_checks, 4);
+  assert.equal(enabledBody.data.local_content_ux_advisory.counts.attribute_binding_checks, 1);
+  assert.equal(enabledBody.data.local_content_ux_advisory.counts.state_binding_checks, 1);
+  assert.equal(enabledBody.data.local_content_ux_advisory.counts.risk_binding_checks, 1);
+  assert.equal(enabledBody.data.local_content_ux_advisory.counts.required_user_questions, 2);
+  assert.equal(enabledBody.data.local_content_ux_advisory.counts.user_questions_answered, 2);
   assert.equal(enabledBody.data.local_content_ux_advisory.gate_effect, 'none');
   assert.equal(enabledBody.data.local_content_ux_advisory.external_evidence_transfer, false);
   assert.equal(enabledBody.data.metrics.finding_count, disabledBody.data.metrics.finding_count);
