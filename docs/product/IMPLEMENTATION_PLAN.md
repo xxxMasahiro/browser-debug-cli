@@ -695,7 +695,88 @@ Phase 28 adds a local workflow manifest and read-only workflow status/index laye
 - Completed: `agent workflow report --workflow <path> --json` writes a bounded local Markdown workflow status summary without mutating review artifacts.
 - Completed: machine-readable schema coverage includes `agent_workflow`, and package API exports `runAgentWorkflowCreate`, `runAgentWorkflowStatus`, `runAgentWorkflowIndex`, and `runAgentWorkflowReport`.
 - Completed: no-browser tests cover workflow creation, post-ingest status recomputation, index aggregation, workflow report output, schema parity, unchanged gate semantics, no provider API calls, no automatic upload, and no review artifact mutation.
-- Completed as an approval boundary: direct API/provider execution remains represented only as disabled provider-boundary metadata. No provider SDK, network request, credential loading, endpoint selection, model selection, MCP agent execution, or external evidence transfer was implemented.
+- Completed at the Phase 28 approval boundary: direct API/provider execution was represented only as disabled provider-boundary metadata. Phase 29 later added the dedicated bounded execution adapter described below.
+
+### Phase 29: Agent Execution Integration
+
+Phase 29 adds an explicit agent execution planning and execution layer above the existing local agent package, workflow, ingest, and report contract. It preserves every existing command and deterministic review output. It supports subscription-style local agents and API-style provider execution through the same local package/workflow/status/ingest/report user experience, while keeping raw review artifacts local by default and keeping provider output advisory-only.
+
+The layer is additive. It must not change existing `agent_workflow` status meanings, review `findings`, `metrics.finding_count`, existing `action_plan`, `quality_signals.release_readiness`, resource guard semantics, daemon behavior, artifact cleanup behavior, target manifest behavior, MCP cleanup boundaries, or MCP review/observe/schema behavior.
+
+#### Phase 29a: Document, Security, and Schema Planning
+
+- Completed: synchronized requirements, specification, implementation plan, security, verification, task tracker, handoff, README, and changelog for the first runtime slice.
+- Completed: defined the `agent_execution` schema as a new contract instead of overloading `agent_workflow`.
+- Completed: recorded the hard boundary fields: `api_call_performed`, `external_evidence_transfer`, `automatic_upload`, `credential_values_recorded`, `credential_storage`, `persistent_credential_storage`, `raw_response_stored`, `raw_provider_response_stored`, `existing_review_mutated`, `mcp_execution_exposed`, and `gate_effect`.
+- Completed: preserved the existing `agent_workflow` schema as workflow status and dashboard handoff state only.
+
+#### Phase 29b: Parser and Public API Surface
+
+- Completed: added `agent execution plan --package <path> --surface <id> --json` for dry-run execution planning.
+- Completed: added `agent execution run --execution <path> --package <path> --surface <id> --provider <id> --model <id> --execute --json` as an explicit execution surface that requires a prior dry-run plan and validates package/surface/provider/model consistency.
+- Completed: added `agent execution status --execution <path> --json` and `agent execution list --json` for local dashboard and automation status.
+- Completed: exported the same core functions from the package API without changing existing exports or command behavior.
+
+#### Phase 29c: Core Execution Boundary Modules
+
+- Completed: added `src/agent-execution.js` for dry-run plan, explicit run, status, list, result paths, and receipts.
+- Completed: added `src/agent-execution-providers.js` for the provider registry, fake provider, local runner callback adapter, and env-only API adapter.
+- Completed: kept provider calls out of `agent.js`, `review.js`, `mcp.js`, resource helpers, and Playwright runtime modules; architecture tests enforce this boundary.
+- Completed: kept execution output separate from review artifacts and normalized provider responses into the existing `agent_advisory_result` shape.
+
+#### Phase 29d: Dry-Run Execution Plan
+
+- Completed: made `agent execution plan` the default, no-network operation for both subscription and API surfaces.
+- Completed: included package metadata, prompt metadata, disclosure policy, provider/surface selection, artifact transfer policy, and exact next command hints; credential requirement naming remains for the provider adapter slice.
+- Completed: wrote only local execution-plan metadata and receipts under `.browser-debug/`.
+- Completed: set boundary fields to `api_call_performed=false`, `external_evidence_transfer=false`, `automatic_upload=false`, `credential_values_recorded=false`, `raw_response_stored=false`, `raw_provider_response_stored=false`, `existing_review_mutated=false`, and `mcp_execution_exposed=false`.
+
+#### Phase 29e: Provider Runner Abstraction and Fake Provider
+
+- Completed: implemented provider-independent adapter interfaces before real provider execution.
+- Completed: added deterministic `fake-agent` provider for no-browser tests, dashboard contract tests, failure path tests, and advisory-result normalization tests.
+- Completed: proved provider output is advisory-only and cannot change deterministic review findings, metrics, existing action plans, or release readiness.
+- Completed: reject unknown providers, unknown models, unsupported surfaces, missing packages, missing execution plans, and plan mismatches deterministically.
+
+#### Phase 29f: Local Subscription-Agent Runner
+
+- Completed: support subscription-style local agents through configured local runner callbacks, not through SaaS web UI automation.
+- Completed: require a configured local runner identifier and avoid free-form shell input or arbitrary shell execution.
+- Completed: keep prompts and packages in local files, keep raw browser artifacts local by default, and normalize returned advisory JSON through the same advisory-result contract.
+- Completed: record execution receipts with runner identity, prompt/package paths, result path, and boundary fields without storing credential values.
+
+#### Phase 29g: One-Shot API Provider Execution
+
+- Completed: support API execution only through a dry-run plan followed by explicit `--execute`.
+- Completed: read credentials only from named environment variables, never from CLI arguments, local config files, `.env` auto-loading, committed files, package artifacts, workflow files, reports, or receipts.
+- Completed: send only bounded package/prompt content allowed by the disclosure policy; raw screenshots, trace contents, raw DOM, console payloads, network payloads, sourceData values, report bodies, and existing browser profile data are not sent by the adapter.
+- Completed: do not persist raw provider responses. Provider responses are normalized into `agent_advisory_result`, a local receipt is written, and `gate_effect="none"` is preserved.
+- Completed: did not add provider SDK dependencies; the minimal adapter boundary is tested with injected transports.
+
+#### Phase 29h: Dashboard Contract and Status Integration
+
+- Completed: dashboard and automation flows are the same for subscription and API modes: package, execution plan/run, execution status/list, advisory result/report, workflow status/index/report.
+- Completed: exposed only additive execution metadata to dashboards, including plan status, run status, provider/surface kind, receipt paths, advisory-result path, dashboard status fields, and boundary flags.
+- Completed: kept dashboard-specific semantics in dashboard-owned manifests or fixtures, not Browser Debug CLI runtime branches.
+- Completed: kept MCP execution out of scope for this phase; the MCP adapter does not expose `agent execution run`.
+
+#### Phase 29 Verification Plan
+
+- Parser tests cover new `agent execution` subcommands, required options, missing `--execute`, unknown providers, unknown models, and conflict handling.
+- No-browser tests cover plan/run/status/list success and failure paths through the fake provider and injected transports.
+- Schema parity tests cover `agent_execution` without changing existing `agent_workflow`, `agent_advisory_result`, or review schemas except for additive references.
+- Credential tests prove token values are not accepted through CLI args, not stored in artifacts, not printed in JSON, and not copied into receipts.
+- Boundary tests prove raw screenshots, traces, DOM, console payloads, network payloads, sourceData values, report bodies, and raw provider responses are not transferred or stored by default.
+- Invariance tests prove execution output does not change review `findings`, `metrics.finding_count`, existing `action_plan`, `quality_signals.release_readiness`, resource guard output, or artifact cleanup behavior.
+- Architecture tests prove provider calls are isolated to the provider adapter module and are not reachable through MCP execution, review, resource, daemon, or cleanup modules.
+- Verification must include `npm test`, `npm run test:pack`, `npm run release:check`, `./tools/product-gate`, and `git diff --check`. Browser smoke tests are required only if browser runtime behavior changes.
+
+#### Phase 29 Stop Conditions
+
+- Stop if an implementation path requires changing existing deterministic review outputs, existing `agent_workflow` status semantics, existing action-plan fields, or existing release-readiness semantics.
+- Stop if raw artifacts, sourceData values, trace contents, report bodies, raw provider responses, credential values, browser profile data, cookies, storage state, or secrets would be stored, uploaded, printed, or committed.
+- Stop if provider execution cannot be gated by a local dry-run plan, explicit `--execute`, env-only credentials, local receipts, and advisory-only normalization.
+- Stop if implementation requires OAuth/login automation, SaaS web UI automation, existing-browser-profile reuse, persistent credential storage, external upload beyond the bounded package/prompt policy, HTTP/socket MCP transport, MCP agent execution, arbitrary shell execution, marketplace mutation, npm publication, package rename, or license changes.
 
 ## Verification Method
 
@@ -756,7 +837,8 @@ Phase 28 adds a local workflow manifest and read-only workflow status/index laye
 - Ask before `gh repo create`, remote setup, push, or any public GitHub action.
 - Ask before npm publish.
 - Ask before external uploads, OAuth, webhooks, credential storage, cleanup outside the configured artifact root, automatic cleanup, host cleanup, or destructive cleanup not explicitly scoped to `.browser-debug/`.
-- Ask before model/API review integration or any evidence leaves the local process.
-- Ask before turning the generic API-provider boundary into direct provider API execution, adding provider SDKs, storing provider credentials, or exposing agent/API execution through MCP.
+- Ask before model/API review integration outside the Phase 29 agent execution adapter boundary or any evidence transfer beyond the bounded package/prompt disclosure policy.
+- Ask before extending the generic API-provider boundary beyond Phase 29 dry-run planning, explicit `--execute`, env-only credentials, local receipts, bounded disclosure, advisory-only normalization, and no raw provider response storage.
+- Ask before adding provider SDKs, storing provider credentials, or exposing agent/API execution through MCP.
 - Ask before HTTP/socket MCP server mode, remote control channels, persistent session storage, existing-browser-profile reuse, or authentication automation.
 - Ask before public API stabilization, npm package file-set changes intended for publication, package naming, license changes, or packed release promotion.

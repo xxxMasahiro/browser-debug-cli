@@ -4,6 +4,7 @@ const VALUE_OPTIONS = new Set([
   'agent-result',
   'artifact-root',
   'daemon',
+  'execution',
   'idle-timeout',
   'input',
   'mask',
@@ -11,9 +12,11 @@ const VALUE_OPTIONS = new Set([
   'max-bytes',
   'max-lifetime',
   'mock',
+  'model',
   'name',
   'older-than',
   'package',
+  'provider',
   'region',
   'resource-guard',
   'review-index',
@@ -362,7 +365,7 @@ function parseAgent(args, globals) {
     return parseError('agent', globals.json, {
       code: 'MISSING_SUBCOMMAND',
       message: 'agent requires a subcommand.',
-      details: { subcommands: ['surfaces', 'requests', 'workflow', 'package', 'ingest', 'report'] }
+      details: { subcommands: ['surfaces', 'requests', 'workflow', 'execution', 'package', 'ingest', 'report'] }
     });
   }
   if (subcommand === 'surfaces') {
@@ -373,6 +376,9 @@ function parseAgent(args, globals) {
   }
   if (subcommand === 'workflow') {
     return parseAgentWorkflow(args.slice(1), globals);
+  }
+  if (subcommand === 'execution') {
+    return parseAgentExecution(args.slice(1), globals);
   }
   if (subcommand === 'package') {
     return parseAgentPackage(args.slice(1), globals);
@@ -386,7 +392,7 @@ function parseAgent(args, globals) {
   return parseError('agent', globals.json, {
     code: 'UNKNOWN_SUBCOMMAND',
     message: `Unknown agent subcommand: ${subcommand}`,
-    details: { subcommands: ['surfaces', 'requests', 'workflow', 'package', 'ingest', 'report'] }
+    details: { subcommands: ['surfaces', 'requests', 'workflow', 'execution', 'package', 'ingest', 'report'] }
   });
 }
 
@@ -458,6 +464,49 @@ function parseAgentWorkflow(args, globals) {
     });
   }
   return { ok: true, command: 'agent workflow index', json: globals.json, options: parsed.options };
+}
+
+function parseAgentExecution(args, globals) {
+  const subcommand = args[0];
+  if (!['plan', 'run', 'status', 'list'].includes(subcommand)) {
+    return parseError('agent execution', globals.json, {
+      code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+      message: subcommand ? `Unknown agent execution subcommand: ${subcommand}` : 'agent execution requires a subcommand.',
+      details: { subcommands: ['plan', 'run', 'status', 'list'] }
+    });
+  }
+  if (subcommand === 'plan') {
+    return parseRequiredOptions('agent execution plan', args.slice(1), globals, ['package', 'surface']);
+  }
+  if (subcommand === 'run') {
+    const parsed = parseRequiredOptions('agent execution run', args.slice(1), globals, ['execution', 'package', 'surface', 'provider', 'model']);
+    if (!parsed.ok) {
+      return parsed;
+    }
+    if (!parsed.options.execute) {
+      return parseError('agent execution run', globals.json, {
+        code: 'MISSING_REQUIRED_OPTION',
+        message: 'agent execution run requires --execute.',
+        details: { option: 'execute' }
+      });
+    }
+    return parsed;
+  }
+  if (subcommand === 'status') {
+    return parseRequiredOptions('agent execution status', args.slice(1), globals, ['execution']);
+  }
+  const parsed = parseOptions('agent execution list', args.slice(1), globals.json);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  if (parsed.positionals.length > 0) {
+    return parseError('agent execution list', globals.json, {
+      code: 'UNEXPECTED_ARGUMENT',
+      message: 'agent execution list does not accept positional arguments.',
+      details: { argument: parsed.positionals[0] }
+    });
+  }
+  return { ok: true, command: 'agent execution list', json: globals.json, options: parsed.options };
 }
 
 function parseAgentPackage(args, globals) {
@@ -851,6 +900,10 @@ function plannedCommands() {
     'agent workflow status',
     'agent workflow index',
     'agent workflow report',
+    'agent execution plan',
+    'agent execution run',
+    'agent execution status',
+    'agent execution list',
     'agent package',
     'agent ingest',
     'agent report',

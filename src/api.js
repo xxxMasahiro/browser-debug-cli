@@ -1,5 +1,15 @@
 export { executeCli, runCli } from './cli.js';
 export {
+  runAgentExecutionList,
+  runAgentExecutionPlan,
+  runAgentExecutionRun,
+  runAgentExecutionStatus
+} from './agent-execution.js';
+export {
+  AGENT_EXECUTION_PROVIDERS,
+  resolveAgentExecutionProvider
+} from './agent-execution-providers.js';
+export {
   AGENT_SURFACES,
   runAgentIngest,
   runAgentPackage,

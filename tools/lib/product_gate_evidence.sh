@@ -58,7 +58,7 @@ product_gate_evidence_safe_id() {
 
 product_gate_evidence_validate_source_id() {
   case "$1" in
-    repositories.product|repositories.product.*|product.docs|product.docs.*|product.workflow|product.workflow.*|product.git|product.git.*|product.ci|product.ci.*|product.security|product.security.*|product.approvals|product.approvals.*|product.gates|product.gates.*)
+    repositories.product|repositories.product.*|product.docs|product.docs.*|product.workflow|product.workflow.*|product.git|product.git.*|product.ci|product.ci.*|product.security|product.security.*|product.approvals|product.approvals.*|product.design_system|product.design_system.*|product.gates|product.gates.*)
       return 0
       ;;
   esac

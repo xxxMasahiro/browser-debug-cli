@@ -49,6 +49,10 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Provide local `agent package`, `agent ingest`, and `agent report` commands that create bounded evidence packages, import untrusted advisory JSON, and render separate advisory reports without changing deterministic review output.
 - Provide local `agent requests list` and `agent requests show` output so dashboards and local automation can track and inspect advisory packages without running provider APIs or mutating review output.
 - Provide local `agent workflow create`, `agent workflow status`, `agent workflow index`, and `agent workflow report` output so dashboards and local automation can track package, prompt, agent response, ingest, report-pending states, and local workflow summaries without running provider APIs or changing review output.
+- Provide an agent execution layer so dashboards, local automation, subscription-style local agents, and API-style provider execution can share the same package, dry-run plan, run, status, result/report, and workflow experience without changing deterministic review output.
+- Support subscription-style local agent execution through configured local runner callbacks, not through SaaS web UI automation or free-form shell input.
+- Support API-style provider execution only through a dry-run execution plan, explicit `--execute`, env-only credentials, bounded disclosure policy, local receipts, and advisory-only result normalization.
+- Provide local `agent execution plan`, `agent execution run`, `agent execution status`, and `agent execution list` contracts as an additive layer separate from existing `agent workflow` state.
 - Suggest target manifest improvements when dogfood review evidence shows missing page expectations, unpinned discovered routes, exhausted route budgets, failed page checks, or rendered-state gaps.
 - Provide action plans, implementation-focused fix candidates, and local heuristic advisory signals that help developers decide what to fix first.
 - Provide structured local quality signals for visual hierarchy, rendered state, responsive layout, interaction affordance, accessibility structure, evidence completeness, local release readiness, and model-review boundaries.
@@ -73,6 +77,12 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Do not expose artifact cleanup execution through MCP; MCP may report local artifact usage but must not delete files.
 - Do not treat local agent advisory output as deterministic findings, release approval, or a replacement for owner judgment.
 - Do not run provider APIs, upload evidence, store credentials, or expose agent/API execution through MCP as part of the local agent advisory handoff layer.
+- Do not let agent execution mutate review `findings`, `metrics.finding_count`, existing `action_plan`, `quality_signals.release_readiness`, resource guard output, artifact cleanup behavior, or existing `agent_workflow` status meanings.
+- Do not run agent/API execution without a local dry-run execution plan, explicit `--execute`, local receipt, and advisory-only normalization path.
+- Do not accept provider credentials through CLI arguments, committed files, package artifacts, workflow files, reports, receipts, `.env` auto-loading, or persistent local storage.
+- Do not upload or send raw screenshots, trace contents, raw DOM, console payloads, network payloads, sourceData values, report bodies, cookies, storage state, existing browser profile data, or raw review artifacts as part of default agent execution.
+- Do not store raw provider responses; only normalized advisory results and local receipts may be retained.
+- Do not expose `agent execution run` through MCP in the planned execution layer.
 - Do not register a plugin marketplace entry, change the package license, choose a public package name, or publish to npm without explicit release approval.
 
 ## Success Criteria
@@ -127,12 +137,27 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - `agent workflow create --package <path> --json` writes a local workflow manifest and receipt under `.browser-debug/` for dashboard and automation handoff without launching a browser, contacting providers, uploading evidence, storing credentials, or mutating review artifacts.
 - `agent workflow status --workflow <path> --json` and `agent workflow index --json` read local workflow/package/result metadata and report current handoff status without writing artifacts, launching a browser, contacting providers, uploading evidence, storing credentials, or changing deterministic review output.
 - `agent workflow report --workflow <path> --json` writes a local Markdown workflow status summary without launching a browser, contacting providers, uploading evidence, storing credentials, mutating review artifacts, or changing deterministic review output.
+- `agent execution plan --package <path> --surface <id> --json` creates a local no-network dry-run execution plan and receipt from a bounded agent package without launching a browser, contacting providers, uploading evidence, storing credentials, mutating review artifacts, changing deterministic gates, or exposing execution through MCP.
+- `agent execution status --execution <path> --json` and `agent execution list --json` read local execution metadata for dashboards and automation without launching browsers, contacting providers, uploading evidence, storing credentials, writing review artifacts, or changing existing workflow status semantics.
 - `agent ingest --package <path> --input <json> --json` imports untrusted agent advisory JSON from inline input, stdin, or a workspace-relative `@file` into separate advisory fields and writes local receipts without changing deterministic review findings, metrics, existing action plans, or release readiness.
 - `agent report --review-index <path> --agent-result <path> --json` renders a separate Markdown advisory report without mutating existing review JSON.
 - Review outputs include `action_plan`, `review_advisory`, and `quality_signals` objects for developer handoff while keeping subjective or model-like judgment out of deterministic gates.
 - Review outputs include local `evidence_summary` data and `artifact_index` metadata so agents can evaluate expected UI state and hand developers a bounded artifact bundle.
 - Target review can emit `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, `content_ux_page_handoff`, `content_ux_manifest_authoring`, and `quality_signals.content_ux` only when the target manifest explicitly enables `localContentUxAdvisory.enabled=true`.
 - The repository includes local plugin metadata, local MCP configuration, and a plugin-facing skill without adding marketplace registration, npm publication, external upload, credential handling, or HTTP/socket MCP transport.
+
+## Phase 29 Agent Execution Criteria
+
+- Completed: `agent execution plan --package <path> --surface <id> --provider <id> --model <id> --json` creates a local no-network dry-run plan and receipt for subscription or API execution.
+- Completed: `agent execution run --execution <path> --package <path> --surface <id> --provider <id> --model <id> --execute --json` requires a prior dry-run execution plan, rejects execution without explicit `--execute`, validates package/surface/provider/model plan consistency, and records local run receipts.
+- Completed: `agent execution status --execution <path> --json` and `agent execution list --json` report local execution state, normalized advisory-result paths, dashboard status fields, and aggregate boundary flags without launching browsers, mutating review artifacts, or changing deterministic gates.
+- Completed: subscription-style execution supports configured local runner callbacks through provider/model identifiers and rejects free-form shell input or SaaS web UI automation.
+- Completed: deterministic fake-provider execution covers no-browser provider success paths and advisory-result normalization.
+- Completed: API-style execution reads endpoint and credential values only from named environment variables, supports injected fetch transports for tests, records that an API call occurred, and never records credential values.
+- Completed: execution plans and receipts record `api_call_performed`, `external_evidence_transfer`, `automatic_upload`, `credential_values_recorded`, `credential_storage`, `persistent_credential_storage`, `raw_response_stored`, `raw_provider_response_stored`, `existing_review_mutated`, `mcp_execution_exposed`, and `gate_effect`.
+- Completed: execution output normalizes provider or runner responses into the existing untrusted advisory-result shape so dashboards get the same final experience for subscription and API modes.
+- Execution output should not change review `findings`, `metrics.finding_count`, existing `action_plan`, `quality_signals.release_readiness`, resource guard behavior, artifact cleanup behavior, or existing workflow status semantics.
+- MCP should not expose `agent execution run` in this phase. If read-only execution plan/status tools are ever exposed through MCP, they require a separate allowlist decision and tests.
 
 ## Review Platform Criteria
 

@@ -1,5 +1,11 @@
 import { CLI_NAME, DEFAULT_ARTIFACT_ROOT, PACKAGE_VERSION, PLANNED_COMMANDS } from './constants.js';
 import {
+  runAgentExecutionList,
+  runAgentExecutionPlan,
+  runAgentExecutionRun,
+  runAgentExecutionStatus
+} from './agent-execution.js';
+import {
   runAgentIngest,
   runAgentPackage,
   runAgentReport,
@@ -157,6 +163,22 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'agent workflow report') {
       return runtimeResult(parsed.command, await (context.agentWorkflowReportRunner ?? runAgentWorkflowReport)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent execution plan') {
+      return runtimeResult(parsed.command, await (context.agentExecutionPlanRunner ?? runAgentExecutionPlan)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent execution run') {
+      return runtimeResult(parsed.command, await (context.agentExecutionRunRunner ?? runAgentExecutionRun)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent execution status') {
+      return runtimeResult(parsed.command, await (context.agentExecutionStatusRunner ?? runAgentExecutionStatus)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent execution list') {
+      return runtimeResult(parsed.command, await (context.agentExecutionListRunner ?? runAgentExecutionList)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'agent package') {
@@ -409,6 +431,11 @@ function usageText(topic) {
     || topic === 'agent workflow status'
     || topic === 'agent workflow index'
     || topic === 'agent workflow report'
+    || topic === 'agent execution'
+    || topic === 'agent execution plan'
+    || topic === 'agent execution run'
+    || topic === 'agent execution status'
+    || topic === 'agent execution list'
   ) {
     return [
       `Usage: ${CLI_NAME} agent surfaces list [--json]`,
@@ -419,6 +446,10 @@ function usageText(topic) {
       `       ${CLI_NAME} agent workflow status --workflow <agent-workflow> [--json]`,
       `       ${CLI_NAME} agent workflow index [--json]`,
       `       ${CLI_NAME} agent workflow report --workflow <agent-workflow> [--json]`,
+      `       ${CLI_NAME} agent execution plan --package <agent-package> --surface <id> [--json]`,
+      `       ${CLI_NAME} agent execution run --execution <agent-execution> --package <agent-package> --surface <id> --provider <id> --model <id> --execute [--json]`,
+      `       ${CLI_NAME} agent execution status --execution <agent-execution> [--json]`,
+      `       ${CLI_NAME} agent execution list [--json]`,
       `       ${CLI_NAME} agent ingest --package <agent-package> --input <agent-result-json> [--json]`,
       `       ${CLI_NAME} agent report --review-index <review-artifact-index> --agent-result <agent-result> [--json]`,
       '',

@@ -11,6 +11,10 @@ import { redact, redactUrl } from '../src/redaction.js';
 import { classifyActionCandidate, normalizeTargetManifest, runReview } from '../src/review.js';
 import { buildLocalContentUxAdvisory } from '../src/content-ux-advisory.js';
 import { createTargetManifest } from '../src/target.js';
+import {
+  API_PROVIDER_CREDENTIAL_ENV,
+  API_PROVIDER_ENDPOINT_ENV
+} from '../src/agent-execution-providers.js';
 
 const fixedNow = '2026-06-17T00:00:00.000Z';
 
@@ -312,6 +316,7 @@ test('schema commands expose machine-readable contracts', async () => {
     ['agent_request_status', '../schemas/agent-request-status.schema.json'],
     ['agent_request_detail', '../schemas/agent-request-detail.schema.json'],
     ['agent_workflow', '../schemas/agent-workflow.schema.json'],
+    ['agent_execution', '../schemas/agent-execution.schema.json'],
     ['agent_advisory_result', '../schemas/agent-advisory-result.schema.json'],
     ['agent_disclosure_policy', '../schemas/agent-disclosure-policy.schema.json']
   ];
@@ -661,6 +666,399 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   const workflowReportText = await readFile(path.join(cwd, '.browser-debug', 'reports', 'agent-workflow-report-fixed.md'), 'utf8');
   assert.match(workflowReportText, /Agent Workflow Report/);
   assert.match(workflowReportText, /Existing deterministic review findings/);
+
+  const executionPlan = await executeCli([
+    'agent',
+    'execution',
+    'plan',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--surface',
+    'local-subscription-agent',
+    '--provider',
+    'fake-agent',
+    '--model',
+    'fake-model',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agent-execution-fixed'
+  });
+  assert.equal(executionPlan.exitCode, 0);
+  const executionPlanBody = JSON.parse(executionPlan.stdout);
+  assert.equal(executionPlanBody.command, 'agent execution plan');
+  assert.equal(executionPlanBody.data.agent_execution.status, 'planned');
+  assert.equal(executionPlanBody.data.agent_execution.execution_path, '.browser-debug/agent-executions/agent-execution-fixed/execution.json');
+  assert.equal(executionPlanBody.data.agent_execution.steps.plan.no_network, true);
+  assert.equal(executionPlanBody.data.agent_execution.steps.execution.provider_adapter_required, false);
+  assert.equal(executionPlanBody.data.agent_execution.provider.id, 'fake-agent');
+  assert.equal(executionPlanBody.data.agent_execution.model.id, 'fake-model');
+  assert.equal(executionPlanBody.data.agent_execution.provider_adapter.implemented, true);
+  assert.equal(executionPlanBody.data.agent_execution.api_call_performed, false);
+  assert.equal(executionPlanBody.data.agent_execution.external_evidence_transfer, false);
+  assert.equal(executionPlanBody.data.agent_execution.credential_values_recorded, false);
+  assert.equal(executionPlanBody.data.agent_execution.raw_provider_response_stored, false);
+  assert.equal(executionPlanBody.data.agent_execution.mcp_execution_exposed, false);
+  assert.equal(executionPlanBody.artifacts.some((artifact) => artifact.type === 'agent_execution'), true);
+  const executionFile = JSON.parse(await readFile(path.join(cwd, '.browser-debug', 'agent-executions', 'agent-execution-fixed', 'execution.json'), 'utf8'));
+  assert.equal(executionFile.dashboard_handoff.status_command, 'browser-debug agent execution status --execution .browser-debug/agent-executions/agent-execution-fixed/execution.json --json');
+  assert.equal(executionFile.dashboard_handoff.run_command, 'browser-debug agent execution run --execution .browser-debug/agent-executions/agent-execution-fixed/execution.json --package .browser-debug/agent-packages/agent-package-fixed/packet.json --surface local-subscription-agent --provider fake-agent --model fake-model --execute --json');
+
+  const executionStatus = await executeCli([
+    'agent',
+    'execution',
+    'status',
+    '--execution',
+    '.browser-debug/agent-executions/agent-execution-fixed/execution.json',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(executionStatus.exitCode, 0);
+  const executionStatusBody = JSON.parse(executionStatus.stdout);
+  assert.equal(executionStatusBody.command, 'agent execution status');
+  assert.equal(executionStatusBody.data.agent_execution_status.status, 'planned');
+  assert.equal(executionStatusBody.data.agent_execution_status.existing_review_mutated, false);
+
+  const executionIndex = await executeCli([
+    'agent',
+    'execution',
+    'list',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(executionIndex.exitCode, 0);
+  const executionIndexBody = JSON.parse(executionIndex.stdout);
+  assert.equal(executionIndexBody.command, 'agent execution list');
+  assert.equal(executionIndexBody.data.summary.total, 1);
+  assert.equal(executionIndexBody.data.summary.planned, 1);
+  assert.equal(executionIndexBody.data.summary.api_call_performed, false);
+  assert.equal(executionIndexBody.data.summary.mcp_execution_exposed, false);
+
+  const executionRunWithoutFlag = await executeCli([
+    'agent',
+    'execution',
+    'run',
+    '--execution',
+    '.browser-debug/agent-executions/agent-execution-fixed/execution.json',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--surface',
+    'local-subscription-agent',
+    '--provider',
+    'fake-agent',
+    '--model',
+    'fake-model',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(executionRunWithoutFlag.exitCode, 2);
+  const executionRunWithoutFlagBody = JSON.parse(executionRunWithoutFlag.stdout);
+  assert.equal(executionRunWithoutFlagBody.errors[0].code, 'MISSING_REQUIRED_OPTION');
+  assert.equal(executionRunWithoutFlagBody.errors[0].details.option, 'execute');
+
+  const executionRunWithoutPlan = await executeCli([
+    'agent',
+    'execution',
+    'run',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--surface',
+    'local-subscription-agent',
+    '--provider',
+    'fake-agent',
+    '--model',
+    'fake-model',
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(executionRunWithoutPlan.exitCode, 2);
+  const executionRunWithoutPlanBody = JSON.parse(executionRunWithoutPlan.stdout);
+  assert.equal(executionRunWithoutPlanBody.errors[0].code, 'MISSING_REQUIRED_OPTION');
+  assert.equal(executionRunWithoutPlanBody.errors[0].details.option, 'execution');
+
+  const executionRun = await executeCli([
+    'agent',
+    'execution',
+    'run',
+    '--execution',
+    '.browser-debug/agent-executions/agent-execution-fixed/execution.json',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--surface',
+    'local-subscription-agent',
+    '--provider',
+    'fake-agent',
+    '--model',
+    'fake-model',
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: (prefix) => prefix === 'agent-result' ? 'agent-result-from-fake' : 'unexpected-id'
+  });
+  assert.equal(executionRun.exitCode, 0);
+  const executionRunBody = JSON.parse(executionRun.stdout);
+  assert.equal(executionRunBody.command, 'agent execution run');
+  assert.equal(executionRunBody.data.agent_execution.status, 'completed');
+  assert.equal(executionRunBody.data.agent_execution.normalized_agent_result_path, '.browser-debug/agent-results/agent-result-from-fake.json');
+  assert.equal(executionRunBody.data.agent_execution.api_call_performed, false);
+  assert.equal(executionRunBody.data.agent_execution.external_evidence_transfer, false);
+  assert.equal(executionRunBody.data.agent_execution.credential_values_recorded, false);
+  assert.equal(executionRunBody.data.agent_execution.raw_provider_response_stored, false);
+  assert.equal(executionRunBody.data.agent_execution.mcp_execution_exposed, false);
+  assert.equal(executionRunBody.artifacts.some((artifact) => artifact.type === 'agent_advisory_result'), true);
+  const fakeResult = JSON.parse(await readFile(path.join(cwd, '.browser-debug', 'agent-results', 'agent-result-from-fake.json'), 'utf8'));
+  assert.equal(fakeResult.agent_advisory.source, 'agent_execution');
+  assert.equal(fakeResult.agent_advisory.api_call_performed_by_cli, false);
+  assert.equal(fakeResult.boundary.raw_provider_response_stored, false);
+
+  const completedExecutionStatus = await executeCli([
+    'agent',
+    'execution',
+    'status',
+    '--execution',
+    '.browser-debug/agent-executions/agent-execution-fixed/execution.json',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(completedExecutionStatus.exitCode, 0);
+  const completedExecutionStatusBody = JSON.parse(completedExecutionStatus.stdout);
+  assert.equal(completedExecutionStatusBody.data.agent_execution_status.status, 'completed');
+  assert.equal(completedExecutionStatusBody.data.agent_execution_status.dashboard_status.report_pending, true);
+
+  const localExecutionPlan = await executeCli([
+    'agent',
+    'execution',
+    'plan',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--surface',
+    'local-subscription-agent',
+    '--provider',
+    'local-runner',
+    '--model',
+    'local-agent',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agent-execution-local'
+  });
+  assert.equal(localExecutionPlan.exitCode, 0);
+
+  const localExecutionRun = await executeCli([
+    'agent',
+    'execution',
+    'run',
+    '--execution',
+    '.browser-debug/agent-executions/agent-execution-local/execution.json',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--surface',
+    'local-subscription-agent',
+    '--provider',
+    'local-runner',
+    '--model',
+    'local-agent',
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: (prefix) => prefix === 'agent-result' ? 'agent-result-from-local-runner' : 'unexpected-id',
+    agentExecutionLocalRunner: async ({ package_path: packagePath }) => ({
+      agent_advisory_findings: [{
+        id: 'local-runner-finding',
+        category: 'implementation_diagnosis',
+        severity: 'medium',
+        message: `Local runner reviewed ${packagePath}.`,
+        recommendation: 'Review the local runner advisory item.'
+      }],
+      agent_advisory_action_plan: { next_actions: [] },
+      owner_decision_requests: []
+    })
+  });
+  assert.equal(localExecutionRun.exitCode, 0);
+  const localExecutionRunBody = JSON.parse(localExecutionRun.stdout);
+  assert.equal(localExecutionRunBody.data.agent_execution.status, 'completed');
+  assert.equal(localExecutionRunBody.data.agent_execution.boundary.shell_used, false);
+  assert.equal(localExecutionRunBody.data.agent_execution.boundary.free_form_shell_input_accepted, false);
+  const localRunnerResult = JSON.parse(await readFile(path.join(cwd, '.browser-debug', 'agent-results', 'agent-result-from-local-runner.json'), 'utf8'));
+  assert.equal(localRunnerResult.agent_advisory_findings.length, 1);
+  assert.equal(localRunnerResult.agent_advisory_findings[0].source, 'agent_advisory');
+
+  const apiPackage = await executeCli([
+    'agent',
+    'package',
+    '--review-index',
+    '.browser-debug/review-artifacts/review-fixed.json',
+    '--surface',
+    'generic-api-provider',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agent-package-api'
+  });
+  assert.equal(apiPackage.exitCode, 0);
+
+  const apiExecutionPlan = await executeCli([
+    'agent',
+    'execution',
+    'plan',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-api/packet.json',
+    '--surface',
+    'generic-api-provider',
+    '--provider',
+    'generic-api-provider',
+    '--model',
+    'generic-model',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agent-execution-api-missing-config'
+  });
+  assert.equal(apiExecutionPlan.exitCode, 0);
+
+  const apiExecutionMissingConfig = await executeCli([
+    'agent',
+    'execution',
+    'run',
+    '--execution',
+    '.browser-debug/agent-executions/agent-execution-api-missing-config/execution.json',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-api/packet.json',
+    '--surface',
+    'generic-api-provider',
+    '--provider',
+    'generic-api-provider',
+    '--model',
+    'generic-model',
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    env: {}
+  });
+  assert.equal(apiExecutionMissingConfig.exitCode, 1);
+  const apiExecutionMissingConfigBody = JSON.parse(apiExecutionMissingConfig.stdout);
+  assert.equal(apiExecutionMissingConfigBody.errors[0].code, 'AGENT_EXECUTION_API_CONFIGURATION_MISSING');
+  assert.equal(apiExecutionMissingConfigBody.data.agent_execution.api_call_performed, false);
+  assert.equal(apiExecutionMissingConfigBody.data.agent_execution.credential_values_recorded, false);
+
+  const apiExecutionPlanSuccess = await executeCli([
+    'agent',
+    'execution',
+    'plan',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-api/packet.json',
+    '--surface',
+    'generic-api-provider',
+    '--provider',
+    'generic-api-provider',
+    '--model',
+    'generic-model',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agent-execution-api'
+  });
+  assert.equal(apiExecutionPlanSuccess.exitCode, 0);
+
+  const apiCalls = [];
+  const apiExecutionRun = await executeCli([
+    'agent',
+    'execution',
+    'run',
+    '--execution',
+    '.browser-debug/agent-executions/agent-execution-api/execution.json',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-api/packet.json',
+    '--surface',
+    'generic-api-provider',
+    '--provider',
+    'generic-api-provider',
+    '--model',
+    'generic-model',
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: (prefix) => prefix === 'agent-result' ? 'agent-result-from-api' : 'unexpected-id',
+    env: {
+      [API_PROVIDER_ENDPOINT_ENV]: 'https://provider.example.test/agent-advisory',
+      [API_PROVIDER_CREDENTIAL_ENV]: 'credential-value-for-test'
+    },
+    fetch: async (url, init) => {
+      apiCalls.push({ url, init, body: JSON.parse(init.body) });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          agent_advisory_findings: [{
+            id: 'api-finding',
+            category: 'visual_design',
+            severity: 'low',
+            message: 'API provider advisory.',
+            recommendation: 'Review the API advisory item.'
+          }],
+          agent_advisory_action_plan: { next_actions: [] },
+          owner_decision_requests: []
+        })
+      };
+    }
+  });
+  assert.equal(apiExecutionRun.exitCode, 0);
+  assert.equal(apiCalls.length, 1);
+  assert.equal(apiCalls[0].url, 'https://provider.example.test/agent-advisory');
+  assert.equal(apiCalls[0].body.disclosure_policy.raw_artifact_content_included, false);
+  assert.equal(apiCalls[0].body.disclosure_policy.prompt_content_included, true);
+  assert.match(apiCalls[0].init.headers.authorization, /^Bearer /);
+  const apiExecutionRunBody = JSON.parse(apiExecutionRun.stdout);
+  assert.equal(apiExecutionRunBody.data.agent_execution.api_call_performed, true);
+  assert.equal(apiExecutionRunBody.data.agent_execution.external_evidence_transfer, true);
+  assert.equal(apiExecutionRunBody.data.agent_execution.credential_values_recorded, false);
+  assert.equal(apiExecutionRunBody.data.agent_execution.raw_provider_response_stored, false);
+  const apiResultText = await readFile(path.join(cwd, '.browser-debug', 'agent-results', 'agent-result-from-api.json'), 'utf8');
+  assert.doesNotMatch(apiResultText, /credential-value-for-test/);
+  const apiResult = JSON.parse(apiResultText);
+  assert.equal(apiResult.agent_advisory.api_call_performed_by_cli, true);
+  assert.equal(apiResult.agent_advisory_findings.length, 1);
+
+  const completedExecutionIndex = await executeCli([
+    'agent',
+    'execution',
+    'list',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(completedExecutionIndex.exitCode, 0);
+  const completedExecutionIndexBody = JSON.parse(completedExecutionIndex.stdout);
+  assert.equal(completedExecutionIndexBody.data.summary.completed, 3);
+  assert.equal(completedExecutionIndexBody.data.summary.blocked, 1);
+  assert.equal(completedExecutionIndexBody.data.summary.advisory_results, 3);
+  assert.equal(completedExecutionIndexBody.data.summary.credential_values_recorded, false);
+  assert.equal(completedExecutionIndexBody.data.summary.raw_provider_response_stored, false);
 
   await writeFile(
     path.join(cwd, '.browser-debug', 'agent-results', 'agent-result-other.json'),
