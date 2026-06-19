@@ -1000,6 +1000,20 @@ Phase 37 makes Browser Debug CLI easier to use from external repositories withou
 - Verification must include `node --check` on changed test files, `npm test`, `npm run test:pack`, `npm run test:pack-install`, `npm run release:check`, `./tools/product-gate`, and `git diff --check`.
 - Browser smoke tests are not required for Phase 37 unless browser runtime behavior changes; Phase 37 changes documentation, package metadata, manifests, and no-browser package smoke coverage only.
 
+#### Phase 38: Local Checkout MCP Config Dogfood Hardening
+
+- Completed: dogfooded external-repository CLI and MCP discovery from a temporary consumer repository without launching a browser.
+- Completed: identified that generated MCP config was still package-bin/PATH oriented, which made unpublished local checkout use less self-explanatory for other agents.
+- Completed: added `local_checkout` metadata to stdio MCP config output with absolute `bin/browser-debug-mcp.js` and `node` command launch data derived from the current package location.
+- Completed: added `local_checkout.launch` to safe HTTP MCP config output with the same token-free placeholder policy and loopback safe-profile connection metadata.
+- Completed: preserved existing installed-bin `launch`, `client_connection`, and `mcpServers` shapes for compatibility.
+- Completed: added no-browser and packed-install smoke assertions for the local-checkout metadata without expanding MCP permissions, starting listeners, writing config files, reading credentials, or exposing token values.
+
+#### Phase 38 Verification Plan
+
+- Verification must include `node --check` on changed runtime/test files, focused external-repository dogfood for `mcp config`, `npm test`, `npm run test:pack`, `npm run test:pack-install`, `npm run release:check`, `./tools/product-gate`, and `git diff --check`.
+- Browser smoke tests are not required for Phase 38 unless browser runtime behavior changes; Phase 38 changes no-browser MCP configuration metadata, documentation, and package smoke coverage only.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -1044,7 +1058,7 @@ Phase 37 makes Browser Debug CLI easier to use from external repositories withou
 - Phase 32 checks cover product identity metadata, package/plugin/MCP name alignment, identity-derived package dry-run paths, derived packed-install tarball paths, package API identity exports, and unchanged current names before any approved rename.
 - Phase 33 checks cover MCP read-only agent surfaces, request status/detail, workflow status/index, execution status/list, safe-profile availability, packed-install exposure, and continued non-exposure of execution run, cleanup execution, provider/API execution, shell tools, HTTP/socket transport, and write-producing advisory tools.
 - Phase 34 checks cover HTTP MCP safe transport policy, loopback bind enforcement, bearer-token enforcement, Host and Origin validation, body-size limits, safe-profile-only tools, CLI metadata, packed-install API exports, and architecture/security isolation for the approved listener module.
-- Phase 35 checks cover token-free MCP client configuration output, stdio and safe HTTP client setup metadata, safe-profile defaulting, HTTP full/admin rejection, packed-install HTTP MCP initialize smoke coverage, and unchanged non-exposure of execution, cleanup, provider/API, shell, socket, remote HTTP, and credential-bearing tools.
+- Phase 35/38 checks cover token-free MCP client configuration output, installed-bin and local-checkout stdio and safe HTTP client setup metadata, safe-profile defaulting, HTTP full/admin rejection, packed-install HTTP MCP initialize smoke coverage, and unchanged non-exposure of execution, cleanup, provider/API, shell, socket, remote HTTP, and credential-bearing tools.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, unapproved external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
 
 ## Recovery Path

@@ -49,6 +49,8 @@ node "$BROWSER_DEBUG_CLI" mcp capabilities --profile all --json
 
 Generated MCP config defaults to `safe`. Use `safe` for discovery, schema inspection, target validation, resource status, artifact planning, read-only local agent status, and capability inspection. Use `full` only when the MCP client needs local browser observation or review. No-profile `browser-debug-mcp` and the packaged `.mcp.json` preserve compatibility by resolving to `full`.
 
+If `browser-debug-mcp` is installed and on PATH, use the generated top-level `mcpServers` object. If you are using an unpublished local checkout, use `config.local_checkout.mcpServers` instead; it contains the `node` command and absolute `bin/browser-debug-mcp.js` path for the checkout that generated the config.
+
 ## Safe HTTP MCP Quickstart
 
 Use safe HTTP MCP only when stdio is not suitable for the MCP client. It is safe-profile-only, loopback-only, and bearer-token gated.
@@ -58,6 +60,8 @@ node "$BROWSER_DEBUG_CLI" mcp config --transport http --profile safe --host 127.
 # Set BROWSER_DEBUG_MCP_HTTP_TOKEN in your shell to a 16-or-more-character local value.
 node /path/to/browser-debug-cli/bin/browser-debug-mcp.js --transport http --profile safe --host 127.0.0.1 --port 8765
 ```
+
+When the package bin is installed and on PATH, use the generated top-level `launch` command. When using an unpublished local checkout, use `config.local_checkout.launch` from the generated output so the MCP client starts the exact checkout entrypoint.
 
 Do not expose HTTP MCP on a remote interface. HTTP `full` and HTTP `admin` are intentionally unavailable in this phase.
 
@@ -95,7 +99,7 @@ node "$BROWSER_DEBUG_CLI" mcp capabilities --profile admin --scope excluded --js
 
 ## Troubleshooting
 
-- If an agent says it does not know how to connect, run `mcp config --profile safe --json` and give it the generated client metadata.
+- If an agent says it does not know how to connect, run `mcp config --profile safe --json` and give it the generated client metadata. For local checkout use, point it to `config.local_checkout.mcpServers` for stdio or `config.local_checkout.launch` for safe HTTP.
 - If an agent wants to know what is excluded from MCP, run `mcp capabilities --profile admin --scope excluded --json`.
 - If browser review is slow or unstable, run `resource status --json`, lower route or viewport budgets, and rerun `target validate`.
 - If artifacts are large, run `resource artifacts plan --json` first. Use cleanup execution only from the CLI and only when artifact-root cleanup is intended.

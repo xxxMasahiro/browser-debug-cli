@@ -272,3 +272,11 @@ commit: 1af1fcd Document agent execution integration plan
 - Updated README and `skills/browser-debug-review/SKILL.md` so agents can use `mcp config`, `mcp capabilities`, and the packaged guide instead of reading source internals.
 - Added package file-set, product manifest, repository index, no-browser architecture, and packed-install smoke coverage for the guide.
 - Phase 37 does not change runtime behavior, MCP permissions, publication state, marketplace state, identity names, cleanup execution, provider/API execution, shell tools, remote listeners, or credential handling.
+
+## 2026-06-20 Phase 38 Local Checkout MCP Config Dogfood
+
+- Dogfooded external-repository no-browser usage from a temporary consumer workspace and confirmed `doctor`, `mcp capabilities`, `resource status`, `target init`, and `target validate` work from outside the product repository.
+- Identified that `mcp config` still assumed `browser-debug-mcp` was installed and on PATH, which forced unpublished local-checkout users to know package internals.
+- Added `local_checkout` metadata to generated stdio and safe HTTP MCP config output, including the current package root, absolute MCP bin path, `node` launch command, stdio `mcpServers`, and safe HTTP launch metadata.
+- Preserved installed-bin `launch`, `client_connection`, and `mcpServers` output for compatibility.
+- Added no-browser and packed-install smoke assertions for local-checkout metadata without starting listeners, writing config files, reading credentials, emitting token values, expanding MCP permissions, publishing, or renaming identities.

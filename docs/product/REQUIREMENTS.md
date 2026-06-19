@@ -154,8 +154,8 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Target review can emit `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, `content_ux_page_handoff`, `content_ux_manifest_authoring`, and `quality_signals.content_ux` only when the target manifest explicitly enables `localContentUxAdvisory.enabled=true`.
 - The repository includes local plugin metadata, local MCP configuration, and a plugin-facing skill without adding marketplace registration, npm publication, external upload, credential handling, or an HTTP default in the packaged MCP config.
 - `browser-debug-mcp --transport http --profile safe --host 127.0.0.1 --port <port>` starts only a local safe HTTP MCP endpoint. It requires a bearer token, validates loopback Host and Origin headers, and does not expose browser-launching, write-producing, cleanup, provider/API, shell, `full`, or `admin` tools.
-- `browser-debug mcp config --json` returns reusable client configuration for stdio MCP without launching a server, mutating files, or requiring repository-specific source inspection.
-- `browser-debug mcp config --transport http --profile safe --port <port> --json` returns launch and client-connection metadata for the explicit safe HTTP MCP endpoint without printing token values.
+- `browser-debug mcp config --json` returns reusable client configuration for stdio MCP without launching a server, mutating files, or requiring repository-specific source inspection. It includes installed-bin metadata and local-checkout metadata for unpublished package use.
+- `browser-debug mcp config --transport http --profile safe --port <port> --json` returns launch and client-connection metadata for the explicit safe HTTP MCP endpoint without printing token values. It includes a local-checkout launch block for the current package entrypoint when `browser-debug-mcp` is not on PATH.
 - `browser-debug mcp capabilities --profile safe|full|admin|all --scope all|profiles|excluded --json` returns the current MCP profile, transport, and admin exclusion policy without launching a server, mutating files, reading credentials, or enabling write/execute tools.
 - `docs/workflow/CONSUMER_USAGE.md` is packaged with the local tarball and documents external-repository CLI, MCP stdio, safe HTTP MCP, and Codex plugin connection flows without requiring source-code inspection.
 
@@ -172,7 +172,9 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 
 - Add a no-side-effect MCP client configuration command that can be used from any repository after install or from this checkout.
 - Keep generated stdio configuration compatible with normal MCP client `mcpServers` shapes while preserving the existing packaged `.mcp.json` compatibility behavior.
+- Include a generated local-checkout `mcpServers` shape for stdio use when the package bin is not installed or not on PATH.
 - Keep generated HTTP configuration safe-profile-only, loopback-only, bearer-token-env-based, and explicit about the single-request POST JSON response subset.
+- Include a generated local-checkout launch shape for safe HTTP use when the package bin is not installed or not on PATH.
 - Default generated HTTP examples to a fixed local port suitable for client configuration, while keeping the server runtime default port unchanged.
 - Add packed-install smoke coverage that creates the safe HTTP MCP handler from the installed package API and completes an authenticated `initialize` request without binding a port.
 - Keep all configuration output token-free, credential-free, local-first, reusable, and generic across external repositories.

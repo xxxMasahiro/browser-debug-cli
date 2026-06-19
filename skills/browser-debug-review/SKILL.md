@@ -25,29 +25,31 @@ Use this skill when a user wants local browser observation, route coverage, UI r
    `browser-debug resource artifacts plan --json`
 10. When connecting through MCP, ask Browser Debug CLI for token-free client setup metadata instead of inspecting repository internals:
    `browser-debug mcp config --profile safe --json`
-11. When checking what MCP can and cannot do, inspect the read-only capability policy instead of inferring from source files:
+11. If `browser-debug-mcp` is installed and on PATH, use the top-level generated `mcpServers`; if using an unpublished local checkout, use `config.local_checkout.mcpServers`.
+12. When checking what MCP can and cannot do, inspect the read-only capability policy instead of inferring from source files:
    `browser-debug mcp capabilities --profile admin --scope excluded --json`
-12. When connecting through MCP, prefer the smallest launch profile that fits the task:
+13. When connecting through MCP, prefer the smallest launch profile that fits the task:
    `browser-debug-mcp --profile safe` for no-browser discovery and validation, or `browser-debug-mcp --profile full` for local observe/review workflows.
-13. Treat the packaged `.mcp.json` and no-profile `browser-debug-mcp` as compatibility `full`; low-trust clients should explicitly launch `browser-debug-mcp --profile safe`.
-14. If an HTTP MCP endpoint is explicitly requested, generate the safe HTTP setup first, then launch it only as safe, loopback, and token-gated:
+14. Treat the packaged `.mcp.json` and no-profile `browser-debug-mcp` as compatibility `full`; low-trust clients should explicitly launch `browser-debug-mcp --profile safe`.
+15. If an HTTP MCP endpoint is explicitly requested, generate the safe HTTP setup first, then launch it only as safe, loopback, and token-gated:
    `browser-debug mcp config --transport http --profile safe --port 8765 --json`
    `BROWSER_DEBUG_MCP_HTTP_TOKEN=<token> browser-debug-mcp --transport http --profile safe --host 127.0.0.1 --port 8765`
-15. Run a single-page review for focused checks:
+   For unpublished local checkout use, start the server with generated `config.local_checkout.launch` instead of assuming `browser-debug-mcp` is on PATH.
+16. Run a single-page review for focused checks:
    `browser-debug review --url <url> --screenshot --report --json`
-16. Use `--resource-guard fail-critical` only when the caller wants browser launch to stop on critical local resource pressure.
-17. Run a site review for route and viewport coverage:
+17. Use `--resource-guard fail-critical` only when the caller wants browser launch to stop on critical local resource pressure.
+18. Run a site review for route and viewport coverage:
    `browser-debug review --target <manifest> --report --json`
-18. Use `resource_status.status`, `resource_guard.status`, and recommendations to decide whether to reduce route or viewport budgets, split manifests, defer traces/screenshots, or stop unused Browser Debug CLI daemons before review.
-19. Use `quality_signals.route_coverage` to decide whether to raise route budgets, split manifests, or add missing expected routes.
-20. Use `quality_signals.page_expectations`, `quality_signals.rendered_state`, and `artifact_index` to decide whether expected page states, loaded/empty UI states, mocks, or evidence bundles need follow-up.
-21. Use `manifest_suggestions` to identify manifest-only rerun improvements such as adding named pages, pinning routes, or raising route budgets.
-22. Use the returned `action_plan`, `review_advisory`, `quality_signals`, findings, and artifact paths for developer handoff.
-23. When a local subscription agent should provide advisory review, package the existing review artifact index:
+19. Use `resource_status.status`, `resource_guard.status`, and recommendations to decide whether to reduce route or viewport budgets, split manifests, defer traces/screenshots, or stop unused Browser Debug CLI daemons before review.
+20. Use `quality_signals.route_coverage` to decide whether to raise route budgets, split manifests, or add missing expected routes.
+21. Use `quality_signals.page_expectations`, `quality_signals.rendered_state`, and `artifact_index` to decide whether expected page states, loaded/empty UI states, mocks, or evidence bundles need follow-up.
+22. Use `manifest_suggestions` to identify manifest-only rerun improvements such as adding named pages, pinning routes, or raising route budgets.
+23. Use the returned `action_plan`, `review_advisory`, `quality_signals`, findings, and artifact paths for developer handoff.
+24. When a local subscription agent should provide advisory review, package the existing review artifact index:
    `browser-debug agent package --review-index <review-artifact-index> --surface local-subscription-agent --json`
-24. Import the returned advisory JSON without changing deterministic review fields:
+25. Import the returned advisory JSON without changing deterministic review fields:
    `browser-debug agent ingest --package <agent-package> --input @agent-advisory-result.json --json`
-25. Render a separate advisory report when needed:
+26. Render a separate advisory report when needed:
    `browser-debug agent report --review-index <review-artifact-index> --agent-result <agent-result> --json`
 
 ## Boundaries
@@ -66,7 +68,7 @@ Use this skill when a user wants local browser observation, route coverage, UI r
 - MCP profiles are launch-time boundaries. Use `safe` for no-browser validation/planning, `full` for local observe/review, and do not treat `admin` as permission for cleanup execution, agent/API execution, shell tools, HTTP `full` or `admin`, socket transport, external upload, profile reuse, provider credentials, or arbitrary process control.
 - `browser-debug mcp capabilities` is read-only policy inspection. It reports current exclusions but does not grant cleanup execution, provider/API execution, `agent execution run`, shell tools, daemon/session control, HTTP `full` or `admin`, socket transport, remote listeners, or credential-bearing MCP workflows.
 - HTTP MCP transport is a safe-profile-only loopback endpoint in this phase. It requires a bearer token from `BROWSER_DEBUG_MCP_HTTP_TOKEN`, does not change the packaged stdio `.mcp.json`, and must not expose browser-launching, write-producing, cleanup, provider/API, shell, or admin tools.
-- `browser-debug mcp config` emits token-free metadata only. It must not be treated as a credential source, server launcher, config-file writer, or permission to expose HTTP `full`/`admin`.
+- `browser-debug mcp config` emits token-free metadata only, including local checkout launch metadata when the package bin is not on PATH. It must not be treated as a credential source, server launcher, config-file writer, or permission to expose HTTP `full`/`admin`.
 - Agent advisory commands are local handoff/import tools. They do not call provider APIs, upload artifacts, store credentials, mutate review JSON, or change deterministic findings, metrics, existing action plans, or release readiness.
 - Keep direct model/API execution approval-bound even when an API-provider surface is listed as a future boundary.
 - Prefer target manifests, route budgets, expected routes, and viewport matrices over app-specific runtime branches.

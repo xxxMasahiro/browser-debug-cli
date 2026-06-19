@@ -1858,6 +1858,15 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(stdioConfigBody.data.config.launch.command, PRODUCT_IDENTITY.mcpBinName);
   assert.deepEqual(stdioConfigBody.data.config.launch.args, ['--profile', 'safe']);
   assert.equal(stdioConfigBody.data.config.mcpServers[PRODUCT_IDENTITY.mcpServerName].command, PRODUCT_IDENTITY.mcpBinName);
+  const expectedLocalMcpBinPath = path.resolve(process.cwd(), PRODUCT_IDENTITY.mcpBinPath);
+  assert.equal(stdioConfigBody.data.config.local_checkout.launch.command, process.execPath);
+  assert.deepEqual(stdioConfigBody.data.config.local_checkout.launch.args, [expectedLocalMcpBinPath, '--profile', 'safe']);
+  assert.equal(stdioConfigBody.data.config.local_checkout.mcpServers[PRODUCT_IDENTITY.mcpServerName].command, process.execPath);
+  assert.deepEqual(
+    stdioConfigBody.data.config.local_checkout.mcpServers[PRODUCT_IDENTITY.mcpServerName].args,
+    [expectedLocalMcpBinPath, '--profile', 'safe']
+  );
+  assert.equal(stdioConfigBody.data.config.local_checkout.boundary.config_file_written, false);
   assert.equal(stdioConfigBody.data.config.boundary.server_started, false);
   assert.equal(stdioConfigBody.data.config.boundary.token_values_emitted, false);
   assert.equal(stdioConfigBody.data.config.boundary.cleanup_execution, false);
@@ -1970,6 +1979,25 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(httpConfigBody.data.config.client_connection.url, 'http://127.0.0.1:8765/mcp');
   assert.equal(httpConfigBody.data.config.client_connection.protocol_version, '2025-06-18');
   assert.equal(httpConfigBody.data.config.launch.env[mcpHttpTokenEnv], '<set-16-or-more-character-token>');
+  assert.equal(httpConfigBody.data.config.local_checkout.launch.command, process.execPath);
+  assert.deepEqual(httpConfigBody.data.config.local_checkout.launch.args, [
+    expectedLocalMcpBinPath,
+    '--transport',
+    'http',
+    '--profile',
+    'safe',
+    '--host',
+    '127.0.0.1',
+    '--port',
+    '8765',
+    '--endpoint',
+    '/mcp',
+    '--token-env',
+    'BROWSER_DEBUG_MCP_HTTP_TOKEN'
+  ]);
+  assert.equal(httpConfigBody.data.config.local_checkout.launch.env[mcpHttpTokenEnv], '<set-16-or-more-character-token>');
+  assert.equal(httpConfigBody.data.config.local_checkout.client_connection.url, 'http://127.0.0.1:8765/mcp');
+  assert.equal(httpConfigBody.data.config.local_checkout.boundary.server_started, false);
   assert.equal(httpConfigBody.data.config.metadata.token_env, 'BROWSER_DEBUG_MCP_HTTP_TOKEN');
   assert.equal(httpConfigBody.data.config.boundary.token_values_emitted, false);
   assert.equal(httpConfigBody.data.config.boundary.server_started, false);
