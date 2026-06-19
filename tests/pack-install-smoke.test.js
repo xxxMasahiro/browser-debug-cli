@@ -1,0 +1,230 @@
+import assert from 'node:assert/strict';
+import { constants as fsConstants } from 'node:fs';
+import {
+  access,
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile
+} from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import { tmpdir } from 'node:os';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { gunzipSync } from 'node:zlib';
+
+const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+
+await main();
+
+async function main() {
+  const tarballPath = process.argv[2];
+  assert.ok(tarballPath, 'Usage: node tests/pack-install-smoke.test.js <packed-tarball>');
+  await access(tarballPath, fsConstants.R_OK);
+
+  const layout = await createPackedInstallLayout(tarballPath);
+  try {
+    const { installRoot, packageDir, binDir } = layout;
+
+    await assertFile(packageDir, 'bin/browser-debug.js');
+    await assertFile(packageDir, 'bin/browser-debug-mcp.js');
+    await assertFile(packageDir, 'src/api.js');
+    await assertFile(packageDir, 'schemas/agent-execution.schema.json');
+    await assertFile(packageDir, 'schemas/review.schema.json');
+    await assertFile(packageDir, 'templates/review-target-manifest.json');
+    await assertFile(packageDir, 'templates/status-dashboard-content-ux-target-manifest.json');
+    await assertFile(packageDir, '.codex-plugin/plugin.json');
+    await assertFile(packageDir, '.mcp.json');
+    await assertFile(packageDir, 'skills/browser-debug-review/SKILL.md');
+    await assertFile(packageDir, 'docs/workflow/SECURITY.md');
+    await assert.rejects(access(path.join(packageDir, 'docs/product/IMPLEMENTATION_PLAN.md')));
+
+    const packageJson = JSON.parse(await readFile(path.join(packageDir, 'package.json'), 'utf8'));
+    assert.equal(packageJson.private, true);
+    assert.equal(packageJson.license, 'UNLICENSED');
+    assert.equal(packageJson.bin['browser-debug'], './bin/browser-debug.js');
+    assert.equal(packageJson.bin['browser-debug-mcp'], './bin/browser-debug-mcp.js');
+
+    const browserDebugBin = await readFile(path.join(packageDir, 'bin/browser-debug.js'), 'utf8');
+    const browserDebugMcpBin = await readFile(path.join(packageDir, 'bin/browser-debug-mcp.js'), 'utf8');
+    assert.match(browserDebugBin, /from '\.\.\/src\/cli\.js'/);
+    assert.match(browserDebugMcpBin, /from '\.\.\/src\/mcp\.js'/);
+    assert.equal(((await stat(path.join(packageDir, 'bin/browser-debug.js'))).mode & 0o111) !== 0, true);
+    assert.equal(((await stat(path.join(packageDir, 'bin/browser-debug-mcp.js'))).mode & 0o111) !== 0, true);
+
+    const requireFromInstall = createRequire(path.join(installRoot, 'package.json'));
+    const apiPath = requireFromInstall.resolve('browser-debug-cli');
+    const reviewSchemaPath = requireFromInstall.resolve('browser-debug-cli/schemas/review');
+    assert.equal(path.normalize(apiPath), path.join(packageDir, 'src/api.js'));
+    assert.equal(path.normalize(reviewSchemaPath), path.join(packageDir, 'schemas/review.schema.json'));
+
+    const api = await import(pathToFileURL(apiPath));
+    assert.equal(typeof api.executeCli, 'function');
+    assert.equal(typeof api.runTargetValidate, 'function');
+    assert.equal(api.schemaNames().includes('agent_execution'), true);
+    assert.equal(api.MCP_TOOLS.some((tool) => tool.name === 'browser_debug_review_target'), true);
+
+    const doctor = await api.executeCli(['doctor', '--json'], { cwd: installRoot });
+    assert.equal(doctor.exitCode, 0);
+    const doctorBody = JSON.parse(doctor.stdout);
+    assert.equal(doctorBody.command, 'doctor');
+    assert.equal(doctorBody.status, 'ok');
+    assert.equal(doctorBody.data.checks.find((check) => check.id === 'artifact_root.ignored').status, 'pass');
+    assert.equal(doctorBody.data.checks.find((check) => check.id === 'playwright.package').status, 'pass');
+
+    const schemaList = await api.executeCli(['schema', 'list', '--json'], { cwd: installRoot });
+    assert.equal(schemaList.exitCode, 0);
+    const schemaBody = JSON.parse(schemaList.stdout);
+    const schemaNames = schemaBody.data.schemas.map((schema) => schema.name);
+    assert.ok(schemaNames.includes('review'));
+    assert.ok(schemaNames.includes('target_manifest'));
+    assert.ok(schemaNames.includes('agent_execution'));
+
+    const targetPath = path.join(installRoot, 'target.json');
+    await writeFile(targetPath, JSON.stringify(targetManifestFixture(), null, 2), 'utf8');
+    const validate = await api.executeCli(
+      ['target', 'validate', '--target', 'target.json', '--json'],
+      { cwd: installRoot }
+    );
+    assert.equal(validate.exitCode, 0);
+    const validateBody = JSON.parse(validate.stdout);
+    assert.equal(validateBody.command, 'target validate');
+    assert.equal(validateBody.status, 'ok');
+    assert.equal(validateBody.data.boundary.browser_launched, false);
+    assert.equal(validateBody.data.boundary.external_upload, false);
+
+    const mcpBody = await api.handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { cwd: installRoot });
+    assert.equal(mcpBody.result.tools.some((tool) => tool.name === 'browser_debug_target_validate'), true);
+    assert.equal(mcpBody.result.tools.some((tool) => /agent execution/i.test(tool.name)), false);
+
+    const binLink = await lstat(path.join(binDir, 'browser-debug'));
+    assert.equal(binLink.isSymbolicLink(), true);
+    console.log('Packed install smoke passed.');
+  } finally {
+    if (process.env.BROWSER_DEBUG_KEEP_PACK_INSTALL_SMOKE !== '1') {
+      await rm(layout.tempRoot, { recursive: true, force: true });
+    }
+  }
+}
+
+async function createPackedInstallLayout(tarballPath) {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), 'browser-debug-pack-install-'));
+  const installRoot = path.join(tempRoot, 'install');
+  const nodeModules = path.join(installRoot, 'node_modules');
+  const packageDir = path.join(nodeModules, 'browser-debug-cli');
+  const binDir = path.join(nodeModules, '.bin');
+
+  await mkdir(packageDir, { recursive: true });
+  await mkdir(binDir, { recursive: true });
+  await writeFile(path.join(installRoot, 'package.json'), '{"type":"module"}\n', 'utf8');
+  await writeFile(path.join(installRoot, '.gitignore'), '.browser-debug/\n', 'utf8');
+  await extractPackageTarball(tarballPath, packageDir);
+  await linkDependency(nodeModules, 'playwright');
+  await linkDependency(nodeModules, 'playwright-core');
+  await linkBin(binDir, 'browser-debug', path.join(packageDir, 'bin/browser-debug.js'));
+  await linkBin(binDir, 'browser-debug-mcp', path.join(packageDir, 'bin/browser-debug-mcp.js'));
+
+  return { tempRoot, installRoot, packageDir, binDir };
+}
+
+async function extractPackageTarball(tarballPath, outputDir) {
+  const archive = gunzipSync(await readFile(tarballPath));
+  let offset = 0;
+  while (offset + 512 <= archive.length) {
+    const header = archive.subarray(offset, offset + 512);
+    if (header.every((byte) => byte === 0)) {
+      break;
+    }
+    const name = readTarString(header, 0, 100);
+    const prefix = readTarString(header, 345, 155);
+    const fullName = [prefix, name].filter(Boolean).join('/');
+    const type = readTarString(header, 156, 1) || '0';
+    const size = Number.parseInt(readTarString(header, 124, 12).trim() || '0', 8);
+    const mode = Number.parseInt(readTarString(header, 100, 8).trim() || '644', 8);
+    const relative = fullName.replace(/^package\/?/, '');
+    offset += 512;
+    if (relative && isSafeRelativePath(relative)) {
+      const target = path.join(outputDir, relative);
+      if (type === '5') {
+        await mkdir(target, { recursive: true });
+      } else if (type === '0' || type === '') {
+        await mkdir(path.dirname(target), { recursive: true });
+        await writeFile(target, archive.subarray(offset, offset + size));
+        await chmod(target, mode);
+      }
+    }
+    offset += Math.ceil(size / 512) * 512;
+  }
+}
+
+function readTarString(buffer, start, length) {
+  return buffer
+    .subarray(start, start + length)
+    .toString('utf8')
+    .replace(/\0.*$/u, '')
+    .trim();
+}
+
+function isSafeRelativePath(relativePath) {
+  return relativePath
+    && !path.isAbsolute(relativePath)
+    && !relativePath.split('/').some((part) => part === '..' || part === '');
+}
+
+async function linkDependency(nodeModules, name) {
+  const source = path.join(repoRoot, 'node_modules', name);
+  await access(source, fsConstants.R_OK);
+  await symlink(source, path.join(nodeModules, name), 'dir');
+}
+
+async function linkBin(binDir, name, target) {
+  await chmod(target, 0o755);
+  await symlink(path.relative(binDir, target), path.join(binDir, name), 'file');
+}
+
+async function assertFile(root, relativePath) {
+  await access(path.join(root, relativePath), fsConstants.R_OK);
+}
+
+function targetManifestFixture() {
+  return {
+    schema_version: '0.1.0',
+    name: 'Packed install fixture',
+    baseUrl: 'https://example.test/',
+    scope: {
+      sameOrigin: true,
+      allowedHosts: ['example.test']
+    },
+    seeds: ['/'],
+    expectedRoutes: ['/'],
+    viewportMatrix: [
+      { name: 'desktop', width: 1280, height: 720 }
+    ],
+    actionPolicy: {
+      click: 'navigation_only',
+      forms: 'skip',
+      destructive: 'skip',
+      external: 'skip'
+    },
+    budgets: {
+      maxRoutes: 1,
+      maxActionsPerRoute: 0
+    },
+    artifacts: {
+      screenshot: false,
+      trace: false,
+      report: false
+    },
+    masks: [],
+    regions: [],
+    pages: [],
+    localContentUxAdvisory: {
+      enabled: false
+    }
+  };
+}

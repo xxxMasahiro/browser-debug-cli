@@ -74,6 +74,8 @@ All notable local development changes are tracked here before public release.
 - Added local `agent workflow create/status/index/report` output and schema so dashboards and local automation can track advisory handoff step state and write bounded workflow summaries without browser launch, provider API calls, uploads, credential storage, MCP agent execution, external evidence transfer, or review gate changes.
 - Added the first Phase 29 agent execution foundation slice: `agent_execution` schema parity, `agent execution plan/status/list`, package API exports, local dry-run plan receipts, explicit run gating, no MCP execution exposure, and unchanged deterministic review gates.
 - Completed the Phase 29 agent execution adapter slice with `agent execution run --execution ... --execute`, deterministic fake provider execution, configured local runner callbacks, env-only generic API execution, bounded package/prompt disclosure, normalized advisory results, local run receipts, dashboard status/list fields, no raw provider response storage, no credential value recording, and architecture checks that keep provider calls out of review, resource, daemon, cleanup, Playwright, and MCP execution paths.
+- Added Phase 30 packed install smoke coverage with `npm run test:pack-install` for the packed tarball layout, packaged CLI entrypoints, package API imports, MCP stdio tool listing, schema/template/plugin file presence, selected workflow security docs, and no-publish release boundaries.
+- Wired packed install smoke into `npm run release:check`, the product aggregate gate, CI validation, and the Node GitHub Actions job without changing package naming, license, marketplace, publication, or external evidence transfer boundaries.
 
 ## Release Status
 

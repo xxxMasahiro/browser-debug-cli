@@ -53,6 +53,7 @@ for rel in \
   tests/architecture.test.js \
   tests/cli.test.js \
   tests/browser-smoke.test.js \
+  tests/pack-install-smoke.test.js \
   docs/product/REQUIREMENTS.md \
   docs/product/SPECIFICATION.md \
   docs/product/IMPLEMENTATION_PLAN.md \

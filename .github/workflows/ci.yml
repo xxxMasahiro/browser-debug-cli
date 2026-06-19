@@ -39,6 +39,9 @@ jobs:
       - name: Verify package file set
         run: npm run test:pack
 
+      - name: Run packed install smoke
+        run: npm run test:pack-install
+
   browser-smoke:
     name: Browser smoke
     runs-on: ubuntu-latest

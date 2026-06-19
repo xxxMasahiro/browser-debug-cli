@@ -13,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$SCRIPT_DIR/../package.json" ]]; then
   (cd "$SCRIPT_DIR/.." && npm test)
   (cd "$SCRIPT_DIR/.." && npm run --if-present test:pack)
+  (cd "$SCRIPT_DIR/.." && npm run --if-present test:pack-install)
 fi
 
 printf 'Product repository tests passed.\n'
