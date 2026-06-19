@@ -45,6 +45,7 @@ product.agent_disclosure_policy_schema	optional	all	all	schemas/agent-disclosure
 product.target_template	optional	all	all	templates/review-target-manifest.json	doc	file_nonempty	workflow	Reusable target manifest template for route and viewport review.
 product.status_dashboard_content_ux_template	optional	all	all	templates/status-dashboard-content-ux-target-manifest.json	doc	file_nonempty	workflow	Reusable manifest example for generic status-dashboard content UX advisory, review brief, and rubric review.
 product.plugin_skill	optional	all	all	skills/browser-debug-review/SKILL.md	doc	file_nonempty	workflow	Plugin-facing usage skill for local browser review workflows.
+product.consumer_usage	optional	all	all	docs/workflow/CONSUMER_USAGE.md	doc	file_nonempty	workflow	Packaged external repository usage guide for CLI, MCP stdio, safe HTTP MCP, and Codex plugin connection modes.
 product.architecture_test	optional	all	all	tests/architecture.test.js	test	file_nonempty	workflow	Architecture regression tests for reusable and generic runtime boundaries.
 product.test	required	all	all	tests/cli.test.js	test	file_nonempty	workflow	No-browser CLI parser, JSON output, and doctor tests.
 product.browser_smoke	optional	all	all	tests/browser-smoke.test.js	test	file_nonempty	workflow	Optional Playwright browser smoke tests.

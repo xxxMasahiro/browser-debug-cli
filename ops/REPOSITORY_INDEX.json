@@ -61,6 +61,7 @@
     { "path": "docs/product/IMPLEMENTATION_PLAN.md", "role": "product_doc" },
     { "path": "docs/workflow/TASK_TRACKER.md", "role": "workflow_doc" },
     { "path": "docs/workflow/HANDOFF.md", "role": "workflow_doc" },
+    { "path": "docs/workflow/CONSUMER_USAGE.md", "role": "workflow_doc" },
     { "path": "docs/workflow/IDENTITY_MIGRATION.md", "role": "workflow_doc" },
     { "path": "docs/workflow/RELEASE.md", "role": "workflow_doc" },
     { "path": "ops/CI_MANIFEST.tsv", "role": "ci_config" },

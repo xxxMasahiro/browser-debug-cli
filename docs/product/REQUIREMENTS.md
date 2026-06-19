@@ -32,6 +32,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Provide an explicit safe HTTP MCP endpoint for local MCP-compatible tooling that cannot use stdio, while keeping it loopback-only, bearer-token gated, and limited to safe no-browser/read-only tools.
 - Provide machine-readable MCP client configuration output so humans, agents, and external repositories can connect through stdio or explicit safe HTTP without reverse-engineering package internals.
 - Provide machine-readable MCP capability policy output so humans, agents, and external repositories can see which profiles, transports, and admin write/execute exclusions are currently in force without starting a server or inspecting source files.
+- Provide a packaged external-repository usage guide so humans, shell-based agents, MCP-capable agents, and Codex users can choose CLI, MCP stdio, safe HTTP MCP, or plugin connection modes without source inspection.
 - Support evidence-backed UI review findings for browser health, layout integrity, interaction quality, accessibility basics, and mock fidelity.
 - Support generic target manifests so site review can cover local applications and dashboards without hard-coded product-specific branches.
 - Treat manifest `expectedRoutes` as reviewable local targets so known app routes can be covered even when route discovery cannot find them from anchors or navigation candidates.
@@ -156,6 +157,16 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - `browser-debug mcp config --json` returns reusable client configuration for stdio MCP without launching a server, mutating files, or requiring repository-specific source inspection.
 - `browser-debug mcp config --transport http --profile safe --port <port> --json` returns launch and client-connection metadata for the explicit safe HTTP MCP endpoint without printing token values.
 - `browser-debug mcp capabilities --profile safe|full|admin|all --scope all|profiles|excluded --json` returns the current MCP profile, transport, and admin exclusion policy without launching a server, mutating files, reading credentials, or enabling write/execute tools.
+- `docs/workflow/CONSUMER_USAGE.md` is packaged with the local tarball and documents external-repository CLI, MCP stdio, safe HTTP MCP, and Codex plugin connection flows without requiring source-code inspection.
+
+## Phase 37 External Repository Usage Criteria
+
+- Add a packaged guide for using Browser Debug CLI from a consumer repository before npm publication.
+- Document that the current working directory should be the consumer repository when review artifacts and target manifests belong there.
+- Document CLI, MCP stdio, safe HTTP MCP, and Codex plugin as connection modes over the same core rather than unrelated products.
+- Document the practical capability differences between CLI, MCP `safe`, MCP `full`, MCP `admin`, safe HTTP MCP, and the Codex plugin.
+- Keep the guide generic, local-first, token-free, credential-free, and free of consumer-specific paths or product names.
+- Keep package smoke coverage proving the guide is included in the local tarball without publishing.
 
 ## Phase 35 HTTP MCP Integration Hardening Criteria
 

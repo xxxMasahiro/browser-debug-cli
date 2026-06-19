@@ -33,6 +33,7 @@
     "skills/browser-debug-review/SKILL.md",
     "README.md",
     "CHANGELOG.md",
+    "docs/workflow/CONSUMER_USAGE.md",
     "docs/workflow/IDENTITY_MIGRATION.md",
     "docs/workflow/SECURITY.md",
     "docs/workflow/RELEASE.md",

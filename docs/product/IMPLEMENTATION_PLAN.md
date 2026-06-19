@@ -973,9 +973,32 @@ Phase 36 implements a read-only MCP capability policy report so users and agents
 - Verification must include `node --check` on changed runtime and test files, `npm test`, `npm run test:pack`, `npm run test:pack-install`, `npm run release:check`, `./tools/product-gate`, and `git diff --check`.
 - Browser smoke tests are not required for Phase 36 unless browser runtime behavior changes; Phase 36 changes no-browser MCP policy reporting, package smoke checks, and documentation only.
 
-### Phase 37: Future Transport Expansion Review
+### Phase 37: External Repository Usage Quickstart
 
-Phase 37 is not implemented in Phase 36. If approved later, it should decide whether socket transport, remote HTTP binding, streaming HTTP behavior, or broader MCP profiles over HTTP are necessary. Any such expansion requires a security design, authentication and origin policy, operational documentation, and tests before implementation.
+Phase 37 makes Browser Debug CLI easier to use from external repositories without broadening runtime permissions. It keeps the CLI as the source of truth and treats MCP stdio, safe HTTP MCP, and the Codex plugin as connection modes over the same core.
+
+#### Phase 37a: Post-Merge Workflow Sync
+
+- Completed: updated workflow state after Phase 36 PR CI, main CI, and local/remote synchronization completed.
+- Completed: kept Phase 36 scope limited to read-only MCP capability policy reporting.
+
+#### Phase 37b: Candidate Selection
+
+- Completed: selected external-repository usage quickstart as the next low-risk improvement because it improves ecosystem usability without exposing MCP execution, cleanup, shell, provider/API, remote HTTP, socket, or credential-bearing tools.
+- Completed: kept future transport expansion, MCP execution exposure, public package naming, license changes, npm publication, and marketplace registration approval-bound.
+
+#### Phase 37c: Packaged Usage Guide
+
+- Completed: added `docs/workflow/CONSUMER_USAGE.md` with CLI, MCP stdio, safe HTTP MCP, and Codex plugin connection guidance for consumer repositories.
+- Completed: documented capability boundaries for CLI, MCP `safe`, MCP `full`, MCP `admin`, safe HTTP MCP, and the Codex plugin.
+- Completed: documented that consumer target manifests, acceptance notes, and consumer-specific policy should live in the consumer repository while raw `.browser-debug/` artifacts remain local and ignored.
+- Completed: updated README and plugin-facing skill guidance to point agents to `mcp config`, `mcp capabilities`, and the packaged consumer guide instead of source inspection.
+- Completed: included the guide in the package file set and packed-install smoke coverage without npm publication.
+
+#### Phase 37 Verification Plan
+
+- Verification must include `node --check` on changed test files, `npm test`, `npm run test:pack`, `npm run test:pack-install`, `npm run release:check`, `./tools/product-gate`, and `git diff --check`.
+- Browser smoke tests are not required for Phase 37 unless browser runtime behavior changes; Phase 37 changes documentation, package metadata, manifests, and no-browser package smoke coverage only.
 
 ## Verification Method
 

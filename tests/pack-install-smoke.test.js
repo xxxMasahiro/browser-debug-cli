@@ -55,6 +55,7 @@ async function main() {
     await assertFile(packageDir, '.codex-plugin/plugin.json');
     await assertFile(packageDir, '.mcp.json');
     await assertFile(packageDir, PRODUCT_IDENTITY.pluginSkillPath);
+    await assertFile(packageDir, 'docs/workflow/CONSUMER_USAGE.md');
     await assertFile(packageDir, 'docs/workflow/IDENTITY_MIGRATION.md');
     await assertFile(packageDir, 'docs/workflow/SECURITY.md');
     await assert.rejects(access(path.join(packageDir, 'docs/product/IMPLEMENTATION_PLAN.md')));

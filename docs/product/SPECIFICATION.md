@@ -28,6 +28,7 @@ The Phase 2a design baseline uses Node.js 20 or newer, ESM modules, and a local 
 - Agent execution layer: plans and runs subscription-style local agent or API-style provider execution from bounded agent packages through dedicated provider adapters, exposes status/list metadata, and normalizes output as advisory-only results without mutating deterministic review artifacts or existing workflow status semantics.
 - Schema layer: defines stable JSON contracts for envelopes, artifacts, target manifests, findings, reports, and adapter I/O.
 - Adapter layer: keeps CLI as the source of truth and exposes the same core through MCP adapters. Stdio preserves the compatibility profile surface, while explicit HTTP transport is limited to safe-profile loopback requests.
+- Consumer usage guide: documents the external-repository connection flow for CLI, MCP stdio, safe HTTP MCP, and Codex plugin users without changing runtime permissions or requiring source inspection.
 
 ## Planned CLI Surface
 
@@ -131,6 +132,7 @@ Implemented behavior:
 - `browser-debug mcp config --json` emits reusable stdio MCP client configuration without launching a server, writing files, or reading credentials. Generated client config defaults to the `safe` profile; the packaged `.mcp.json` remains compatibility `full`.
 - `browser-debug mcp config --transport http --profile safe --port <port> --json` emits token-free launch and client-connection metadata for the explicit safe HTTP MCP endpoint, including the URL, token environment variable name, authorization header placeholder, protocol version, body limit, and safe-profile boundaries.
 - `browser-debug mcp capabilities --json` emits a read-only MCP capability policy report with profile tool surfaces, transport support, the current admin policy, explicit excluded operations, and boundary flags. It does not launch a server, write files, read token values, store credentials, or enable write/execute operations.
+- `docs/workflow/CONSUMER_USAGE.md` is a packaged external-repository usage guide. It explains how to run the CLI from a consumer repository, how to generate MCP stdio and safe HTTP MCP setup metadata, how to treat the Codex plugin as a discovery wrapper, and how to keep consumer target manifests and raw `.browser-debug/` artifacts local.
 - MCP profile selection happens at server launch or trusted adapter context, not per MCP request. `tools/list` and `tools/call` fail closed for invalid profiles or out-of-profile tool names.
 - MCP `@file` structured input is workspace-confined. Absolute paths, parent traversal, symlink escapes, non-regular files, and oversized files are rejected for MCP requests. Normal CLI `@file` behavior is unchanged outside MCP-restricted contexts.
 - Product identity metadata is explicit and reusable. The current package name, CLI bin name, MCP bin name, MCP server name, plugin name, display name, repository URL, and packaged skill path remain unchanged, but tests, package dry-run checks, and packed-install smoke derive expectations from the identity contract so a future approved rename can be implemented predictably.

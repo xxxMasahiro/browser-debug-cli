@@ -263,3 +263,12 @@ commit: 1af1fcd Document agent execution integration plan
 - The report records that `admin` is currently equivalent to `full` and that cleanup execution, package/ingest/report writing, workflow creation/report writing, execution planning, `agent execution run`, daemon/session control, provider/API execution, arbitrary shell, socket transport, remote HTTP listeners, and HTTP `full` or `admin` remain excluded from MCP.
 - Added no-browser, architecture, and packed-install smoke coverage for CLI/API/MCP policy reporting.
 - Synchronized README, plugin skill, product docs, workflow docs, manifests, task tracker, handoff, AGENTS current phase, changelog, release notes, verification, and security docs.
+
+## 2026-06-20 Phase 37 External Repository Usage Quickstart
+
+- Updated the post-merge workflow state after Phase 36 PR CI, main CI, and local/remote synchronization completed.
+- Selected external-repository usage guidance as the next low-risk phase because it improves ecosystem adoption without broadening MCP permissions or runtime authority.
+- Added packaged `docs/workflow/CONSUMER_USAGE.md` with CLI, MCP stdio, safe HTTP MCP, and Codex plugin connection guidance for consumer repositories.
+- Updated README and `skills/browser-debug-review/SKILL.md` so agents can use `mcp config`, `mcp capabilities`, and the packaged guide instead of reading source internals.
+- Added package file-set, product manifest, repository index, no-browser architecture, and packed-install smoke coverage for the guide.
+- Phase 37 does not change runtime behavior, MCP permissions, publication state, marketplace state, identity names, cleanup execution, provider/API execution, shell tools, remote listeners, or credential handling.

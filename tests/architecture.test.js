@@ -88,6 +88,7 @@ test('package keeps a standard local Node CLI surface', async () => {
   assert.equal(pkg.exports['./schemas/*'], './schemas/*.schema.json');
   assert.ok(pkg.files.includes('.codex-plugin/'));
   assert.ok(pkg.files.includes('.mcp.json'));
+  assert.ok(pkg.files.includes('docs/workflow/CONSUMER_USAGE.md'));
   assert.ok(pkg.files.includes('docs/workflow/IDENTITY_MIGRATION.md'));
   assert.ok(pkg.files.includes('templates/'));
   assert.ok(pkg.files.includes(PRODUCT_IDENTITY.pluginSkillPath));
@@ -243,6 +244,7 @@ test('plugin metadata keeps local stdio MCP boundaries', async () => {
   const plugin = JSON.parse(await readText('.codex-plugin/plugin.json'));
   const mcp = JSON.parse(await readText('.mcp.json'));
   const skill = await readText('skills/browser-debug-review/SKILL.md');
+  const consumerUsage = await readText('docs/workflow/CONSUMER_USAGE.md');
   const mcpServer = mcp.mcpServers[PRODUCT_IDENTITY.mcpServerName];
 
   assert.equal(plugin.name, PRODUCT_IDENTITY.pluginName);
@@ -255,6 +257,9 @@ test('plugin metadata keeps local stdio MCP boundaries', async () => {
   assert.doesNotMatch(JSON.stringify(mcp), /http|https|WebSocket|listen|curl|wget|token|password/i);
   assert.match(skill, /browser-debug review --target/);
   assert.match(skill, /upload artifacts|external upload/i);
+  assert.match(consumerUsage, /mcp config --profile safe --json/);
+  assert.match(consumerUsage, /mcp capabilities --profile admin --scope excluded --json/);
+  assert.doesNotMatch(consumerUsage, /FrameCue|ai-driven-development-lesson|\/home\/masahiro\/projects/);
 });
 
 test('HTTP MCP listener stays isolated to the approved transport module', async () => {
