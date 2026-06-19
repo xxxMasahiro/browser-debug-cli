@@ -94,6 +94,12 @@ as the source of truth and make MCP a thin stdio adapter over the same core.
    would be sent outside the local process. Trace, raw DOM, screenshot, and
    source sharing remain approval-bound.
 
+8. Agent Workflow Handoff.
+   Keep agent workflows as local package/prompt/result/report state tracking for
+   dashboards and local automation. Direct provider/API execution must remain a
+   separate approval-bound layer that does not replace the local workflow
+   manifest, status, index, or report contract.
+
 ## Important Risks
 
 - Model review is a data-exfiltration boundary. Screenshots, DOM, traces,
@@ -116,5 +122,8 @@ as the source of truth and make MCP a thin stdio adapter over the same core.
 - Evidence remains under ignored `.browser-debug/` paths.
 - Runtime code does not contain target-specific branches for the two Control
   Centers.
+- Agent workflow status/index can track local advisory handoff state without
+  provider API calls, external upload, credential storage, or review gate
+  mutation.
 - Model/API calls, profile reuse, OAuth, external upload, and destructive
   cleanup remain opt-in or approval-bound.

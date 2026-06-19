@@ -158,3 +158,12 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - `browser-debug agent requests show --package <path> --json` returns one advisory handoff package detail with package metadata, disclosure policy, source review index metadata, local artifact-reference summaries, selected/latest result paths, bounded advisory result summary, dashboard handoff hints, and boundary flags.
 - `browser-debug agent requests show --package <path> --agent-result <path> --json` selects a matching workspace-relative imported result and rejects mismatched result/package pairs.
 - The implementation remains read-only, local-first, and advisory-only. It does not write artifacts, launch browsers, call provider APIs, upload evidence, store credentials, expose MCP agent execution, mutate review artifacts, or change deterministic review findings, metrics, existing action plans, or release readiness.
+
+## 2026-06-19 Phase 28 Agent Workflow Status Handoff
+
+- Phase 28 is complete for local agent workflow status output.
+- `browser-debug agent workflow create --package <path> --json` writes a local `.browser-debug/agent-workflows/<id>/workflow.json` manifest and workflow receipt for dashboard/local automation handoff.
+- `browser-debug agent workflow status --workflow <path> --json` recomputes current workflow state from local package/result metadata and reports waiting, imported, or package-missing state without writing artifacts.
+- `browser-debug agent workflow index --json` aggregates local workflow manifests and reports waiting/imported/package-missing/report-pending counts.
+- `browser-debug agent workflow report --workflow <path> --json` writes a bounded local Markdown workflow status summary without mutating review artifacts.
+- Direct provider/API execution remains unimplemented and approval-bound; workflow output only records provider-boundary metadata and does not call providers, upload evidence, store credentials, expose MCP agent execution, launch browsers, mutate review artifacts, or change deterministic gates.

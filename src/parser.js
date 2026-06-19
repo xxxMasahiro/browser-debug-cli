@@ -24,7 +24,8 @@ const VALUE_OPTIONS = new Set([
   'timeout',
   'task',
   'url',
-  'viewport'
+  'viewport',
+  'workflow'
 ]);
 
 const BOOLEAN_OPTIONS = new Set([
@@ -361,7 +362,7 @@ function parseAgent(args, globals) {
     return parseError('agent', globals.json, {
       code: 'MISSING_SUBCOMMAND',
       message: 'agent requires a subcommand.',
-      details: { subcommands: ['surfaces', 'requests', 'package', 'ingest', 'report'] }
+      details: { subcommands: ['surfaces', 'requests', 'workflow', 'package', 'ingest', 'report'] }
     });
   }
   if (subcommand === 'surfaces') {
@@ -369,6 +370,9 @@ function parseAgent(args, globals) {
   }
   if (subcommand === 'requests') {
     return parseAgentRequests(args.slice(1), globals);
+  }
+  if (subcommand === 'workflow') {
+    return parseAgentWorkflow(args.slice(1), globals);
   }
   if (subcommand === 'package') {
     return parseAgentPackage(args.slice(1), globals);
@@ -382,7 +386,7 @@ function parseAgent(args, globals) {
   return parseError('agent', globals.json, {
     code: 'UNKNOWN_SUBCOMMAND',
     message: `Unknown agent subcommand: ${subcommand}`,
-    details: { subcommands: ['surfaces', 'requests', 'package', 'ingest', 'report'] }
+    details: { subcommands: ['surfaces', 'requests', 'workflow', 'package', 'ingest', 'report'] }
   });
 }
 
@@ -422,6 +426,38 @@ function parseAgentRequests(args, globals) {
     });
   }
   return { ok: true, command: 'agent requests list', json: globals.json, options: parsed.options };
+}
+
+function parseAgentWorkflow(args, globals) {
+  const subcommand = args[0];
+  if (!['create', 'status', 'index', 'report'].includes(subcommand)) {
+    return parseError('agent workflow', globals.json, {
+      code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+      message: subcommand ? `Unknown agent workflow subcommand: ${subcommand}` : 'agent workflow requires a subcommand.',
+      details: { subcommands: ['create', 'status', 'index', 'report'] }
+    });
+  }
+  if (subcommand === 'create') {
+    return parseRequiredOptions('agent workflow create', args.slice(1), globals, ['package']);
+  }
+  if (subcommand === 'status') {
+    return parseRequiredOptions('agent workflow status', args.slice(1), globals, ['workflow']);
+  }
+  if (subcommand === 'report') {
+    return parseRequiredOptions('agent workflow report', args.slice(1), globals, ['workflow']);
+  }
+  const parsed = parseOptions('agent workflow index', args.slice(1), globals.json);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  if (parsed.positionals.length > 0) {
+    return parseError('agent workflow index', globals.json, {
+      code: 'UNEXPECTED_ARGUMENT',
+      message: 'agent workflow index does not accept positional arguments.',
+      details: { argument: parsed.positionals[0] }
+    });
+  }
+  return { ok: true, command: 'agent workflow index', json: globals.json, options: parsed.options };
 }
 
 function parseAgentPackage(args, globals) {
@@ -811,6 +847,10 @@ function plannedCommands() {
     'agent surfaces list',
     'agent requests list',
     'agent requests show',
+    'agent workflow create',
+    'agent workflow status',
+    'agent workflow index',
+    'agent workflow report',
     'agent package',
     'agent ingest',
     'agent report',
