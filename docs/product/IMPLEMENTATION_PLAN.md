@@ -695,7 +695,7 @@ Phase 28 adds a local workflow manifest and read-only workflow status/index laye
 - Completed: `agent workflow report --workflow <path> --json` writes a bounded local Markdown workflow status summary without mutating review artifacts.
 - Completed: machine-readable schema coverage includes `agent_workflow`, and package API exports `runAgentWorkflowCreate`, `runAgentWorkflowStatus`, `runAgentWorkflowIndex`, and `runAgentWorkflowReport`.
 - Completed: no-browser tests cover workflow creation, post-ingest status recomputation, index aggregation, workflow report output, schema parity, unchanged gate semantics, no provider API calls, no automatic upload, and no review artifact mutation.
-- Completed as an approval boundary: direct API/provider execution remains represented only as disabled provider-boundary metadata. No provider SDK, network request, credential loading, endpoint selection, model selection, MCP agent execution, or external evidence transfer was implemented.
+- Completed at the Phase 28 approval boundary: direct API/provider execution was represented only as disabled provider-boundary metadata. Phase 29 later added the dedicated bounded execution adapter described below.
 
 ### Phase 29: Agent Execution Integration
 
@@ -713,16 +713,16 @@ The layer is additive. It must not change existing `agent_workflow` status meani
 #### Phase 29b: Parser and Public API Surface
 
 - Completed: added `agent execution plan --package <path> --surface <id> --json` for dry-run execution planning.
-- Completed: added `agent execution run --package <path> --surface <id> --provider <id> --model <id> --execute --json` as an explicit fail-closed command surface; provider execution remains unimplemented in this slice.
+- Completed: added `agent execution run --execution <path> --package <path> --surface <id> --provider <id> --model <id> --execute --json` as an explicit execution surface that requires a prior dry-run plan and validates package/surface/provider/model consistency.
 - Completed: added `agent execution status --execution <path> --json` and `agent execution list --json` for local dashboard and automation status.
 - Completed: exported the same core functions from the package API without changing existing exports or command behavior.
 
 #### Phase 29c: Core Execution Boundary Modules
 
-- Completed: added `src/agent-execution.js` for plan, fail-closed run, status, list, and receipts.
-- Plan: add a dedicated provider adapter module such as `src/agent-providers.js` for provider registry and execution adapters.
-- Plan: keep provider calls out of `agent.js`, `review.js`, `mcp.js`, resource helpers, and Playwright runtime modules.
-- Plan: keep execution output separate from review artifacts and route provider responses through the existing advisory ingest-style normalization path.
+- Completed: added `src/agent-execution.js` for dry-run plan, explicit run, status, list, result paths, and receipts.
+- Completed: added `src/agent-execution-providers.js` for the provider registry, fake provider, local runner callback adapter, and env-only API adapter.
+- Completed: kept provider calls out of `agent.js`, `review.js`, `mcp.js`, resource helpers, and Playwright runtime modules; architecture tests enforce this boundary.
+- Completed: kept execution output separate from review artifacts and normalized provider responses into the existing `agent_advisory_result` shape.
 
 #### Phase 29d: Dry-Run Execution Plan
 
@@ -733,32 +733,32 @@ The layer is additive. It must not change existing `agent_workflow` status meani
 
 #### Phase 29e: Provider Runner Abstraction and Fake Provider
 
-- Plan: implement provider-independent runner interfaces before real provider execution.
-- Plan: add a deterministic fake provider for no-browser tests, dashboard contract tests, failure path tests, and ingest normalization tests.
-- Plan: prove provider output is advisory-only and cannot change deterministic review findings, metrics, existing action plans, or release readiness.
-- Plan: reject unknown providers, unknown models, unsupported surfaces, missing packages, and missing execution receipts deterministically.
+- Completed: implemented provider-independent adapter interfaces before real provider execution.
+- Completed: added deterministic `fake-agent` provider for no-browser tests, dashboard contract tests, failure path tests, and advisory-result normalization tests.
+- Completed: proved provider output is advisory-only and cannot change deterministic review findings, metrics, existing action plans, or release readiness.
+- Completed: reject unknown providers, unknown models, unsupported surfaces, missing packages, missing execution plans, and plan mismatches deterministically.
 
 #### Phase 29f: Local Subscription-Agent Runner
 
-- Plan: support subscription-style local agents through allowlisted local runner commands or local stdio runners, not through SaaS web UI automation.
-- Plan: require a configured local runner identifier and avoid free-form shell input.
-- Plan: keep prompts and packages in local files, keep raw browser artifacts local by default, and normalize returned advisory JSON through the same ingest contract.
-- Plan: record execution receipts with runner identity, prompt/package paths, result path, boundary fields, and redacted command metadata without storing credential values.
+- Completed: support subscription-style local agents through configured local runner callbacks, not through SaaS web UI automation.
+- Completed: require a configured local runner identifier and avoid free-form shell input or arbitrary shell execution.
+- Completed: keep prompts and packages in local files, keep raw browser artifacts local by default, and normalize returned advisory JSON through the same advisory-result contract.
+- Completed: record execution receipts with runner identity, prompt/package paths, result path, and boundary fields without storing credential values.
 
 #### Phase 29g: One-Shot API Provider Execution
 
-- Plan: support API execution only through a dry-run plan followed by explicit `--execute`.
-- Plan: read credentials only from named environment variables, never from CLI arguments, local config files, `.env` auto-loading, committed files, package artifacts, workflow files, reports, or receipts.
-- Plan: send only the bounded package/prompt content allowed by the disclosure policy; do not send raw screenshots, trace contents, raw DOM, console payloads, network payloads, sourceData values, report bodies, or existing browser profile data.
-- Plan: do not persist raw provider responses. Normalize the provider response into `agent_advisory_result`, write a local receipt, and set `gate_effect="none"`.
-- Plan: do not add provider SDK dependencies in the first implementation slice unless a separate dependency decision is recorded; prefer a minimal adapter boundary that can be tested with injected transports.
+- Completed: support API execution only through a dry-run plan followed by explicit `--execute`.
+- Completed: read credentials only from named environment variables, never from CLI arguments, local config files, `.env` auto-loading, committed files, package artifacts, workflow files, reports, or receipts.
+- Completed: send only bounded package/prompt content allowed by the disclosure policy; raw screenshots, trace contents, raw DOM, console payloads, network payloads, sourceData values, report bodies, and existing browser profile data are not sent by the adapter.
+- Completed: do not persist raw provider responses. Provider responses are normalized into `agent_advisory_result`, a local receipt is written, and `gate_effect="none"` is preserved.
+- Completed: did not add provider SDK dependencies; the minimal adapter boundary is tested with injected transports.
 
 #### Phase 29h: Dashboard Contract and Status Integration
 
-- Plan: make dashboard and automation flows the same for subscription and API modes: package, execution plan/run, execution status/list, advisory ingest/report, workflow status/index/report.
-- Plan: expose only additive execution metadata to dashboards, including plan status, run status, provider/surface kind, receipt paths, missing-credential hints, advisory-result path, and boundary flags.
-- Plan: keep dashboard-specific semantics in dashboard-owned manifests or fixtures, not Browser Debug CLI runtime branches.
-- Plan: keep MCP execution out of scope for this phase. The MCP adapter may remain unchanged, or later expose read-only plan/status tools only after separate approval; it must not expose `agent execution run`.
+- Completed: dashboard and automation flows are the same for subscription and API modes: package, execution plan/run, execution status/list, advisory result/report, workflow status/index/report.
+- Completed: exposed only additive execution metadata to dashboards, including plan status, run status, provider/surface kind, receipt paths, advisory-result path, dashboard status fields, and boundary flags.
+- Completed: kept dashboard-specific semantics in dashboard-owned manifests or fixtures, not Browser Debug CLI runtime branches.
+- Completed: kept MCP execution out of scope for this phase; the MCP adapter does not expose `agent execution run`.
 
 #### Phase 29 Verification Plan
 

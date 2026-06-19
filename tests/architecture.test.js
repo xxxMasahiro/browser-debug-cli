@@ -11,6 +11,7 @@ test('runtime and tests avoid caller-specific implementation literals', async ()
     'src/cli.js',
     'src/agent.js',
     'src/agent-execution.js',
+    'src/agent-execution-providers.js',
     'src/constants.js',
     'src/content-ux-advisory.js',
     'src/daemon.js',
@@ -172,6 +173,25 @@ test('agent advisory layer keeps local handoff and import boundaries', async () 
   assert.match(combinedAgent, /external_evidence_transfer:\s*false/);
   assert.match(agentExecution, /mcp_execution_exposed:\s*false/);
   assert.doesNotMatch(mcp, /browser_debug_agent|agent package|agent ingest|agent report|agent execution/);
+});
+
+test('agent execution provider calls stay in the dedicated adapter boundary', async () => {
+  const agent = await readText('src/agent.js');
+  const agentExecution = await readText('src/agent-execution.js');
+  const providers = await readText('src/agent-execution-providers.js');
+  const mcp = await readText('src/mcp.js');
+
+  assert.doesNotMatch(`${agent}\n${agentExecution}`, /\bfetch\s*\(|XMLHttpRequest|curl|wget/);
+  assert.match(providers, /\bfetchImpl\b/);
+  assert.doesNotMatch(providers, /from 'playwright'|import\('playwright'\)/);
+  assert.doesNotMatch(providers, /node:child_process|child_process|execFile|spawn\(/);
+  assert.doesNotMatch(providers, /createServer|listen\(|WebSocket|EventSource/);
+  assert.doesNotMatch(providers, /launchPersistentContext|userDataDir|storageState/);
+  assert.match(providers, /environment_variable_only/);
+  assert.match(providers, /raw_provider_response_stored:\s*false/);
+  assert.match(providers, /credential_values_recorded:\s*false/);
+  assert.match(providers, /free_form_shell_input_accepted:\s*false/);
+  assert.doesNotMatch(mcp, /agent execution|browser_debug_agent/);
 });
 
 test('packaged target templates stay domain-neutral', async () => {

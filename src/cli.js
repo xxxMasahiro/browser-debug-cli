@@ -447,7 +447,7 @@ function usageText(topic) {
       `       ${CLI_NAME} agent workflow index [--json]`,
       `       ${CLI_NAME} agent workflow report --workflow <agent-workflow> [--json]`,
       `       ${CLI_NAME} agent execution plan --package <agent-package> --surface <id> [--json]`,
-      `       ${CLI_NAME} agent execution run --package <agent-package> --surface <id> --provider <id> --model <id> --execute [--json]`,
+      `       ${CLI_NAME} agent execution run --execution <agent-execution> --package <agent-package> --surface <id> --provider <id> --model <id> --execute [--json]`,
       `       ${CLI_NAME} agent execution status --execution <agent-execution> [--json]`,
       `       ${CLI_NAME} agent execution list [--json]`,
       `       ${CLI_NAME} agent ingest --package <agent-package> --input <agent-result-json> [--json]`,

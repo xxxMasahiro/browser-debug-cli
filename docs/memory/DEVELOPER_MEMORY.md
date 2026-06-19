@@ -94,11 +94,13 @@ as the source of truth and make MCP a thin stdio adapter over the same core.
    would be sent outside the local process. Trace, raw DOM, screenshot, and
    source sharing remain approval-bound.
 
-8. Agent Workflow Handoff.
+8. Agent Workflow and Execution Handoff.
    Keep agent workflows as local package/prompt/result/report state tracking for
-   dashboards and local automation. Direct provider/API execution must remain a
-   separate approval-bound layer that does not replace the local workflow
-   manifest, status, index, or report contract.
+   dashboards and local automation. Agent execution is a separate Phase 29 layer
+   with dry-run plans, explicit `--execute`, bounded disclosure, local receipts,
+   and advisory-only normalization; broader provider expansion remains
+   approval-bound and must not replace the local workflow manifest, status,
+   index, or report contract.
 
 ## Important Risks
 

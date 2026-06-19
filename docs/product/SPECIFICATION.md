@@ -25,7 +25,7 @@ The Phase 2a design baseline uses Node.js 20 or newer, ESM modules, and a local 
 - Resource artifact layer: inventories `.browser-debug/` artifact usage, proposes cleanup candidates, and performs explicit artifact-root-only cleanup with receipts when `--execute` is provided.
 - Daemon lifecycle layer: adds optional local idle-timeout and max-lifetime shutdown guards to detached ephemeral browser workers.
 - Agent advisory layer: creates bounded local evidence packages from review artifact indexes, generates handoff prompts for local subscription agents, lists and inspects local request status from package/result artifacts, imports untrusted advisory JSON, and renders separate advisory reports without direct API calls, external upload, credential storage, or deterministic gate changes.
-- Agent execution layer: plans subscription-style local agent or API-style provider execution from bounded agent packages, exposes status/list metadata, and keeps execution run fail-closed until dedicated runner/provider adapters are implemented without mutating deterministic review artifacts or existing workflow status semantics.
+- Agent execution layer: plans and runs subscription-style local agent or API-style provider execution from bounded agent packages through dedicated provider adapters, exposes status/list metadata, and normalizes output as advisory-only results without mutating deterministic review artifacts or existing workflow status semantics.
 - Schema layer: defines stable JSON contracts for envelopes, artifacts, target manifests, findings, reports, and adapter I/O.
 - Adapter layer: keeps CLI as the source of truth and later exposes the same core through an MCP stdio adapter.
 
@@ -54,8 +54,8 @@ browser-debug agent workflow create --package <agent-package> --json
 browser-debug agent workflow status --workflow <agent-workflow> --json
 browser-debug agent workflow index --json
 browser-debug agent workflow report --workflow <agent-workflow> --json
-browser-debug agent execution plan --package <agent-package> --surface <surface-id> --json
-browser-debug agent execution run --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --execute --json
+browser-debug agent execution plan --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --json
+browser-debug agent execution run --execution <agent-execution> --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --execute --json
 browser-debug agent execution status --execution <agent-execution> --json
 browser-debug agent execution list --json
 browser-debug agent ingest --package <agent-package> --input <agent-result-json> --json
@@ -392,7 +392,7 @@ Workflow create writes only local workflow metadata and a receipt under `.browse
 
 ## Agent Execution Contract
 
-The agent execution layer is an additive bridge from local packages to local subscription runners or API provider adapters. The current implementation covers the no-network dry-run plan, explicit run parser/API surface, local status, and local list contract. Direct local runner/API provider execution remains unimplemented and fail-closed until a dedicated provider adapter slice is approved and tested. This layer is not a replacement for review, workflow, ingest, or report commands. It must keep the existing package, workflow, ingest, report, resource, daemon, cleanup, and review contracts intact.
+The agent execution layer is an additive bridge from local packages to local subscription runners or API provider adapters. The current implementation covers the no-network dry-run plan, explicit run parser/API surface, dedicated provider adapter registry, deterministic fake provider, configured local runner callback boundary, env-only generic API provider adapter, local status, and local list contract. This layer is not a replacement for review, workflow, ingest, or report commands. It must keep the existing package, workflow, ingest, report, resource, daemon, cleanup, and review contracts intact.
 
 `agent_execution` records:
 
@@ -412,7 +412,7 @@ boundary flags and gate effect
 The dry-run command:
 
 ```text
-browser-debug agent execution plan --package <agent-package> --surface <surface-id> --json
+browser-debug agent execution plan --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --json
 ```
 
 is the default no-network operation. It validates the package, resolves the surface, records the disclosure policy, records provider/model selection metadata, and writes local plan metadata plus a receipt under `.browser-debug/agent-executions/`. It sets `api_call_performed=false`, `external_evidence_transfer=false`, `automatic_upload=false`, `credential_values_recorded=false`, `credential_storage="none"`, `persistent_credential_storage=false`, `raw_response_stored=false`, `raw_provider_response_stored=false`, `existing_review_mutated=false`, `mcp_execution_exposed=false`, and `gate_effect="none"`.
@@ -420,14 +420,20 @@ is the default no-network operation. It validates the package, resolves the surf
 The run command:
 
 ```text
-browser-debug agent execution run --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --execute --json
+browser-debug agent execution run --execution <agent-execution> --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --execute --json
 ```
 
-requires an explicit `--execute` flag and fails deterministically without it. In the current implementation, the command surface is present but direct execution returns a fail-closed provider-not-implemented error without calling providers, loading credentials, uploading evidence, or writing result artifacts. Future subscription-style execution must use a configured local runner identifier or local stdio surface; it must not accept free-form shell commands or automate a SaaS web UI. Future API-style execution must read token values only from named environment variables, never from CLI arguments, committed files, package artifacts, workflow files, reports, receipts, `.env` auto-loading, or persistent local storage.
+requires a prior dry-run execution record and an explicit `--execute` flag, and fails deterministically without either. Runtime validation rejects package, surface, provider, or model mismatches between the run request and the dry-run plan. The provider adapter registry is dedicated to agent execution and is not reachable from review, resource, daemon, cleanup, Playwright, or MCP execution paths.
+
+Implemented providers:
+
+- `fake-agent`: deterministic local provider for no-browser provider success/failure and dashboard contract coverage. It performs no API call or external transfer.
+- `local-runner`: configured local runner callback boundary for subscription-style execution. It uses provider/model identifiers and package API context callbacks, not free-form shell input or SaaS web UI automation.
+- `generic-api-provider`: one-shot provider API adapter. It reads endpoint and credential values only from `BROWSER_DEBUG_AGENT_API_ENDPOINT` and `BROWSER_DEBUG_AGENT_API_TOKEN`, never from CLI arguments, committed files, package artifacts, workflow files, reports, receipts, `.env` auto-loading, or persistent local storage. Tests use injected transports rather than live network calls.
 
 Execution may send only bounded package and prompt content allowed by the disclosure policy. By default, it must not transfer raw screenshots, trace contents, raw DOM, console payloads, network payloads, sourceData values, report bodies, cookies, storage state, existing browser profile data, or raw review artifacts. API execution must record that an API call occurred and which bounded evidence classes were sent, but it must not store raw provider responses. Runner/provider output is normalized into `agent_advisory_result` and remains untrusted advisory data.
 
-`agent execution status --execution <path> --json` reads one local execution record and reports current state, normalized advisory result path, missing credential hints, receipt paths, dashboard handoff commands, and boundary flags. `agent execution list --json` scans local execution records and returns aggregate status counts for dashboards and local automation. Status and list are read-only and must not launch browsers, call providers, upload evidence, store credentials, write review artifacts, or change deterministic gates.
+`agent execution status --execution <path> --json` reads one local execution record and reports current state, normalized advisory result path, missing credential hints, receipt paths, dashboard handoff commands, dashboard status fields, and boundary flags. `agent execution list --json` scans local execution records and returns aggregate planned/running/completed/failed/blocked counts, advisory-result counts, and boundary flags for dashboards and local automation. Status and list are read-only and must not launch browsers, call providers, upload evidence, store credentials, write review artifacts, or change deterministic gates.
 
 The planned layer keeps dashboard user experience aligned across subscription and API modes:
 

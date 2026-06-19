@@ -92,8 +92,38 @@
     "dashboard_handoff": {
       "type": "object"
     },
+    "dashboard_status": {
+      "type": "object"
+    },
     "disclosure_policy": {
       "type": "object"
+    },
+    "provider_adapter": {
+      "type": "object"
+    },
+    "normalized_agent_result_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "latest_result_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "agent_result_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "execution_run_receipt_path": {
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "gate_effect": {
       "enum": [

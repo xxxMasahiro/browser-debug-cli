@@ -166,7 +166,7 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - `browser-debug agent workflow status --workflow <path> --json` recomputes current workflow state from local package/result metadata and reports waiting, imported, or package-missing state without writing artifacts.
 - `browser-debug agent workflow index --json` aggregates local workflow manifests and reports waiting/imported/package-missing/report-pending counts.
 - `browser-debug agent workflow report --workflow <path> --json` writes a bounded local Markdown workflow status summary without mutating review artifacts.
-- Direct provider/API execution remains unimplemented and approval-bound; workflow output only records provider-boundary metadata and does not call providers, upload evidence, store credentials, expose MCP agent execution, launch browsers, mutate review artifacts, or change deterministic gates.
+- At the end of Phase 28, provider/API execution was still unimplemented and approval-bound; workflow output only recorded provider-boundary metadata and did not call providers, upload evidence, store credentials, expose MCP agent execution, launch browsers, mutate review artifacts, or change deterministic gates. Phase 29 later added the bounded execution adapter described below.
 
 ## 2026-06-19 Verbatim Resume Note
 
@@ -189,11 +189,21 @@ commit: 1af1fcd Document agent execution integration plan
 
 ## 2026-06-19 Phase 29 Agent Execution Foundation Slice
 
-- Implemented the first Phase 29 runtime foundation slice for `agent_execution` without enabling direct provider execution.
-- Added `src/agent-execution.js`, `agent execution plan/status/list`, `agent execution run` parser/API surface with explicit `--execute` enforcement and fail-closed provider-not-implemented behavior.
+- Implemented the first Phase 29 runtime foundation slice for `agent_execution` before provider adapters were added.
+- Added `src/agent-execution.js`, `agent execution plan/status/list`, and the first `agent execution run` parser/API surface with explicit `--execute` enforcement.
 - Added `agent_execution` schema registry/file parity and package API exports.
 - Fixed product-local gate evidence source validation so documented `product.design_system.*` evidence rows can be recorded under their canonical source id.
 - Dry-run execution plans write local metadata and receipts under `.browser-debug/agent-executions/` and `.browser-debug/receipts/`.
 - Preserved existing `agent_workflow` status semantics, deterministic review findings, metrics, existing action plans, release readiness, resource guard behavior, artifact cleanup behavior, and MCP allowlist boundaries.
 - Verification so far: `node --check src/agent-execution.js`, `node --check src/cli.js`, `node --check src/parser.js`, `npm test`, `./tools/check_product_structure.sh`, `./tools/check_product_docs.sh`, `./tools/check_product_security.sh`, `./tools/check_product_design_system.sh`, `./tools/product-gate`, and `npm run release:check`.
-- Next implementation slice: provider-runner isolation with a dedicated provider adapter registry and deterministic fake provider coverage before any real local runner or API provider execution.
+- The follow-up provider-runner isolation slice is complete in the adapter completion entry below.
+
+## 2026-06-19 Phase 29 Agent Execution Adapter Completion
+
+- Completed the remaining Phase 29 implementation plan for agent execution provider adapters.
+- Added `src/agent-execution-providers.js` as the dedicated adapter boundary for deterministic fake provider execution, configured local runner callbacks, and env-only generic API execution.
+- Updated `agent execution plan` to record provider adapter metadata, dashboard status fields, normalized result paths, and run commands that include `--execution`.
+- Updated `agent execution run` to require a matching dry-run execution plan plus explicit `--execute`, reject package/surface/provider/model mismatches, write local run receipts, update execution status, and write normalized advisory results under `.browser-debug/agent-results/`.
+- Preserved existing review findings, metrics, action plans, release readiness, resource guard behavior, artifact cleanup behavior, existing `agent_workflow` status meanings, and MCP execution non-exposure.
+- The implementation does not accept free-form shell commands, automate SaaS web UIs, persist credential values, store raw provider responses, mutate review artifacts, launch browsers from agent execution, or add provider calls outside the adapter module.
+- No-browser coverage now includes fake provider success, configured local runner success, API missing-configuration blocking, injected API transport success, advisory normalization, dashboard status/list aggregation, and provider boundary architecture checks.

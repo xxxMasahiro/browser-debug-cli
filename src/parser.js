@@ -479,7 +479,7 @@ function parseAgentExecution(args, globals) {
     return parseRequiredOptions('agent execution plan', args.slice(1), globals, ['package', 'surface']);
   }
   if (subcommand === 'run') {
-    const parsed = parseRequiredOptions('agent execution run', args.slice(1), globals, ['package', 'surface', 'provider', 'model']);
+    const parsed = parseRequiredOptions('agent execution run', args.slice(1), globals, ['execution', 'package', 'surface', 'provider', 'model']);
     if (!parsed.ok) {
       return parsed;
     }

@@ -49,8 +49,8 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Provide local `agent package`, `agent ingest`, and `agent report` commands that create bounded evidence packages, import untrusted advisory JSON, and render separate advisory reports without changing deterministic review output.
 - Provide local `agent requests list` and `agent requests show` output so dashboards and local automation can track and inspect advisory packages without running provider APIs or mutating review output.
 - Provide local `agent workflow create`, `agent workflow status`, `agent workflow index`, and `agent workflow report` output so dashboards and local automation can track package, prompt, agent response, ingest, report-pending states, and local workflow summaries without running provider APIs or changing review output.
-- Provide a planned agent execution layer so dashboards, local automation, subscription-style local agents, and API-style provider execution can share the same package, dry-run plan, run, status, ingest, report, and workflow experience without changing deterministic review output.
-- Support subscription-style local agent execution through configured local runners or local stdio surfaces, not through SaaS web UI automation.
+- Provide an agent execution layer so dashboards, local automation, subscription-style local agents, and API-style provider execution can share the same package, dry-run plan, run, status, result/report, and workflow experience without changing deterministic review output.
+- Support subscription-style local agent execution through configured local runner callbacks, not through SaaS web UI automation or free-form shell input.
 - Support API-style provider execution only through a dry-run execution plan, explicit `--execute`, env-only credentials, bounded disclosure policy, local receipts, and advisory-only result normalization.
 - Provide local `agent execution plan`, `agent execution run`, `agent execution status`, and `agent execution list` contracts as an additive layer separate from existing `agent workflow` state.
 - Suggest target manifest improvements when dogfood review evidence shows missing page expectations, unpinned discovered routes, exhausted route budgets, failed page checks, or rendered-state gaps.
@@ -148,13 +148,14 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 
 ## Phase 29 Agent Execution Criteria
 
-- Completed: `agent execution plan --package <path> --surface <id> --json` creates a local no-network dry-run plan and receipt for subscription or API execution.
-- Completed: `agent execution run --package <path> --surface <id> --provider <id> --model <id> --execute --json` has the explicit parser/API surface and rejects execution without explicit `--execute`; direct provider execution remains unimplemented and fail-closed in this slice.
-- Completed: `agent execution status --execution <path> --json` and `agent execution list --json` report local execution state for dashboards and automation without launching browsers, mutating review artifacts, or changing deterministic gates.
-- Subscription-style execution should use configured local runner identifiers or local stdio surfaces and should reject free-form shell input.
-- API-style execution should read credentials only from named environment variables and should never record credential values.
-- Execution plans and receipts should record `api_call_performed`, `external_evidence_transfer`, `automatic_upload`, `credential_values_recorded`, `credential_storage`, `persistent_credential_storage`, `raw_response_stored`, `existing_review_mutated`, and `gate_effect`.
-- Execution output should normalize provider or runner responses into the existing untrusted advisory-result shape so dashboards get the same final experience for subscription and API modes.
+- Completed: `agent execution plan --package <path> --surface <id> --provider <id> --model <id> --json` creates a local no-network dry-run plan and receipt for subscription or API execution.
+- Completed: `agent execution run --execution <path> --package <path> --surface <id> --provider <id> --model <id> --execute --json` requires a prior dry-run execution plan, rejects execution without explicit `--execute`, validates package/surface/provider/model plan consistency, and records local run receipts.
+- Completed: `agent execution status --execution <path> --json` and `agent execution list --json` report local execution state, normalized advisory-result paths, dashboard status fields, and aggregate boundary flags without launching browsers, mutating review artifacts, or changing deterministic gates.
+- Completed: subscription-style execution supports configured local runner callbacks through provider/model identifiers and rejects free-form shell input or SaaS web UI automation.
+- Completed: deterministic fake-provider execution covers no-browser provider success paths and advisory-result normalization.
+- Completed: API-style execution reads endpoint and credential values only from named environment variables, supports injected fetch transports for tests, records that an API call occurred, and never records credential values.
+- Completed: execution plans and receipts record `api_call_performed`, `external_evidence_transfer`, `automatic_upload`, `credential_values_recorded`, `credential_storage`, `persistent_credential_storage`, `raw_response_stored`, `raw_provider_response_stored`, `existing_review_mutated`, `mcp_execution_exposed`, and `gate_effect`.
+- Completed: execution output normalizes provider or runner responses into the existing untrusted advisory-result shape so dashboards get the same final experience for subscription and API modes.
 - Execution output should not change review `findings`, `metrics.finding_count`, existing `action_plan`, `quality_signals.release_readiness`, resource guard behavior, artifact cleanup behavior, or existing workflow status semantics.
 - MCP should not expose `agent execution run` in this phase. If read-only execution plan/status tools are ever exposed through MCP, they require a separate allowlist decision and tests.
 
