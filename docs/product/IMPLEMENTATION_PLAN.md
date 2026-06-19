@@ -675,6 +675,15 @@ Phase 26 adds a local read-only status index for agent advisory handoff automati
 - Completed: machine-readable schema coverage includes `agent_request_status`, and package API exports `runAgentRequestsList`.
 - Completed: no-browser tests cover pending/imported status transitions, schema parity, unchanged gate semantics, no provider API calls, no automatic upload, and no review artifact mutation.
 
+### Phase 27: Local Agent Request Detail
+
+Phase 27 adds a read-only detail command for one local agent advisory handoff package. It builds on the Phase 26 request-status index and preserves existing package, ingest, report, resource guard, daemon lifecycle, and artifact cleanup behavior. It remains provider-neutral, local-first, advisory-only, and additive. It does not add direct provider API calls, automatic upload, credential storage, MCP agent execution, external listeners, browser launch, review artifact mutation, artifact writing, or changes to deterministic review findings, `metrics.finding_count`, existing `action_plan`, or `quality_signals.release_readiness`.
+
+- Completed: `agent requests show --package <path> --json` returns package metadata, disclosure policy, source review index metadata, local artifact-reference summaries, selected/latest result paths, bounded advisory result summary, dashboard handoff hints, and explicit boundary flags.
+- Completed: `agent requests show --package <path> --agent-result <path> --json` selects a matching workspace-relative imported result and rejects mismatched result/package pairs.
+- Completed: machine-readable schema coverage includes `agent_request_detail`, and package API exports `runAgentRequestsShow`.
+- Completed: no-browser tests cover pending/imported detail output, schema parity, unchanged gate semantics, no artifact writes, no provider API calls, no automatic upload, and no review artifact mutation.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -711,6 +720,7 @@ Phase 26 adds a local read-only status index for agent advisory handoff automati
 - Phase 24 checks cover explicit artifact-root-only cleanup receipts and architecture boundaries that prevent host cache/swap mutation, shell execution, privileged helpers, external upload, profile reuse, arbitrary process control, and MCP cleanup execution.
 - Phase 25 checks cover agent surface listing, evidence package generation, prompt and receipt artifacts, advisory result ingest, advisory report generation, schema parity, API-boundary status, unchanged deterministic gate semantics, and architecture boundaries that prevent provider API calls, automatic upload, credential storage, external listeners, shell execution, profile reuse, MCP agent execution, and review artifact mutation.
 - Phase 26 checks cover local agent request status listing, pending/imported transitions, single-package filtering, request status schema parity, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, and no review artifact mutation.
+- Phase 27 checks cover local agent request detail output, selected-result matching, request detail schema parity, no artifact writes, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, and no review artifact mutation.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
 
 ## Recovery Path

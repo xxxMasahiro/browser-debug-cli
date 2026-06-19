@@ -70,6 +70,7 @@ All notable local development changes are tracked here before public release.
 - Added local `agent surfaces list`, `agent package`, `agent ingest`, and `agent report` commands for subscription/local agent handoff and advisory result import without API calls, automatic upload, credential storage, or changes to deterministic review gates.
 - Added agent advisory schemas, local package/import receipts, no-browser tests, and architecture boundaries for advisory-only agent output.
 - Added local `agent requests list` status output and schema so dashboards and local automation can track pending/imported advisory handoffs without API calls, uploads, credential storage, MCP agent execution, or review gate changes.
+- Added local `agent requests show` detail output and schema so dashboards can inspect one advisory handoff package/result without browser launch, provider API calls, uploads, credential storage, MCP agent execution, or review gate changes.
 
 ## Release Status
 

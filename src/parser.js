@@ -400,12 +400,15 @@ function parseAgentSurfaces(args, globals) {
 
 function parseAgentRequests(args, globals) {
   const subcommand = args[0];
-  if (subcommand !== 'list') {
+  if (subcommand !== 'list' && subcommand !== 'show') {
     return parseError('agent requests', globals.json, {
       code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
       message: subcommand ? `Unknown agent requests subcommand: ${subcommand}` : 'agent requests requires a subcommand.',
-      details: { subcommands: ['list'] }
+      details: { subcommands: ['list', 'show'] }
     });
+  }
+  if (subcommand === 'show') {
+    return parseRequiredOptions('agent requests show', args.slice(1), globals, ['package']);
   }
   const parsed = parseOptions('agent requests list', args.slice(1), globals.json);
   if (!parsed.ok) {
@@ -807,6 +810,7 @@ function plannedCommands() {
     'resource artifacts cleanup',
     'agent surfaces list',
     'agent requests list',
+    'agent requests show',
     'agent package',
     'agent ingest',
     'agent report',

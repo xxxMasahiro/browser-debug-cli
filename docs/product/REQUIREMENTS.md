@@ -47,7 +47,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Provide local artifact usage planning and explicit `.browser-debug/`-scoped cleanup receipts so users on constrained machines can manage artifact growth without host cache or swap mutation.
 - Provide local agent advisory handoff so a dashboard, local subscription agent, or future API provider boundary can use the same review package and normalized advisory-result schema.
 - Provide local `agent package`, `agent ingest`, and `agent report` commands that create bounded evidence packages, import untrusted advisory JSON, and render separate advisory reports without changing deterministic review output.
-- Provide local `agent requests list` status output so dashboards and local automation can track whether advisory packages are waiting for an agent response or already imported without running provider APIs or mutating review output.
+- Provide local `agent requests list` and `agent requests show` output so dashboards and local automation can track and inspect advisory packages without running provider APIs or mutating review output.
 - Suggest target manifest improvements when dogfood review evidence shows missing page expectations, unpinned discovered routes, exhausted route budgets, failed page checks, or rendered-state gaps.
 - Provide action plans, implementation-focused fix candidates, and local heuristic advisory signals that help developers decide what to fix first.
 - Provide structured local quality signals for visual hierarchy, rendered state, responsive layout, interaction affordance, accessibility structure, evidence completeness, local release readiness, and model-review boundaries.
@@ -122,6 +122,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - `agent surfaces list --json` reports local subscription-agent surfaces and a future API-provider boundary without contacting providers.
 - `agent package --review-index <path> --json` creates a local bounded evidence package and prompt from an existing review artifact index without copying raw screenshots, traces, DOM, console payloads, network payloads, or source-data values.
 - `agent requests list --json` reads local package/result artifacts and reports pending/imported advisory handoff status without launching a browser, contacting providers, uploading evidence, or writing review artifacts.
+- `agent requests show --package <path> --json` returns one advisory handoff detail with package metadata, local artifact references, selected result summary, dashboard handoff hints, and unchanged gate boundary flags without writing artifacts.
 - `agent ingest --package <path> --input <json> --json` imports untrusted agent advisory JSON from inline input, stdin, or a workspace-relative `@file` into separate advisory fields and writes local receipts without changing deterministic review findings, metrics, existing action plans, or release readiness.
 - `agent report --review-index <path> --agent-result <path> --json` renders a separate Markdown advisory report without mutating existing review JSON.
 - Review outputs include `action_plan`, `review_advisory`, and `quality_signals` objects for developer handoff while keeping subjective or model-like judgment out of deterministic gates.
@@ -173,7 +174,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Completed: MCP tool allowlists include target manifest initialization, target manifest validation, and target review without adding shell, cleanup execution, HTTP/socket, external upload, or profile-reuse tools.
 - Completed: MCP tool allowlists include local resource status preflight without adding shell, cleanup execution, HTTP/socket, external upload, profile-reuse, or privileged host mutation tools.
 - Completed: MCP tool allowlists include local artifact usage planning without exposing artifact cleanup execution.
-- Completed: local agent advisory handoff commands create bounded task packages, import advisory results, and render separate reports without direct API calls, automatic upload, credential storage, MCP agent execution, or deterministic gate changes.
+- Completed: local agent advisory handoff commands create bounded task packages, list and inspect request state, import advisory results, and render separate reports without direct API calls, automatic upload, credential storage, MCP agent execution, or deterministic gate changes.
 - Completed: `.codex-plugin/plugin.json`, `.mcp.json`, and `skills/browser-debug-review/SKILL.md` define a local plugin bundle over the existing CLI/MCP surface.
 - Completed: `templates/review-target-manifest.json` provides a reusable manifest starting point for local route and viewport review.
 

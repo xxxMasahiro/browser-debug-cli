@@ -310,6 +310,7 @@ test('schema commands expose machine-readable contracts', async () => {
     ['agent_surface', '../schemas/agent-surface.schema.json'],
     ['agent_task_package', '../schemas/agent-task-package.schema.json'],
     ['agent_request_status', '../schemas/agent-request-status.schema.json'],
+    ['agent_request_detail', '../schemas/agent-request-detail.schema.json'],
     ['agent_advisory_result', '../schemas/agent-advisory-result.schema.json'],
     ['agent_disclosure_policy', '../schemas/agent-disclosure-policy.schema.json']
   ];
@@ -427,6 +428,30 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   assert.equal(waitingRequestsBody.data.agent_requests[0].gate_effect, 'none');
   assert.equal(waitingRequestsBody.data.agent_requests[0].existing_review_mutated, false);
 
+  const waitingDetail = await executeCli([
+    'agent',
+    'requests',
+    'show',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(waitingDetail.exitCode, 0);
+  const waitingDetailBody = JSON.parse(waitingDetail.stdout);
+  assert.equal(waitingDetailBody.command, 'agent requests show');
+  assert.equal(waitingDetailBody.data.agent_request_detail.status, 'waiting_for_agent');
+  assert.equal(waitingDetailBody.data.agent_request_detail.selected_result_path, null);
+  assert.equal(waitingDetailBody.data.agent_request_detail.package_summary.artifact_reference_count, 2);
+  assert.equal(waitingDetailBody.data.agent_request_detail.package_summary.artifact_references[1].content_included, false);
+  assert.equal(waitingDetailBody.data.agent_request_detail.dashboard_handoff.ingest_expected_schema, 'agent_advisory_result');
+  assert.equal(waitingDetailBody.data.agent_request_detail.api_call_performed, false);
+  assert.equal(waitingDetailBody.data.agent_request_detail.automatic_upload, false);
+  assert.equal(waitingDetailBody.data.agent_request_detail.existing_review_mutated, false);
+  assert.deepEqual(waitingDetailBody.artifacts, []);
+
   const advisoryInput = JSON.stringify({
     agent_advisory_findings: [{
       id: 'visual-density',
@@ -512,6 +537,54 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   assert.equal(importedRequestsBody.data.agent_requests[0].latest_result_path, '.browser-debug/agent-results/agent-result-fixed.json');
   assert.equal(importedRequestsBody.data.agent_requests[0].advisory_findings, 1);
   assert.equal(importedRequestsBody.data.agent_requests[0].api_call_performed, false);
+
+  const importedDetail = await executeCli([
+    'agent',
+    'requests',
+    'show',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--agent-result',
+    '.browser-debug/agent-results/agent-result-fixed.json',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(importedDetail.exitCode, 0);
+  const importedDetailBody = JSON.parse(importedDetail.stdout);
+  assert.equal(importedDetailBody.data.agent_request_detail.status, 'advisory_imported');
+  assert.equal(importedDetailBody.data.agent_request_detail.selected_result_path, '.browser-debug/agent-results/agent-result-fixed.json');
+  assert.equal(importedDetailBody.data.agent_request_detail.agent_advisory_summary.advisory_findings, 1);
+  assert.equal(importedDetailBody.data.agent_request_detail.agent_advisory_summary.owner_decision_requests, 1);
+  assert.equal(importedDetailBody.data.agent_request_detail.agent_advisory_summary.action_items, 1);
+  assert.equal(importedDetailBody.data.agent_request_detail.agent_advisory_summary.gate_effect, 'none');
+  assert.equal(importedDetailBody.data.agent_request_detail.dashboard_handoff.report_command.includes('agent report'), true);
+  assert.equal(importedDetailBody.data.agent_request_detail.api_call_performed, false);
+  assert.equal(importedDetailBody.data.agent_request_detail.automatic_upload, false);
+  assert.equal(importedDetailBody.data.agent_request_detail.existing_review_mutated, false);
+
+  await writeFile(
+    path.join(cwd, '.browser-debug', 'agent-results', 'agent-result-other.json'),
+    `${JSON.stringify({ package_id: 'other-package', package_path: '.browser-debug/agent-packages/other/packet.json' })}\n`,
+    'utf8'
+  );
+  const mismatchedDetail = await executeCli([
+    'agent',
+    'requests',
+    'show',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--agent-result',
+    '.browser-debug/agent-results/agent-result-other.json',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(mismatchedDetail.exitCode, 1);
+  const mismatchedDetailBody = JSON.parse(mismatchedDetail.stdout);
+  assert.equal(mismatchedDetailBody.errors[0].code, 'AGENT_RESULT_PACKAGE_MISMATCH');
 
   const reported = await executeCli([
     'agent',

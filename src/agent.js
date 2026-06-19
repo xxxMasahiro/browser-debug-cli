@@ -149,6 +149,51 @@ export async function runAgentRequestsList(options = {}, context = {}) {
   };
 }
 
+export async function runAgentRequestsShow(options = {}, context = {}) {
+  const cwd = context.cwd ?? process.cwd();
+  const artifactRootInput = options['artifact-root'] ?? DEFAULT_ARTIFACT_ROOT;
+  const packageRead = await readAgentPackages(cwd, artifactRootInput, options.package);
+  if (!packageRead.ok) {
+    return errorResult(packageRead.error.code, packageRead.error.message, packageRead.error.details);
+  }
+  const [agentPackage] = packageRead.packages;
+  if (!agentPackage) {
+    return errorResult('AGENT_PACKAGE_NOT_FOUND', 'No agent package was found for the requested path.', {
+      package_path: options.package
+    });
+  }
+
+  const resultRead = await readAgentResults(cwd, artifactRootInput);
+  const status = requestStatusFromPackage(agentPackage, resultRead.results);
+  const resultSelection = await selectAgentResult({
+    cwd,
+    explicitResultPath: options['agent-result'],
+    agentPackage,
+    resultRead
+  });
+  if (!resultSelection.ok) {
+    return errorResult(resultSelection.error.code, resultSelection.error.message, resultSelection.error.details);
+  }
+
+  const detail = requestDetailFromPackage({
+    agentPackage,
+    status,
+    selectedResult: resultSelection.selectedResult
+  });
+
+  return {
+    status: 'ok',
+    data: {
+      agent_request_detail: detail,
+      agent_request: status,
+      boundary: commonBoundary()
+    },
+    warnings: [...packageRead.warnings, ...resultRead.warnings, ...resultSelection.warnings],
+    errors: [],
+    artifacts: []
+  };
+}
+
 export async function runAgentPackage(options = {}, context = {}) {
   const cwd = context.cwd ?? process.cwd();
   const now = currentDate(context.now);
@@ -648,6 +693,134 @@ function summarizeRequestStatuses(statuses) {
     summary.external_evidence_transfer = summary.external_evidence_transfer || status.external_evidence_transfer;
   }
   return summary;
+}
+
+async function selectAgentResult({ cwd, explicitResultPath, agentPackage, resultRead }) {
+  const warnings = [];
+  if (explicitResultPath) {
+    const input = await readWorkspaceJson(cwd, explicitResultPath, 'agent result');
+    if (!input.ok) {
+      return {
+        ok: false,
+        error: input.error
+      };
+    }
+    const selectedResult = {
+      result: input.value,
+      result_path: input.relativePath
+    };
+    if (!resultMatchesPackage(selectedResult, agentPackage)) {
+      return {
+        ok: false,
+        error: {
+          code: 'AGENT_RESULT_PACKAGE_MISMATCH',
+          message: 'The selected agent result does not belong to the requested package.',
+          details: {
+            package_id: stringOrNull(agentPackage.packet?.id),
+            package_path: agentPackage.package_path,
+            agent_result_path: input.relativePath
+          }
+        }
+      };
+    }
+    return { ok: true, selectedResult, warnings };
+  }
+
+  const selectedResult = resultRead.results
+    .filter((candidate) => resultMatchesPackage(candidate, agentPackage))
+    .sort((left, right) => String(right.result.imported_at ?? '').localeCompare(String(left.result.imported_at ?? '')))[0] ?? null;
+  return { ok: true, selectedResult, warnings };
+}
+
+function resultMatchesPackage(candidate, agentPackage) {
+  const result = candidate?.result ?? {};
+  const packet = agentPackage?.packet ?? {};
+  const packetId = stringOrNull(packet.id);
+  const packagePath = stringOrNull(agentPackage?.package_path);
+  return (packetId !== null && result.package_id === packetId)
+    || (packagePath !== null && result.package_path === packagePath);
+}
+
+function requestDetailFromPackage({ agentPackage, status, selectedResult }) {
+  const packet = agentPackage.packet ?? {};
+  const selected = selectedResult?.result ?? null;
+  const findings = Array.isArray(selected?.agent_advisory_findings) ? selected.agent_advisory_findings : [];
+  const ownerDecisions = Array.isArray(selected?.owner_decision_requests) ? selected.owner_decision_requests : [];
+  const nextActions = Array.isArray(selected?.agent_advisory_action_plan?.next_actions)
+    ? selected.agent_advisory_action_plan.next_actions
+    : [];
+  return {
+    schema_version: SCHEMA_VERSION,
+    package_id: status.package_id,
+    package_path: status.package_path,
+    prompt_path: status.prompt_path,
+    receipt_path: status.receipt_path,
+    status: status.status,
+    selected_result_path: selectedResult?.result_path ?? null,
+    latest_result_path: status.latest_result_path,
+    result_paths: status.result_paths,
+    created_at: status.created_at,
+    task: status.task,
+    surface: status.surface,
+    source: {
+      review_artifact_index_path: status.review_artifact_index_path,
+      review_id: status.review_id,
+      review_mode: stringOrNull(packet.source?.review_mode)
+    },
+    package_summary: summarizeAgentPackage(packet),
+    agent_advisory_summary: selected ? {
+      id: stringOrNull(selected.id),
+      imported_at: stringOrNull(selected.imported_at),
+      status: stringOrNull(selected.agent_advisory?.status),
+      readiness_status: stringOrNull(selected.agent_advisory_readiness?.status),
+      advisory_findings: findings.length,
+      owner_decision_requests: ownerDecisions.length,
+      action_items: nextActions.length,
+      gate_effect: 'none',
+      top_findings: findings.slice(0, 5).map((finding) => ({
+        id: optionalString(finding?.id, 120),
+        category: optionalString(finding?.category, 120),
+        severity: optionalString(finding?.severity, 80),
+        message: truncateText(finding?.message ?? '', 300),
+        recommendation: truncateText(finding?.recommendation ?? '', 400),
+        untrusted_text: true
+      }))
+    } : null,
+    dashboard_handoff: {
+      status_label: status.status,
+      next_step: status.next_step,
+      prompt_path: status.prompt_path,
+      ingest_expected_schema: 'agent_advisory_result',
+      report_command: selectedResult
+        ? `browser-debug agent report --review-index ${status.review_artifact_index_path ?? '<review-index>'} --agent-result ${selectedResult.result_path} --json`
+        : null
+    },
+    gate_effect: 'none',
+    external_evidence_transfer: status.external_evidence_transfer,
+    api_call_performed: false,
+    automatic_upload: false,
+    existing_review_mutated: false
+  };
+}
+
+function summarizeAgentPackage(packet) {
+  const artifacts = Array.isArray(packet.evidence_packet?.artifacts) ? packet.evidence_packet.artifacts : [];
+  return {
+    package_status: stringOrNull(packet.status),
+    disclosure_policy: packet.disclosure_policy ?? {},
+    evidence_classes: normalizeStringArray(packet.evidence_packet?.evidence_classes),
+    artifact_reference_count: artifacts.length,
+    artifact_references: artifacts.slice(0, 100).map((artifact) => ({
+      type: optionalString(artifact?.type, 100),
+      path: optionalString(artifact?.path, 500),
+      description: optionalString(artifact?.description, 500),
+      local_reference: artifact?.local_reference !== false,
+      content_included: false,
+      sensitive_content_possible: Boolean(artifact?.sensitive_content_possible)
+    })),
+    coverage_summary: packet.evidence_packet?.coverage_summary ?? null,
+    rerun: packet.evidence_packet?.rerun ?? null
+  };
 }
 
 function packageRootFromPath(packagePath) {

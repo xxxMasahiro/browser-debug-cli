@@ -151,3 +151,10 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - `browser-debug resource artifacts cleanup --execute --json` deletes selected regular files only under the configured artifact root and writes a receipt under `.browser-debug/receipts/`.
 - The local MCP adapter exposes `browser_debug_resource_artifacts_plan` only; cleanup execution is not exposed through MCP.
 - The implementation remains generic, local-first, and bounded. It does not mutate system cache, configure swap, execute shell commands, use privileged helpers, upload evidence, reuse profiles, add HTTP/socket MCP transport, expose MCP cleanup execution, clean outside the configured artifact root, or control arbitrary processes.
+
+## 2026-06-19 Phase 27 Agent Request Detail Handoff
+
+- Phase 27 is complete for local agent request detail output.
+- `browser-debug agent requests show --package <path> --json` returns one advisory handoff package detail with package metadata, disclosure policy, source review index metadata, local artifact-reference summaries, selected/latest result paths, bounded advisory result summary, dashboard handoff hints, and boundary flags.
+- `browser-debug agent requests show --package <path> --agent-result <path> --json` selects a matching workspace-relative imported result and rejects mismatched result/package pairs.
+- The implementation remains read-only, local-first, and advisory-only. It does not write artifacts, launch browsers, call provider APIs, upload evidence, store credentials, expose MCP agent execution, mutate review artifacts, or change deterministic review findings, metrics, existing action plans, or release readiness.
