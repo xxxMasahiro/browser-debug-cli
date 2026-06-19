@@ -1841,6 +1841,26 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   const mcpInfoBody = JSON.parse(mcpInfo.stdout);
   assert.equal(mcpInfoBody.data.adapter.profile.name, 'safe');
 
+  const mcpConfigParsed = parseCliArgs(['mcp', 'config', '--client', 'codex', '--profile', 'safe', '--json']);
+  assert.equal(mcpConfigParsed.ok, true);
+  assert.equal(mcpConfigParsed.command, 'mcp config');
+  assert.equal(mcpConfigParsed.options.client, 'codex');
+
+  const stdioConfig = await executeCli(['mcp', 'config', '--client', 'codex', '--json'], { now: fixedNow });
+  assert.equal(stdioConfig.exitCode, 0);
+  const stdioConfigBody = JSON.parse(stdioConfig.stdout);
+  assert.equal(stdioConfigBody.command, 'mcp config');
+  assert.equal(stdioConfigBody.data.config.transport, 'stdio');
+  assert.equal(stdioConfigBody.data.config.client, 'codex');
+  assert.equal(stdioConfigBody.data.config.profile.name, 'safe');
+  assert.equal(stdioConfigBody.data.config.launch.command, PRODUCT_IDENTITY.mcpBinName);
+  assert.deepEqual(stdioConfigBody.data.config.launch.args, ['--profile', 'safe']);
+  assert.equal(stdioConfigBody.data.config.mcpServers[PRODUCT_IDENTITY.mcpServerName].command, PRODUCT_IDENTITY.mcpBinName);
+  assert.equal(stdioConfigBody.data.config.boundary.server_started, false);
+  assert.equal(stdioConfigBody.data.config.boundary.token_values_emitted, false);
+  assert.equal(stdioConfigBody.data.config.boundary.cleanup_execution, false);
+  assert.equal(stdioConfigBody.data.config.boundary.provider_api_execution, false);
+
   const httpInfoParsed = parseCliArgs([
     'mcp',
     'serve',
@@ -1880,6 +1900,43 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(httpInfoBody.data.adapter.auth_required, true);
   assert.equal(httpInfoBody.data.adapter.token_env, 'BROWSER_DEBUG_MCP_HTTP_TOKEN');
   assert.equal(httpInfoBody.data.adapter.external_channel, false);
+
+  const mcpHttpTokenEnv = 'BROWSER_DEBUG_MCP_HTTP_TOKEN';
+  const httpConfig = await executeCli([
+    'mcp',
+    'config',
+    '--transport',
+    'http',
+    '--profile',
+    'safe',
+    '--host',
+    '127.0.0.1',
+    '--port',
+    '8765',
+    '--token-env',
+    'BROWSER_DEBUG_MCP_HTTP_TOKEN',
+    '--json'
+  ], { now: fixedNow, env: { [mcpHttpTokenEnv]: 'redaction-sentinel-value' } });
+  assert.equal(httpConfig.exitCode, 0);
+  const httpConfigBody = JSON.parse(httpConfig.stdout);
+  assert.equal(httpConfigBody.data.config.transport, 'http');
+  assert.equal(httpConfigBody.data.config.profile.name, 'safe');
+  assert.equal(httpConfigBody.data.config.client_connection.url, 'http://127.0.0.1:8765/mcp');
+  assert.equal(httpConfigBody.data.config.client_connection.protocol_version, '2025-06-18');
+  assert.equal(httpConfigBody.data.config.launch.env[mcpHttpTokenEnv], '<set-16-or-more-character-token>');
+  assert.equal(httpConfigBody.data.config.metadata.token_env, 'BROWSER_DEBUG_MCP_HTTP_TOKEN');
+  assert.equal(httpConfigBody.data.config.boundary.token_values_emitted, false);
+  assert.equal(httpConfigBody.data.config.boundary.server_started, false);
+  assert.equal(httpConfigBody.data.config.boundary.http_full_or_admin, false);
+  assert.equal(JSON.stringify(httpConfigBody).includes('redaction-sentinel-value'), false);
+
+  const httpConfigDefaultPort = await executeCli(['mcp', 'config', '--transport', 'http', '--json'], { now: fixedNow });
+  assert.equal(httpConfigDefaultPort.exitCode, 0);
+  assert.equal(JSON.parse(httpConfigDefaultPort.stdout).data.config.client_connection.url, 'http://127.0.0.1:8765/mcp');
+
+  const httpFullConfig = await executeCli(['mcp', 'config', '--transport', 'http', '--profile', 'full', '--json'], { now: fixedNow });
+  assert.equal(httpFullConfig.exitCode, 1);
+  assert.equal(JSON.parse(httpFullConfig.stdout).errors[0].code, 'HTTP_MCP_PROFILE_REJECTED');
 
   const httpFullInfo = await executeCli(['mcp', 'serve', '--transport', 'http', '--profile', 'full', '--json'], { now: fixedNow });
   assert.equal(httpFullInfo.exitCode, 1);
@@ -2019,13 +2076,14 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
 
 test('HTTP MCP transport is loopback, token-gated, and safe-profile only', async () => {
   const token = '0123456789abcdef';
+  const mcpHttpTokenEnv = 'BROWSER_DEBUG_MCP_HTTP_TOKEN';
   const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-http-mcp-'));
   await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
 
   const started = await startMcpHttpServer({ port: 0 }, {
     cwd,
     now: fixedNow,
-    env: { BROWSER_DEBUG_MCP_HTTP_TOKEN: token }
+    env: { [mcpHttpTokenEnv]: token }
   });
   try {
     assert.equal(started.metadata.profile, 'safe');
@@ -2080,19 +2138,19 @@ test('HTTP MCP transport is loopback, token-gated, and safe-profile only', async
 
   await assert.rejects(
     startMcpHttpServer({ profile: 'full', port: 0 }, {
-      env: { BROWSER_DEBUG_MCP_HTTP_TOKEN: token }
+      env: { [mcpHttpTokenEnv]: token }
     }),
     /safe profile/
   );
   await assert.rejects(
     startMcpHttpServer({ host: '0.0.0.0', port: 0 }, {
-      env: { BROWSER_DEBUG_MCP_HTTP_TOKEN: token }
+      env: { [mcpHttpTokenEnv]: token }
     }),
     /loopback host/
   );
 
   const limited = await startMcpHttpServer({ port: 0, bodyLimit: 32 }, {
-    env: { BROWSER_DEBUG_MCP_HTTP_TOKEN: token }
+    env: { [mcpHttpTokenEnv]: token }
   });
   try {
     const oversized = await fetch(limited.url, {

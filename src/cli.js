@@ -29,6 +29,7 @@ import { runReview } from './review.js';
 import { schemaListResult, schemaResult } from './schema-registry.js';
 import { runSupervisor } from './supervisor.js';
 import { runTargetInit, runTargetValidate } from './target.js';
+import { buildMcpClientConfig } from './mcp-client-config.js';
 import { mcpProfileMetadata } from './mcp-profiles.js';
 import { mcpServerInfo } from './mcp.js';
 import {
@@ -254,6 +255,11 @@ export async function executeCli(argv, context = {}) {
         return runtimeResult(parsed.command, mcpInfo, parsed.json, now, 2);
       }
       return runtimeResult(parsed.command, mcpInfo, parsed.json, now);
+    }
+
+    if (parsed.command === 'mcp config') {
+      const mcpConfig = mcpConfigInfo(parsed.options, context.env ?? process.env);
+      return runtimeResult(parsed.command, mcpConfig, parsed.json, now);
     }
 
     return notImplemented(parsed.command, parsed.json, now);
@@ -529,7 +535,11 @@ function usageText(topic) {
   }
 
   if (topic === 'mcp') {
-    return `Usage: ${CLI_NAME} mcp serve [--profile safe|full|admin] [--json]`;
+    return [
+      `Usage: ${CLI_NAME} mcp serve [--profile safe|full|admin] [--json]`,
+      `       ${CLI_NAME} mcp config [--client generic|codex] [--profile safe|full|admin] [--json]`,
+      `       ${CLI_NAME} mcp config --transport http --profile safe --host 127.0.0.1 --port <port> [--json]`
+    ].join('\n');
   }
 
   if (topic === 'session start') {
@@ -561,6 +571,7 @@ function usageText(topic) {
     '  schema list --json',
     '  schema get --name <schema> --json',
     '  mcp serve --profile safe --json',
+    '  mcp config --profile safe --json',
     '',
     'Global options:',
     '  --json',
@@ -616,5 +627,48 @@ function normalizeMcpServeOptions(options = {}) {
     endpoint: options.endpoint,
     tokenEnv: options['token-env'] ?? options.tokenEnv,
     bodyLimit: options['body-limit'] ?? options.bodyLimit
+  };
+}
+
+function mcpConfigInfo(options = {}, env = {}) {
+  const info = buildMcpClientConfig(normalizeMcpConfigOptions(options), env);
+  if (!info.ok) {
+    return {
+      status: 'error',
+      data: {
+        config: {
+          transport: options.transport ?? 'stdio',
+          client: options.client ?? 'generic',
+          token_values_emitted: false,
+          server_started: false,
+          config_file_written: false
+        }
+      },
+      warnings: [],
+      errors: [{ code: info.code ?? 'INVALID_MCP_CONFIG', message: info.message, details: { profile: options.profile, transport: options.transport, client: options.client } }],
+      artifacts: []
+    };
+  }
+  return {
+    status: 'ok',
+    data: {
+      config: info.config
+    },
+    warnings: [],
+    errors: [],
+    artifacts: []
+  };
+}
+
+function normalizeMcpConfigOptions(options = {}) {
+  return {
+    transport: options.transport,
+    profile: options.profile,
+    host: options.host,
+    port: options.port,
+    endpoint: options.endpoint,
+    tokenEnv: options['token-env'] ?? options.tokenEnv,
+    bodyLimit: options['body-limit'] ?? options.bodyLimit,
+    client: options.client
   };
 }

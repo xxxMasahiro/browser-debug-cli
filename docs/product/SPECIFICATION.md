@@ -71,6 +71,8 @@ browser-debug schema list --json
 browser-debug schema get --name <schema> --json
 browser-debug mcp serve [--profile safe|full|admin]
 browser-debug mcp serve --transport http --profile safe --host 127.0.0.1 --port <port>
+browser-debug mcp config [--client generic|codex] [--profile safe|full|admin] --json
+browser-debug mcp config --transport http --profile safe --host 127.0.0.1 --port <port> [--endpoint /mcp] [--token-env BROWSER_DEBUG_MCP_HTTP_TOKEN] --json
 ```
 
 The MVP implementation order is:
@@ -125,6 +127,8 @@ Implemented behavior:
 - `browser-debug-mcp` provides a local stdio MCP adapter with an allowlisted tool surface over the same CLI/core contracts, including target manifest initialization, target manifest validation, local resource status preflight, local artifact usage planning, target review, and read-only local agent advisory/status inspection. It does not expose artifact cleanup execution, write-producing advisory commands, or agent execution run.
 - `browser-debug-mcp --profile safe|full|admin` selects the MCP tool surface at launch. No-profile `browser-debug-mcp` and the packaged `.mcp.json` resolve to `full` for compatibility with the existing adapter. `safe` exposes no-browser/no-delete/no-provider tools only, including local agent surfaces, request status/detail, workflow status/index, and execution status/list. `admin` is explicit and reserved for local-maintenance expansion, but in this phase it does not expose cleanup execution, provider/API execution, agent execution run, daemon/session control, shell, socket listeners, HTTP `full` or `admin`, external upload, provider credentials, or arbitrary process control.
 - `browser-debug-mcp --transport http --profile safe --host 127.0.0.1 --port <port>` starts an explicit safe HTTP MCP endpoint. It binds only to loopback hosts, requires a bearer token from `BROWSER_DEBUG_MCP_HTTP_TOKEN` by default, validates loopback Host and Origin headers, limits request bodies, accepts one JSON-RPC object per POST, and uses the same safe-profile allowlist as stdio. It does not expose `full` or `admin` over HTTP.
+- `browser-debug mcp config --json` emits reusable stdio MCP client configuration without launching a server, writing files, or reading credentials. Generated client config defaults to the `safe` profile; the packaged `.mcp.json` remains compatibility `full`.
+- `browser-debug mcp config --transport http --profile safe --port <port> --json` emits token-free launch and client-connection metadata for the explicit safe HTTP MCP endpoint, including the URL, token environment variable name, authorization header placeholder, protocol version, body limit, and safe-profile boundaries.
 - MCP profile selection happens at server launch or trusted adapter context, not per MCP request. `tools/list` and `tools/call` fail closed for invalid profiles or out-of-profile tool names.
 - MCP `@file` structured input is workspace-confined. Absolute paths, parent traversal, symlink escapes, non-regular files, and oversized files are rejected for MCP requests. Normal CLI `@file` behavior is unchanged outside MCP-restricted contexts.
 - Product identity metadata is explicit and reusable. The current package name, CLI bin name, MCP bin name, MCP server name, plugin name, display name, repository URL, and packaged skill path remain unchanged, but tests, package dry-run checks, and packed-install smoke derive expectations from the identity contract so a future approved rename can be implemented predictably.
@@ -470,6 +474,16 @@ The safe HTTP MCP transport:
 - Limits request body size and accepts one JSON-RPC object per POST in this phase.
 - Returns `MCP-Protocol-Version: 2025-06-18` with JSON responses.
 - Exposes only the same safe-profile tool surface as stdio.
+
+The MCP client configuration helper:
+
+- Is launched through `browser-debug mcp config --json`.
+- Produces reusable JSON for humans, shell scripts, Codex, and other MCP-capable agents.
+- Uses `browser-debug-mcp` as the package-level command in generated examples.
+- Defaults generated stdio client configuration to the `safe` profile; packaged `.mcp.json` remains the compatibility `full` profile.
+- Defaults generated HTTP client configuration to safe profile, loopback host, `/mcp`, `BROWSER_DEBUG_MCP_HTTP_TOKEN`, and a fixed local client port suitable for external MCP client settings.
+- Does not launch a listener, mutate files, contact the network, read token values, print token values, or create credentials.
+- Reports `token_env` and placeholder authorization header syntax only.
 
 The `safe` profile is no-browser, no-delete, no-provider, no-shell, and no-external-listener in its tool effects. It includes no-browser discovery, schema, target validation, resource status, artifact planning, and read-only local agent advisory/status inspection. The `full` profile remains a stdio compatibility profile for local observe/review/target workflows. The `admin` profile remains explicit and reserved for future local maintenance but does not currently add write/execute powers.
 

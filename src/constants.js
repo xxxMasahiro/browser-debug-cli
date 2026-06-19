@@ -52,5 +52,6 @@ export const PLANNED_COMMANDS = Object.freeze([
   'review',
   'schema list',
   'schema get',
-  'mcp serve'
+  'mcp serve',
+  'mcp config'
 ]);

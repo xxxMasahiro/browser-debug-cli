@@ -40,6 +40,7 @@
     { "path": "src/cli.js", "role": "manifest" },
     { "path": "src/daemon.js", "role": "manifest" },
     { "path": "src/daemon-worker.js", "role": "manifest" },
+    { "path": "src/mcp-client-config.js", "role": "manifest" },
     { "path": "src/mcp-http-transport.js", "role": "manifest" },
     { "path": "src/mcp-profiles.js", "role": "manifest" },
     { "path": "src/mcp-transport-policy.js", "role": "manifest" },

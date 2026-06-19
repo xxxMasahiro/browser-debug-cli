@@ -30,6 +30,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Prepare a CLI-first review platform that exposes the same review core through MCP adapters without making MCP the required runtime.
 - Preserve three usable integration paths: the CLI for any shell, human, or agent; MCP stdio for MCP clients; and a Codex plugin wrapper for skill/MCP discovery.
 - Provide an explicit safe HTTP MCP endpoint for local MCP-compatible tooling that cannot use stdio, while keeping it loopback-only, bearer-token gated, and limited to safe no-browser/read-only tools.
+- Provide machine-readable MCP client configuration output so humans, agents, and external repositories can connect through stdio or explicit safe HTTP without reverse-engineering package internals.
 - Support evidence-backed UI review findings for browser health, layout integrity, interaction quality, accessibility basics, and mock fidelity.
 - Support generic target manifests so site review can cover local applications and dashboards without hard-coded product-specific branches.
 - Treat manifest `expectedRoutes` as reviewable local targets so known app routes can be covered even when route discovery cannot find them from anchors or navigation candidates.
@@ -78,6 +79,7 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Do not mutate system memory cache, configure swap, delete artifacts automatically, kill arbitrary processes, or perform privileged host cleanup from the local resource status preflight or guard.
 - Do not expose artifact cleanup execution through MCP; MCP may report local artifact usage but must not delete files.
 - Do not expose HTTP `full` or `admin`, remote HTTP listeners, socket transports, shell tools, cleanup execution, package generation, ingest, report writing, workflow creation, execution planning, `agent execution run`, provider/API execution, or credential handling through MCP without a separate approved phase.
+- Do not emit bearer token values, credentials, local secrets, raw environment values, or external upload configuration from MCP client configuration helpers.
 - Do not treat local agent advisory output as deterministic findings, release approval, or a replacement for owner judgment.
 - Do not run provider APIs, upload evidence, store credentials, or expose agent/API execution through MCP as part of the local agent advisory handoff layer.
 - Do not let agent execution mutate review `findings`, `metrics.finding_count`, existing `action_plan`, `quality_signals.release_readiness`, resource guard output, artifact cleanup behavior, or existing `agent_workflow` status meanings.
@@ -149,6 +151,17 @@ Browser Debug CLI should make browser debugging reusable across repositories and
 - Target review can emit `local_content_ux_advisory`, `content_ux_findings`, `content_ux_action_plan`, `content_ux_readiness`, `content_ux_page_handoff`, `content_ux_manifest_authoring`, and `quality_signals.content_ux` only when the target manifest explicitly enables `localContentUxAdvisory.enabled=true`.
 - The repository includes local plugin metadata, local MCP configuration, and a plugin-facing skill without adding marketplace registration, npm publication, external upload, credential handling, or an HTTP default in the packaged MCP config.
 - `browser-debug-mcp --transport http --profile safe --host 127.0.0.1 --port <port>` starts only a local safe HTTP MCP endpoint. It requires a bearer token, validates loopback Host and Origin headers, and does not expose browser-launching, write-producing, cleanup, provider/API, shell, `full`, or `admin` tools.
+- `browser-debug mcp config --json` returns reusable client configuration for stdio MCP without launching a server, mutating files, or requiring repository-specific source inspection.
+- `browser-debug mcp config --transport http --profile safe --port <port> --json` returns launch and client-connection metadata for the explicit safe HTTP MCP endpoint without printing token values.
+
+## Phase 35 HTTP MCP Integration Hardening Criteria
+
+- Add a no-side-effect MCP client configuration command that can be used from any repository after install or from this checkout.
+- Keep generated stdio configuration compatible with normal MCP client `mcpServers` shapes while preserving the existing packaged `.mcp.json` compatibility behavior.
+- Keep generated HTTP configuration safe-profile-only, loopback-only, bearer-token-env-based, and explicit about the single-request POST JSON response subset.
+- Default generated HTTP examples to a fixed local port suitable for client configuration, while keeping the server runtime default port unchanged.
+- Add packed-install smoke coverage that creates the safe HTTP MCP handler from the installed package API and completes an authenticated `initialize` request without binding a port.
+- Keep all configuration output token-free, credential-free, local-first, reusable, and generic across external repositories.
 
 ## Phase 29 Agent Execution Criteria
 

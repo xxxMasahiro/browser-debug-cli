@@ -244,3 +244,13 @@ commit: 1af1fcd Document agent execution integration plan
 - Added no-browser tests for HTTP metadata, safe-profile-only startup, loopback enforcement, token enforcement, Origin rejection, method rejection, body-size limits, and safe tool listing.
 - Added packed-install and architecture/security coverage for HTTP transport files and package API exports.
 - Synchronized README integration modes, product requirements/specification/implementation plan, security, verification, release, changelog, manifests, task tracker, handoff, AGENTS current phase, plugin skill, and identity migration runbook.
+
+## 2026-06-20 Phase 35 HTTP MCP Integration Hardening
+
+- Added token-free `browser-debug mcp config` output for reusable stdio and explicit safe HTTP MCP client setup.
+- Added `src/mcp-client-config.js` and package API exports for configuration metadata without launching a listener, writing config files, reading token values, printing token values, storing credentials, or broadening MCP permissions.
+- Generated stdio config defaults to `safe`; packaged `.mcp.json` and no-profile `browser-debug-mcp` remain compatibility `full`.
+- Generated HTTP config is safe-profile-only, loopback-only, token-env based, and emits a placeholder bearer token reference rather than token values.
+- Added no-browser tests for `mcp config`, HTTP `full` rejection, token non-disclosure, and no-listener boundaries.
+- Added packed-install smoke coverage for the installed HTTP MCP handler `initialize` path without binding a port.
+- Synchronized README, plugin skill, product docs, workflow docs, manifests, task tracker, handoff, AGENTS current phase, release notes, verification, and security docs.

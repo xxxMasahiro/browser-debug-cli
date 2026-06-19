@@ -4,6 +4,7 @@ const VALUE_OPTIONS = new Set([
   'agent-result',
   'artifact-root',
   'body-limit',
+  'client',
   'daemon',
   'endpoint',
   'execution',
@@ -702,14 +703,14 @@ function parseMcp(args, globals) {
     return { ok: true, command: 'help', json: globals.json, options: { topic: 'mcp' } };
   }
   const subcommand = args[0];
-  if (subcommand !== 'serve') {
+  if (subcommand !== 'serve' && subcommand !== 'config') {
     return parseError('mcp', globals.json, {
       code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
       message: subcommand ? `Unknown mcp subcommand: ${subcommand}` : 'mcp requires a subcommand.',
-      details: { subcommands: ['serve'] }
+      details: { subcommands: ['serve', 'config'] }
     });
   }
-  return parseOptionalOptions('mcp serve', args.slice(1), globals);
+  return parseOptionalOptions(`mcp ${subcommand}`, args.slice(1), globals);
 }
 
 function parseRequiredOptions(command, args, globals, requiredOptions) {
@@ -924,6 +925,7 @@ function plannedCommands() {
     'review',
     'schema list',
     'schema get',
-    'mcp serve'
+    'mcp serve',
+    'mcp config'
   ];
 }

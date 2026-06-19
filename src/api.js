@@ -34,6 +34,11 @@ export {
   normalizeContentDataBindings,
   normalizeContentUxAdvisoryConfig
 } from './content-ux-advisory.js';
+export {
+  MCP_CONFIG_DEFAULT_CLIENT,
+  MCP_HTTP_DEFAULT_CLIENT_PORT,
+  buildMcpClientConfig
+} from './mcp-client-config.js';
 export { listSchemas, getSchema, schemaNames } from './schema-registry.js';
 export {
   PRODUCT_IDENTITY,

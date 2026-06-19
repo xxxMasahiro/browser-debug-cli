@@ -14,6 +14,7 @@ import {
 } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gunzipSync } from 'node:zlib';
@@ -41,6 +42,7 @@ async function main() {
     await assertFile(packageDir, normalizePackagePath(PRODUCT_IDENTITY.cliBinPath));
     await assertFile(packageDir, normalizePackagePath(PRODUCT_IDENTITY.mcpBinPath));
     await assertFile(packageDir, 'src/api.js');
+    await assertFile(packageDir, 'src/mcp-client-config.js');
     await assertFile(packageDir, 'src/mcp-http-transport.js');
     await assertFile(packageDir, 'src/mcp-transport-policy.js');
     await assertFile(packageDir, 'src/product-identity.js');
@@ -86,12 +88,20 @@ async function main() {
     assert.equal(typeof api.getMcpTools, 'function');
     assert.equal(typeof api.resolveMcpProfile, 'function');
     assert.equal(typeof api.startMcpHttpServer, 'function');
+    assert.equal(typeof api.buildMcpClientConfig, 'function');
     assert.equal(typeof api.resolveMcpTransportConfig, 'function');
     assert.equal(api.schemaNames().includes('agent_execution'), true);
     assert.equal(api.MCP_TOOLS.some((tool) => tool.name === 'browser_debug_review_target'), true);
     assert.equal(api.DEFAULT_MCP_PROFILE, 'full');
     assert.equal(api.MCP_HTTP_DEFAULT_PROFILE, 'safe');
+    assert.equal(api.MCP_HTTP_DEFAULT_CLIENT_PORT, 8765);
     assert.equal(api.resolveMcpTransportConfig({ transport: 'http', profile: 'full' }, {}, { requireToken: false }).ok, false);
+    const httpClientConfig = api.buildMcpClientConfig({ transport: 'http' });
+    assert.equal(httpClientConfig.ok, true);
+    assert.equal(httpClientConfig.config.client_connection.url, 'http://127.0.0.1:8765/mcp');
+    const mcpHttpTokenEnv = 'BROWSER_DEBUG_MCP_HTTP_TOKEN';
+    assert.equal(httpClientConfig.config.launch.env[mcpHttpTokenEnv], '<set-16-or-more-character-token>');
+    assert.equal(JSON.stringify(httpClientConfig).includes('secret'), false);
     assert.equal(api.resolveMcpProfile('safe').ok, true);
     assert.equal(api.getMcpTools('safe').some((tool) => tool.name === 'browser_debug_review'), false);
     assert.equal(api.getMcpTools('full').some((tool) => tool.name === 'browser_debug_review'), true);
@@ -105,6 +115,34 @@ async function main() {
     assert.equal(initialized.result.metadata.identity.package_name, PRODUCT_IDENTITY.packageName);
     assert.equal(initialized.result.metadata.identity.package_version, PRODUCT_IDENTITY.packageVersion);
     assert.equal(initialized.result.metadata.identity.cli_bin_name, PRODUCT_IDENTITY.cliBinName);
+
+    const httpToken = 'pack-smoke-token';
+    const resolvedHttp = api.resolveMcpTransportConfig(
+      { transport: 'http', port: 8765 },
+      { [mcpHttpTokenEnv]: httpToken }
+    );
+    assert.equal(resolvedHttp.ok, true);
+    const httpServer = api.createMcpHttpServer(resolvedHttp.config, {
+      cwd: installRoot,
+      env: { [mcpHttpTokenEnv]: httpToken }
+    });
+    const initializedHttp = await dispatchHttpRequest(httpServer, {
+      method: 'POST',
+      url: '/mcp',
+      headers: {
+        host: '127.0.0.1:8765',
+        'content-type': 'application/json',
+        authorization: `Bearer ${httpToken}`,
+        origin: 'http://127.0.0.1'
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 10, method: 'initialize' })
+    });
+    assert.equal(initializedHttp.status, 200);
+    assert.equal(initializedHttp.headers['MCP-Protocol-Version'], '2025-06-18');
+    const initializedHttpBody = JSON.parse(initializedHttp.text);
+    assert.equal(initializedHttpBody.result.serverInfo.name, PRODUCT_IDENTITY.mcpServerName);
+    assert.equal(initializedHttpBody.result.metadata.profile.name, 'safe');
+    assert.equal(initializedHttpBody.result.metadata.identity.cli_bin_name, PRODUCT_IDENTITY.cliBinName);
 
     const doctor = await api.executeCli(['doctor', '--json'], { cwd: installRoot });
     assert.equal(doctor.exitCode, 0);
@@ -181,6 +219,33 @@ async function createPackedInstallLayout(tarballPath) {
   await linkBin(binDir, PRODUCT_IDENTITY.mcpBinName, path.join(packageDir, normalizePackagePath(PRODUCT_IDENTITY.mcpBinPath)));
 
   return { tempRoot, installRoot, packageDir, binDir };
+}
+
+function dispatchHttpRequest(server, { method, url, headers, body }) {
+  return new Promise((resolve, reject) => {
+    const request = new PassThrough();
+    request.method = method;
+    request.url = url;
+    request.headers = headers;
+    const response = {
+      status: 200,
+      headers: {},
+      writeHead(status, responseHeaders) {
+        this.status = status;
+        this.headers = { ...responseHeaders };
+      },
+      end(chunk = '') {
+        resolve({
+          status: this.status,
+          headers: this.headers,
+          text: String(chunk)
+        });
+      }
+    };
+    server.once('error', reject);
+    server.emit('request', request, response);
+    request.end(body);
+  });
 }
 
 async function extractPackageTarball(tarballPath, outputDir) {

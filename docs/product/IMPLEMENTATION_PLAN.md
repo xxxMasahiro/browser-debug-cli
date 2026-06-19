@@ -933,13 +933,26 @@ Phase 34 adds a minimal HTTP MCP transport as a safe foundation for MCP clients 
 - Verification must include `node --check` on changed runtime and test files, `npm test`, `npm run test:pack`, `npm run test:pack-install`, `npm run release:check`, `./tools/product-gate`, and `git diff --check`.
 - Browser smoke tests are not required for Phase 34 unless browser runtime behavior changes; Phase 34 changes MCP transport, no-browser tests, package smoke checks, and documentation only.
 
-### Phase 35: Future Admin MCP Local Write/Execute Review
+### Phase 35: HTTP MCP Integration Hardening
 
-Phase 35 is not implemented in Phase 34. If approved later, it should decide whether any write-producing local advisory operations belong in `admin` MCP. Candidate operations must be reviewed one at a time with explicit receipts, local scope, tests, and failure-safe behavior. Cleanup execution, provider/API execution, `agent execution run`, shell tools, daemon/session control, and credential-bearing flows remain excluded until separately approved.
+Phase 35 makes the safe HTTP MCP foundation easier to adopt from external repositories and MCP clients. It is complete as a local-first integration-hardening slice and does not expand the MCP tool surface.
 
-### Phase 36: Future Transport Expansion Review
+- Add `browser-debug mcp config --json` as a no-side-effect configuration helper for reusable client setup.
+- Emit stdio MCP configuration that can be copied into MCP clients without inspecting repository internals.
+- Emit explicit safe HTTP MCP launch and client-connection metadata without printing token values.
+- Default HTTP configuration examples to a fixed local client port while preserving the server runtime default of port `0`.
+- Add focused CLI/API tests for configuration output, profile defaults, token redaction, and HTTP full/admin rejection.
+- Add packed-install smoke coverage that creates the safe HTTP MCP handler from the installed package API and completes an authenticated `initialize` request without binding a port.
+- Update README, plugin skill guidance, security, verification, package, and workflow docs with the new client configuration path.
+- Keep HTTP `full` or `admin`, socket transport, remote HTTP listeners, shell tools, cleanup execution, provider/API execution, `agent execution run`, package generation, ingest, report writing, workflow creation, execution planning, credential handling, external upload, and profile reuse out of scope.
 
-Phase 36 is not implemented in Phase 34. If approved later, it should decide whether socket transport, remote HTTP binding, streaming HTTP behavior, or broader MCP profiles over HTTP are necessary. Any such expansion requires a security design, authentication and origin policy, operational documentation, and tests before implementation.
+### Phase 36: Future Admin MCP Local Write/Execute Review
+
+Phase 36 is not implemented in Phase 35. If approved later, it should decide whether any write-producing local advisory operations belong in `admin` MCP. Candidate operations must be reviewed one at a time with explicit receipts, local scope, tests, and failure-safe behavior. Cleanup execution, provider/API execution, `agent execution run`, shell tools, daemon/session control, and credential-bearing flows remain excluded until separately approved.
+
+### Phase 37: Future Transport Expansion Review
+
+Phase 37 is not implemented in Phase 35. If approved later, it should decide whether socket transport, remote HTTP binding, streaming HTTP behavior, or broader MCP profiles over HTTP are necessary. Any such expansion requires a security design, authentication and origin policy, operational documentation, and tests before implementation.
 
 ## Verification Method
 
@@ -985,6 +998,7 @@ Phase 36 is not implemented in Phase 34. If approved later, it should decide whe
 - Phase 32 checks cover product identity metadata, package/plugin/MCP name alignment, identity-derived package dry-run paths, derived packed-install tarball paths, package API identity exports, and unchanged current names before any approved rename.
 - Phase 33 checks cover MCP read-only agent surfaces, request status/detail, workflow status/index, execution status/list, safe-profile availability, packed-install exposure, and continued non-exposure of execution run, cleanup execution, provider/API execution, shell tools, HTTP/socket transport, and write-producing advisory tools.
 - Phase 34 checks cover HTTP MCP safe transport policy, loopback bind enforcement, bearer-token enforcement, Host and Origin validation, body-size limits, safe-profile-only tools, CLI metadata, packed-install API exports, and architecture/security isolation for the approved listener module.
+- Phase 35 checks cover token-free MCP client configuration output, stdio and safe HTTP client setup metadata, safe-profile defaulting, HTTP full/admin rejection, packed-install HTTP MCP initialize smoke coverage, and unchanged non-exposure of execution, cleanup, provider/API, shell, socket, remote HTTP, and credential-bearing tools.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, unapproved external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
 
 ## Recovery Path
