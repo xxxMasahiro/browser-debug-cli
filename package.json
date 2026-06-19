@@ -19,8 +19,8 @@
     "doctor": "node ./bin/browser-debug.js doctor --json",
     "test": "node --test tests/architecture.test.js tests/cli.test.js",
     "test:browser": "BROWSER_DEBUG_BROWSER_SMOKE=1 node --test tests/browser-smoke.test.js",
-    "test:pack": "npm pack --dry-run --json --cache /tmp/browser-debug-cli-npm-cache",
-    "test:pack-install": "mkdir -p /tmp/browser-debug-cli-pack-smoke && npm pack --json --pack-destination /tmp/browser-debug-cli-pack-smoke --cache /tmp/browser-debug-cli-npm-cache --ignore-scripts >/tmp/browser-debug-cli-pack-smoke/pack.json && node tests/pack-install-smoke.test.js /tmp/browser-debug-cli-pack-smoke/browser-debug-cli-0.0.0.tgz",
+    "test:pack": "node ./tools/pack-dry-run.mjs",
+    "test:pack-install": "node ./tools/pack-install-smoke.mjs",
     "release:check": "npm test && npm run test:pack && npm run test:pack-install"
   },
   "files": [

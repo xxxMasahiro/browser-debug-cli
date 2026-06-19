@@ -77,6 +77,7 @@ All notable local development changes are tracked here before public release.
 - Added Phase 30 packed install smoke coverage with `npm run test:pack-install` for the packed tarball layout, packaged CLI entrypoints, package API imports, MCP stdio tool listing, schema/template/plugin file presence, selected workflow security docs, and no-publish release boundaries.
 - Wired packed install smoke into `npm run release:check`, the product aggregate gate, CI validation, and the Node GitHub Actions job without changing package naming, license, marketplace, publication, or external evidence transfer boundaries.
 - Added Phase 31 MCP profile gating with `safe`, `full`, and `admin` launch profiles, default/full compatibility, MCP-only workspace-confined `@file` handling, profile API exports, and packed-install smoke coverage without adding cleanup execution, agent/API execution, HTTP/socket transport, shell tools, external upload, profile reuse, or provider credential behavior.
+- Added Phase 32 rename-readiness with centralized product identity metadata, package/plugin/MCP alignment checks, identity-derived package dry-run and packed-install smoke paths, package API identity exports, and MCP identity metadata without renaming the package, repository, plugin, MCP server, CLI commands, or display name.
 
 ## Release Status
 

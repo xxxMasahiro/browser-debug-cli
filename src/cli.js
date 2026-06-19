@@ -22,6 +22,7 @@ import { runDoctor } from './doctor.js';
 import { createEnvelope, createErrorEnvelope, stringifyEnvelope } from './envelope.js';
 import { runObserve } from './observe.js';
 import { parseCliArgs } from './parser.js';
+import { PRODUCT_IDENTITY } from './product-identity.js';
 import { runResourceArtifactsCleanup, runResourceArtifactsPlan } from './resource-artifacts.js';
 import { runResourceStatus } from './resource-status.js';
 import { runReview } from './review.js';
@@ -579,7 +580,7 @@ function mcpServeInfo(options = {}) {
           external_channel: false,
           shell_tools: false,
           cleanup_tools: false,
-          executable: 'browser-debug-mcp'
+          executable: PRODUCT_IDENTITY.mcpBinName
         }
       },
       warnings: [],
@@ -596,7 +597,7 @@ function mcpServeInfo(options = {}) {
         external_channel: false,
         shell_tools: false,
         cleanup_tools: false,
-        executable: 'browser-debug-mcp',
+        executable: PRODUCT_IDENTITY.mcpBinName,
         profile: mcpProfileMetadata(profile.profile)
       }
     },

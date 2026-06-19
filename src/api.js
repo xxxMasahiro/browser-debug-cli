@@ -36,6 +36,13 @@ export {
 } from './content-ux-advisory.js';
 export { listSchemas, getSchema, schemaNames } from './schema-registry.js';
 export {
+  PRODUCT_IDENTITY,
+  packageInstallDirectory,
+  packageSchemaSpecifier,
+  packageTarballFilename,
+  productIdentitySummary
+} from './product-identity.js';
+export {
   DEFAULT_MCP_PROFILE,
   MCP_PROFILES,
   MCP_TOOLS,

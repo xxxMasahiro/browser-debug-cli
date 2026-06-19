@@ -216,3 +216,13 @@ commit: 1af1fcd Document agent execution integration plan
 - Preserved existing review findings, metrics, action plans, release readiness, resource guard behavior, artifact cleanup behavior, existing `agent_workflow` status meanings, and MCP execution non-exposure.
 - The implementation does not accept free-form shell commands, automate SaaS web UIs, persist credential values, store raw provider responses, mutate review artifacts, launch browsers from agent execution, or add provider calls outside the adapter module.
 - No-browser coverage now includes fake provider success, configured local runner success, API missing-configuration blocking, injected API transport success, advisory normalization, dashboard status/list aggregation, and provider boundary architecture checks.
+
+## 2026-06-20 Phase 32 Rename Readiness
+
+- Completed Phase 32 rename readiness without renaming the package, repository, plugin, MCP server, CLI commands, display name, license, or publication state.
+- Added `src/product-identity.js` for package, CLI, MCP, plugin, repository, skill path, version, and package-check temporary path metadata.
+- Exported product identity helpers through the package API and used identity metadata in MCP initialize output, CLI MCP metadata, and the MCP bin help text.
+- Replaced hard-coded package dry-run and packed-install smoke paths with identity-derived runners in `tools/pack-dry-run.mjs` and `tools/pack-install-smoke.mjs`.
+- Added no-browser and packed-install coverage for package/plugin/MCP/API identity alignment and unchanged current names.
+- Updated product manifests, repository index, implementation plan, specification, security/release/verification docs, README, changelog, task tracker, handoff, and AGENTS current phase for the rename-readiness boundary.
+- Phase 32 remains local-first and additive. Future package rename, repository rename, CLI rename, MCP server rename, plugin rename, public package naming, license change, marketplace registration, npm publication, or external evidence transfer still requires explicit approval.
