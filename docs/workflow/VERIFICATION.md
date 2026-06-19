@@ -2,7 +2,7 @@
 
 ## Verification Scope
 
-Current verification checks repository structure, document synchronization, security defaults, review/MCP/plugin local boundaries, CI configuration, design-system placeholders, product operation mode, local MVP runtime behavior, review platform behavior, dogfood target workflow behavior, no-browser target manifest validation, no-browser resource status preflight, review resource guard behavior, daemon lifecycle guards, artifact usage planning, explicit artifact-root cleanup receipts, local agent advisory package/request-status/request-detail/workflow/ingest/report behavior, expected-route execution, route-budget coverage accounting, page expectation coverage, rendered-state findings, manifest suggestions, opt-in content UX advisory behavior, selector-scoped advisory contracts, required user-question advisory checks, dedicated content UX handoff output, page-level content UX handoff, manifest-authoring suggestions, review brief/rubric evaluation, local artifact indexes, local review-quality signals, and browser smoke coverage.
+Current verification checks repository structure, document synchronization, security defaults, review/MCP/plugin local boundaries, CI configuration, design-system placeholders, product operation mode, local MVP runtime behavior, review platform behavior, dogfood target workflow behavior, no-browser target manifest validation, no-browser resource status preflight, review resource guard behavior, daemon lifecycle guards, artifact usage planning, explicit artifact-root cleanup receipts, local agent advisory package/request-status/request-detail/workflow/ingest/report behavior, expected-route execution, route-budget coverage accounting, page expectation coverage, rendered-state findings, manifest suggestions, opt-in content UX advisory behavior, selector-scoped advisory contracts, required user-question advisory checks, dedicated content UX handoff output, page-level content UX handoff, manifest-authoring suggestions, review brief/rubric evaluation, local artifact indexes, local review-quality signals, browser smoke coverage, and planned Phase 29 agent execution boundaries.
 
 ## Product-Local Commands
 
@@ -61,6 +61,8 @@ Phase 25 adds no-browser coverage for agent surface listing, bounded evidence pa
 Phase 26 adds no-browser coverage for `agent requests list`, pending/imported status transitions, single-package filtering, request status schema parity, API export, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, and no review artifact mutation.
 Phase 27 adds no-browser coverage for `agent requests show`, pending/imported detail output, selected-result matching, request detail schema parity, API export, no artifact writes, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, and no review artifact mutation.
 Phase 28 adds no-browser coverage for `agent workflow create/status/index/report`, local workflow manifests and receipts, post-ingest status recomputation, workflow index aggregation, workflow report output, workflow schema parity, API export, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, no external evidence transfer, and no review artifact mutation.
+
+Phase 29 should add no-browser coverage for `agent execution plan/run/status/list`, dry-run plan receipts, explicit `--execute` enforcement, subscription runner abstraction, fake provider execution, API provider adapter boundaries, credential redaction, raw artifact non-transfer, raw provider response non-persistence, execution schema parity, dashboard execution status fields, unchanged `agent_workflow` semantics, unchanged deterministic review gates, and MCP execution non-exposure.
 
 ```bash
 node ./bin/browser-debug.js resource status --json
@@ -213,6 +215,17 @@ Optional acceptance checks against local application servers may run only when t
 - No-browser tests verify packages include only bounded metadata and local artifact references by default, with raw artifact content excluded.
 - No-browser tests verify imported agent advisory output stays separate from review `findings`, `metrics.finding_count`, existing `action_plan`, and `quality_signals.release_readiness`.
 - Architecture tests verify the agent advisory module has no Playwright import, provider API call, external listener, shell execution, profile reuse, storage-state persistence, automatic upload, credential storage, MCP agent execution, or review artifact mutation path.
+
+## Phase 29 Agent Execution Checks
+
+- Parser tests cover `agent execution plan`, `agent execution run`, `agent execution status`, `agent execution list`, required package/surface/provider/model options, missing `--execute`, unknown provider/model values, and conflict handling.
+- Schema parity tests cover a new `agent_execution` schema without breaking existing `agent_workflow`, `agent_advisory_result`, review, resource, daemon, or artifact cleanup schemas.
+- No-browser tests cover dry-run plans, local receipts, execution status/list aggregation, deterministic fake provider success and failure paths, missing package behavior, missing credential behavior, and advisory-result normalization.
+- Credential tests verify provider credentials are read only from named environment variables and are never accepted through CLI args, stored in package artifacts, copied into workflow files, printed in JSON, written to reports, written to receipts, or loaded from `.env` automatically.
+- Boundary tests verify raw screenshots, traces, DOM, console payloads, network payloads, sourceData values, report bodies, existing browser profile data, and raw provider responses are not transferred or stored by default.
+- Invariance tests verify agent execution output does not change review `findings`, `metrics.finding_count`, existing `action_plan`, `quality_signals.release_readiness`, `resource_guard`, artifact cleanup behavior, or existing `agent_workflow` status meanings.
+- Architecture tests verify provider calls live only in the dedicated provider adapter boundary and are not reachable from MCP execution, review, resource, daemon, cleanup, or Playwright runtime modules.
+- MCP tests verify `agent execution run` is not exposed through the MCP allowlist. Any later read-only plan/status MCP exposure requires an explicit allowlist test.
 
 ## Release Readiness Checks
 

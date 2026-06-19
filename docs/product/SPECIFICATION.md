@@ -25,6 +25,7 @@ The Phase 2a design baseline uses Node.js 20 or newer, ESM modules, and a local 
 - Resource artifact layer: inventories `.browser-debug/` artifact usage, proposes cleanup candidates, and performs explicit artifact-root-only cleanup with receipts when `--execute` is provided.
 - Daemon lifecycle layer: adds optional local idle-timeout and max-lifetime shutdown guards to detached ephemeral browser workers.
 - Agent advisory layer: creates bounded local evidence packages from review artifact indexes, generates handoff prompts for local subscription agents, lists and inspects local request status from package/result artifacts, imports untrusted advisory JSON, and renders separate advisory reports without direct API calls, external upload, credential storage, or deterministic gate changes.
+- Agent execution layer: plans and runs subscription-style local agent or API-style provider execution from bounded agent packages, then normalizes runner/provider output into advisory results without mutating deterministic review artifacts or existing workflow status semantics.
 - Schema layer: defines stable JSON contracts for envelopes, artifacts, target manifests, findings, reports, and adapter I/O.
 - Adapter layer: keeps CLI as the source of truth and later exposes the same core through an MCP stdio adapter.
 
@@ -53,6 +54,10 @@ browser-debug agent workflow create --package <agent-package> --json
 browser-debug agent workflow status --workflow <agent-workflow> --json
 browser-debug agent workflow index --json
 browser-debug agent workflow report --workflow <agent-workflow> --json
+browser-debug agent execution plan --package <agent-package> --surface <surface-id> --json
+browser-debug agent execution run --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --execute --json
+browser-debug agent execution status --execution <agent-execution> --json
+browser-debug agent execution list --json
 browser-debug agent ingest --package <agent-package> --input <agent-result-json> --json
 browser-debug agent report --review-index <review-artifact-index> --agent-result <agent-result> --json
 browser-debug target init --url <url> --json
@@ -385,6 +390,53 @@ Workflow create writes only local workflow metadata and a receipt under `.browse
 
 `agent_advisory_result` records imported advisory output as untrusted text. It may include visual design, content information architecture, user journey, mock interpretation, implementation diagnosis, accessibility advisory, and evidence-quality categories. It must set `gate_effect="none"`, `legacy_action_plan_unchanged=true`, `legacy_release_readiness_unchanged=true`, and `blocking_release_gate=false`. Imported advisory output must never execute shell commands, browser actions, file edits, cleanup, publication, dependency changes, manifest mutations, or external uploads.
 
+## Planned Agent Execution Contract
+
+The planned agent execution layer is an additive bridge from local packages to local subscription runners or API provider adapters. It is not a replacement for review, workflow, ingest, or report commands. It must keep the existing package, workflow, ingest, report, resource, daemon, cleanup, and review contracts intact.
+
+`agent_execution` records:
+
+```text
+execution id, name, path, receipt path, created time, updated time
+package path, prompt path, source review artifact index, workflow path
+surface id, surface kind, provider id, model id, runner id
+mode: plan | run
+status: planned | running | succeeded | failed | canceled | credential_required | provider_unavailable
+step state for plan, runner/provider call, advisory normalization, ingest, and report
+advisory result path, normalized result summary, and dashboard handoff commands
+credential requirement names and credential source labels without values
+disclosure policy, evidence transfer policy, and artifact class summary
+boundary flags and gate effect
+```
+
+The dry-run command:
+
+```text
+browser-debug agent execution plan --package <agent-package> --surface <surface-id> --json
+```
+
+is the default no-network operation. It validates the package, resolves the surface, records the disclosure policy, checks whether credentials would be required by name only, and writes local plan metadata plus a receipt under `.browser-debug/agent-executions/`. It sets `api_call_performed=false`, `external_evidence_transfer=false`, `automatic_upload=false`, `credential_values_recorded=false`, `credential_storage="none"`, `persistent_credential_storage=false`, `raw_response_stored=false`, `existing_review_mutated=false`, and `gate_effect="none"`.
+
+The run command:
+
+```text
+browser-debug agent execution run --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --execute --json
+```
+
+requires an explicit `--execute` flag and must fail deterministically without it. Subscription-style execution uses a configured local runner identifier or local stdio surface; it must not accept free-form shell commands or automate a SaaS web UI. API-style execution reads token values only from named environment variables, never from CLI arguments, committed files, package artifacts, workflow files, reports, receipts, `.env` auto-loading, or persistent local storage.
+
+Execution may send only bounded package and prompt content allowed by the disclosure policy. By default, it must not transfer raw screenshots, trace contents, raw DOM, console payloads, network payloads, sourceData values, report bodies, cookies, storage state, existing browser profile data, or raw review artifacts. API execution must record that an API call occurred and which bounded evidence classes were sent, but it must not store raw provider responses. Runner/provider output is normalized into `agent_advisory_result` and remains untrusted advisory data.
+
+`agent execution status --execution <path> --json` reads one local execution record and reports current state, normalized advisory result path, missing credential hints, receipt paths, dashboard handoff commands, and boundary flags. `agent execution list --json` scans local execution records and returns aggregate status counts for dashboards and local automation. Status and list are read-only and must not launch browsers, call providers, upload evidence, store credentials, write review artifacts, or change deterministic gates.
+
+The planned layer keeps dashboard user experience aligned across subscription and API modes:
+
+```text
+agent package -> agent execution plan/run -> agent execution status/list -> agent ingest/report -> agent workflow status/index/report
+```
+
+It does not change review `findings`, `metrics.finding_count`, existing `action_plan`, `quality_signals.release_readiness`, `resource_guard`, artifact cleanup behavior, target manifest behavior, or existing `agent_workflow` status meanings.
+
 ## MCP Adapter Contract
 
 MCP compatibility is implemented as an adapter, not as the product owner layer. The initial MCP adapter:
@@ -393,6 +445,7 @@ MCP compatibility is implemented as an adapter, not as the product owner layer. 
 - Calls the same CLI/core contracts used by local commands.
 - Exposes a narrow allowlist: `browser_debug_doctor`, `browser_debug_observe`, `browser_debug_review`, `browser_debug_target_init`, `browser_debug_target_validate`, `browser_debug_resource_status`, `browser_debug_resource_artifacts_plan`, `browser_debug_review_target`, `browser_debug_schema_list`, and `browser_debug_schema_get`.
 - Avoids HTTP listeners, socket listeners, remote control channels, arbitrary shell execution, cleanup execution commands, profile reuse, storage-state persistence, OAuth, external upload, and credential handling.
+- Does not expose `agent execution run`; execution remains a CLI/API-core boundary unless a later explicit MCP allowlist decision adds read-only plan/status tools.
 - Returns the same envelope families as the CLI.
 
 Any network MCP server mode, external model integration, external upload, existing-profile reuse, or credential-bearing workflow requires separate approval, security documentation, and tests.
