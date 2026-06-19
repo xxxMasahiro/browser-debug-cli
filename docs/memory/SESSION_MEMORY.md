@@ -167,3 +167,22 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - `browser-debug agent workflow index --json` aggregates local workflow manifests and reports waiting/imported/package-missing/report-pending counts.
 - `browser-debug agent workflow report --workflow <path> --json` writes a bounded local Markdown workflow status summary without mutating review artifacts.
 - Direct provider/API execution remains unimplemented and approval-bound; workflow output only records provider-boundary metadata and does not call providers, upload evidence, store credentials, expose MCP agent execution, launch browsers, mutate review artifacts, or change deterministic gates.
+
+## 2026-06-19 Verbatim Resume Note
+
+````text
+はい、問題なく再開できます。
+
+次回はこの情報だけで十分です。
+
+```text
+browser-debug-cli
+branch: feature/agent-execution-doc-sync
+commit: 1af1fcd Document agent execution integration plan
+状態: clean
+内容: Phase 29 Agent Execution Integration の文書同期のみ完了。runtime 実装は未着手。
+次: Phase 29a から実装開始、または push/PR/main CI に進む。
+```
+
+親リポジトリは変更していません。次回は「前回の `1af1fcd` から Phase 29a を進めてください」または「push/PR/main CI まで進めてください」でスムーズに続けられます。
+````
