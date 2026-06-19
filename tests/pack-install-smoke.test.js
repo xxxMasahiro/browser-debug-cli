@@ -17,6 +17,12 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gunzipSync } from 'node:zlib';
+import {
+  PRODUCT_IDENTITY,
+  packageInstallDirectory,
+  packageSchemaSpecifier,
+  packageTarballFilename
+} from '../src/product-identity.js';
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 
@@ -25,15 +31,17 @@ await main();
 async function main() {
   const tarballPath = process.argv[2];
   assert.ok(tarballPath, 'Usage: node tests/pack-install-smoke.test.js <packed-tarball>');
+  assert.equal(path.basename(tarballPath), packageTarballFilename());
   await access(tarballPath, fsConstants.R_OK);
 
   const layout = await createPackedInstallLayout(tarballPath);
   try {
     const { installRoot, packageDir, binDir } = layout;
 
-    await assertFile(packageDir, 'bin/browser-debug.js');
-    await assertFile(packageDir, 'bin/browser-debug-mcp.js');
+    await assertFile(packageDir, normalizePackagePath(PRODUCT_IDENTITY.cliBinPath));
+    await assertFile(packageDir, normalizePackagePath(PRODUCT_IDENTITY.mcpBinPath));
     await assertFile(packageDir, 'src/api.js');
+    await assertFile(packageDir, 'src/product-identity.js');
     await assertFile(packageDir, 'src/mcp-profiles.js');
     await assertFile(packageDir, 'schemas/agent-execution.schema.json');
     await assertFile(packageDir, 'schemas/review.schema.json');
@@ -41,32 +49,36 @@ async function main() {
     await assertFile(packageDir, 'templates/status-dashboard-content-ux-target-manifest.json');
     await assertFile(packageDir, '.codex-plugin/plugin.json');
     await assertFile(packageDir, '.mcp.json');
-    await assertFile(packageDir, 'skills/browser-debug-review/SKILL.md');
+    await assertFile(packageDir, PRODUCT_IDENTITY.pluginSkillPath);
     await assertFile(packageDir, 'docs/workflow/SECURITY.md');
     await assert.rejects(access(path.join(packageDir, 'docs/product/IMPLEMENTATION_PLAN.md')));
 
     const packageJson = JSON.parse(await readFile(path.join(packageDir, 'package.json'), 'utf8'));
+    assert.equal(packageJson.name, PRODUCT_IDENTITY.packageName);
     assert.equal(packageJson.private, true);
     assert.equal(packageJson.license, 'UNLICENSED');
-    assert.equal(packageJson.bin['browser-debug'], './bin/browser-debug.js');
-    assert.equal(packageJson.bin['browser-debug-mcp'], './bin/browser-debug-mcp.js');
+    assert.equal(packageJson.bin[PRODUCT_IDENTITY.cliBinName], PRODUCT_IDENTITY.cliBinPath);
+    assert.equal(packageJson.bin[PRODUCT_IDENTITY.mcpBinName], PRODUCT_IDENTITY.mcpBinPath);
 
-    const browserDebugBin = await readFile(path.join(packageDir, 'bin/browser-debug.js'), 'utf8');
-    const browserDebugMcpBin = await readFile(path.join(packageDir, 'bin/browser-debug-mcp.js'), 'utf8');
+    const browserDebugBin = await readFile(path.join(packageDir, normalizePackagePath(PRODUCT_IDENTITY.cliBinPath)), 'utf8');
+    const browserDebugMcpBin = await readFile(path.join(packageDir, normalizePackagePath(PRODUCT_IDENTITY.mcpBinPath)), 'utf8');
     assert.match(browserDebugBin, /from '\.\.\/src\/cli\.js'/);
     assert.match(browserDebugMcpBin, /from '\.\.\/src\/mcp\.js'/);
-    assert.equal(((await stat(path.join(packageDir, 'bin/browser-debug.js'))).mode & 0o111) !== 0, true);
-    assert.equal(((await stat(path.join(packageDir, 'bin/browser-debug-mcp.js'))).mode & 0o111) !== 0, true);
+    assert.equal(((await stat(path.join(packageDir, normalizePackagePath(PRODUCT_IDENTITY.cliBinPath)))).mode & 0o111) !== 0, true);
+    assert.equal(((await stat(path.join(packageDir, normalizePackagePath(PRODUCT_IDENTITY.mcpBinPath)))).mode & 0o111) !== 0, true);
 
     const requireFromInstall = createRequire(path.join(installRoot, 'package.json'));
-    const apiPath = requireFromInstall.resolve('browser-debug-cli');
-    const reviewSchemaPath = requireFromInstall.resolve('browser-debug-cli/schemas/review');
+    const apiPath = requireFromInstall.resolve(PRODUCT_IDENTITY.packageName);
+    const reviewSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('review'));
     assert.equal(path.normalize(apiPath), path.join(packageDir, 'src/api.js'));
     assert.equal(path.normalize(reviewSchemaPath), path.join(packageDir, 'schemas/review.schema.json'));
 
     const api = await import(pathToFileURL(apiPath));
     assert.equal(typeof api.executeCli, 'function');
     assert.equal(typeof api.runTargetValidate, 'function');
+    assert.equal(api.PRODUCT_IDENTITY.packageName, PRODUCT_IDENTITY.packageName);
+    assert.equal(api.PRODUCT_IDENTITY.cliBinName, PRODUCT_IDENTITY.cliBinName);
+    assert.equal(typeof api.packageTarballFilename, 'function');
     assert.equal(typeof api.getMcpTools, 'function');
     assert.equal(typeof api.resolveMcpProfile, 'function');
     assert.equal(api.schemaNames().includes('agent_execution'), true);
@@ -75,6 +87,16 @@ async function main() {
     assert.equal(api.resolveMcpProfile('safe').ok, true);
     assert.equal(api.getMcpTools('safe').some((tool) => tool.name === 'browser_debug_review'), false);
     assert.equal(api.getMcpTools('full').some((tool) => tool.name === 'browser_debug_review'), true);
+
+    const initialized = await api.handleMcpRequest(
+      { jsonrpc: '2.0', id: 0, method: 'initialize' },
+      { cwd: installRoot }
+    );
+    assert.equal(initialized.result.serverInfo.name, PRODUCT_IDENTITY.mcpServerName);
+    assert.equal(initialized.result.metadata.name, 'full');
+    assert.equal(initialized.result.metadata.identity.package_name, PRODUCT_IDENTITY.packageName);
+    assert.equal(initialized.result.metadata.identity.package_version, PRODUCT_IDENTITY.packageVersion);
+    assert.equal(initialized.result.metadata.identity.cli_bin_name, PRODUCT_IDENTITY.cliBinName);
 
     const doctor = await api.executeCli(['doctor', '--json'], { cwd: installRoot });
     assert.equal(doctor.exitCode, 0);
@@ -118,21 +140,21 @@ async function main() {
     assert.equal(safeMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_target_validate'), true);
     assert.equal(safeMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_review_target'), false);
 
-    const binLink = await lstat(path.join(binDir, 'browser-debug'));
+    const binLink = await lstat(path.join(binDir, PRODUCT_IDENTITY.cliBinName));
     assert.equal(binLink.isSymbolicLink(), true);
     console.log('Packed install smoke passed.');
   } finally {
-    if (process.env.BROWSER_DEBUG_KEEP_PACK_INSTALL_SMOKE !== '1') {
+    if (process.env[PRODUCT_IDENTITY.packSmokeKeepEnv] !== '1') {
       await rm(layout.tempRoot, { recursive: true, force: true });
     }
   }
 }
 
 async function createPackedInstallLayout(tarballPath) {
-  const tempRoot = await mkdtemp(path.join(tmpdir(), 'browser-debug-pack-install-'));
+  const tempRoot = await mkdtemp(path.join(tmpdir(), `${PRODUCT_IDENTITY.packageName}-pack-install-`));
   const installRoot = path.join(tempRoot, 'install');
   const nodeModules = path.join(installRoot, 'node_modules');
-  const packageDir = path.join(nodeModules, 'browser-debug-cli');
+  const packageDir = packageInstallDirectory(nodeModules);
   const binDir = path.join(nodeModules, '.bin');
 
   await mkdir(packageDir, { recursive: true });
@@ -142,8 +164,8 @@ async function createPackedInstallLayout(tarballPath) {
   await extractPackageTarball(tarballPath, packageDir);
   await linkDependency(nodeModules, 'playwright');
   await linkDependency(nodeModules, 'playwright-core');
-  await linkBin(binDir, 'browser-debug', path.join(packageDir, 'bin/browser-debug.js'));
-  await linkBin(binDir, 'browser-debug-mcp', path.join(packageDir, 'bin/browser-debug-mcp.js'));
+  await linkBin(binDir, PRODUCT_IDENTITY.cliBinName, path.join(packageDir, normalizePackagePath(PRODUCT_IDENTITY.cliBinPath)));
+  await linkBin(binDir, PRODUCT_IDENTITY.mcpBinName, path.join(packageDir, normalizePackagePath(PRODUCT_IDENTITY.mcpBinPath)));
 
   return { tempRoot, installRoot, packageDir, binDir };
 }
@@ -190,6 +212,10 @@ function isSafeRelativePath(relativePath) {
   return relativePath
     && !path.isAbsolute(relativePath)
     && !relativePath.split('/').some((part) => part === '..' || part === '');
+}
+
+function normalizePackagePath(packagePath) {
+  return packagePath.replace(/^\.\//u, '');
 }
 
 async function linkDependency(nodeModules, name) {

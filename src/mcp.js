@@ -9,6 +9,7 @@ import {
   resolveMcpProfile,
   resolveMcpTool
 } from './mcp-profiles.js';
+import { PRODUCT_IDENTITY, productIdentitySummary } from './product-identity.js';
 
 export { DEFAULT_MCP_PROFILE, MCP_PROFILES, getMcpTools, mcpProfileMetadata, resolveMcpProfile };
 
@@ -23,16 +24,21 @@ export async function handleMcpRequest(request, context = {}) {
     return response(request.id, null, errorObject(-32602, profile.message));
   }
   if (request.method === 'initialize') {
+    const profileMetadata = mcpProfileMetadata(profile.profile);
     return response(request.id, {
       protocolVersion: '2025-06-18',
       serverInfo: {
-        name: 'browser-debug-cli',
+        name: PRODUCT_IDENTITY.mcpServerName,
         version: PACKAGE_VERSION
       },
       capabilities: {
         tools: {}
       },
-      metadata: mcpProfileMetadata(profile.profile)
+      metadata: {
+        ...profileMetadata,
+        identity: productIdentitySummary(),
+        profile: profileMetadata
+      }
     });
   }
   if (request.method === 'tools/list') {

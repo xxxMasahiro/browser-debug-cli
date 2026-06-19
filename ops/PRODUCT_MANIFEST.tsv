@@ -25,6 +25,7 @@ product.observe	optional	all	all	src/observe.js	source	file_nonempty	workflow	Pl
 product.review	optional	all	all	src/review.js	source	file_nonempty	workflow	Playwright-backed deterministic review, quality signals, target manifest, coverage, and mock metrics runtime.
 product.content_ux_advisory	optional	all	all	src/content-ux-advisory.js	source	file_nonempty	workflow	Pure local content UX advisory helper for manifest opt-in source-to-screen contracts, page handoff, manifest-authoring suggestions, review brief, rubric evaluation, and dedicated handoff output.
 product.mcp_profiles	optional	all	all	src/mcp-profiles.js	source	file_nonempty	workflow	Reusable MCP profile registry for safe, full, and admin stdio adapter tool surfaces.
+product.identity	optional	all	all	src/product-identity.js	source	file_nonempty	workflow	Reusable package, CLI, MCP, plugin, and repository identity metadata for rename-readiness checks.
 product.schema_registry	optional	all	all	src/schema-registry.js	source	file_nonempty	workflow	Machine-readable schema registry for CLI and adapter contracts.
 product.sessions	optional	all	all	src/sessions.js	source	file_nonempty	workflow	Local session, action, report, and spec runtime.
 product.supervisor	optional	all	all	src/supervisor.js	source	file_nonempty	workflow	Process-scoped supervised ephemeral browser runtime.
@@ -44,6 +45,8 @@ product.architecture_test	optional	all	all	tests/architecture.test.js	test	file_
 product.test	required	all	all	tests/cli.test.js	test	file_nonempty	workflow	No-browser CLI parser, JSON output, and doctor tests.
 product.browser_smoke	optional	all	all	tests/browser-smoke.test.js	test	file_nonempty	workflow	Optional Playwright browser smoke tests.
 product.pack_install_smoke	optional	all	all	tests/pack-install-smoke.test.js	test	file_nonempty	workflow	Packed tarball install-layout smoke tests for CLI, API, MCP, schemas, templates, and local release boundaries.
+product.pack_dry_run_tool	optional	all	all	tools/pack-dry-run.mjs	custom	file_nonempty	workflow	Local package dry-run runner that derives npm cache paths from product identity metadata.
+product.pack_install_smoke_tool	optional	all	all	tools/pack-install-smoke.mjs	custom	file_nonempty	workflow	Local packed install smoke runner that derives tarball paths from package metadata.
 product.requirements	required	all	all	docs/product/REQUIREMENTS.md	doc	file_nonempty	workflow	Canonical requirements.
 product.specification	required	all	all	docs/product/SPECIFICATION.md	doc	file_nonempty	workflow	Canonical specification.
 product.plan	required	all	all	docs/product/IMPLEMENTATION_PLAN.md	doc	file_nonempty	workflow	Canonical implementation plan.

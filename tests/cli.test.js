@@ -7,6 +7,7 @@ import { executeCli } from '../src/cli.js';
 import { handleMcpRequest } from '../src/mcp.js';
 import { runObserve } from '../src/observe.js';
 import { parseCliArgs } from '../src/parser.js';
+import { PRODUCT_IDENTITY } from '../src/product-identity.js';
 import { redact, redactUrl } from '../src/redaction.js';
 import { classifyActionCandidate, normalizeTargetManifest, runReview } from '../src/review.js';
 import { buildLocalContentUxAdvisory } from '../src/content-ux-advisory.js';
@@ -1676,6 +1677,14 @@ test('target validate checks edited manifests without launching a browser', asyn
 });
 
 test('MCP adapter exposes a local allowlisted tool surface', async () => {
+  const initialized = await handleMcpRequest({ jsonrpc: '2.0', id: 0, method: 'initialize' });
+  assert.equal(initialized.result.serverInfo.name, PRODUCT_IDENTITY.mcpServerName);
+  assert.equal(initialized.result.metadata.name, 'full');
+  assert.equal(initialized.result.metadata.identity.package_name, PRODUCT_IDENTITY.packageName);
+  assert.equal(initialized.result.metadata.identity.package_version, PRODUCT_IDENTITY.packageVersion);
+  assert.equal(initialized.result.metadata.identity.mcp_bin_name, PRODUCT_IDENTITY.mcpBinName);
+  assert.equal(initialized.result.metadata.profile.name, 'full');
+
   const listed = await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
   assert.equal(listed.result.profile.name, 'full');
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review'), true);

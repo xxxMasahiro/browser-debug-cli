@@ -44,6 +44,7 @@ for rel in \
   src/mcp.js \
   src/mcp-profiles.js \
   src/page-evidence.js \
+  src/product-identity.js \
   src/observe.js \
   src/review.js \
   src/schema-registry.js \
@@ -87,6 +88,8 @@ for rel in \
   tools/product-gate \
   tools/product-mode \
   tools/product-gate-evidence \
+  tools/pack-dry-run.mjs \
+  tools/pack-install-smoke.mjs \
   tools/check_product_structure.sh \
   tools/check_product_docs.sh \
   tools/check_product_security.sh \

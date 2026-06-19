@@ -836,6 +836,34 @@ Phase 31 turns the local stdio MCP adapter from one fixed allowlist into a launc
 - Verification must include `npm test`, `npm run test:pack`, `npm run test:pack-install`, `npm run release:check`, `./tools/product-gate`, and `git diff --check`.
 - Browser smoke tests are required only if browser runtime behavior changes; Phase 31 changes MCP adapter gating and no-browser input confinement only.
 
+### Phase 32: Rename Readiness Without Renaming
+
+Phase 32 prepares the package, plugin, MCP, and test surfaces for a future repository or command rename without performing that rename. It preserves the current `browser-debug-cli`, `browser-debug`, `browser-debug-mcp`, Browser Debug CLI display name, private package state, license, MCP server name, plugin name, and GitHub repository URL. It makes rename-sensitive values explicit, reusable, and checked so a later approved rename can be made in one small contract-driven slice instead of scattered ad hoc edits.
+
+#### Phase 32a: Identity Contract and Documentation
+
+- Completed: defined a single product identity helper for package name, display name, CLI bin name, MCP bin name, MCP server name, plugin name, repository URL, plugin skill path, package version, and temporary pack/cache names.
+- Completed: documented that Phase 32 does not rename the package, repository, plugin, MCP server, CLI command, or display name.
+- Completed: kept `ops/PRODUCT_PROFILE.json` as the display-name authority and kept `Browser Debug CLI` unchanged.
+- Completed: kept package naming, public package naming, repository rename, license change, marketplace registration, and npm publication approval-bound.
+
+#### Phase 32b: Runtime and Package Alignment
+
+- Completed: used the identity helper for MCP server metadata, CLI MCP metadata, bin help text, package API exports, and tests that verify package/plugin/MCP alignment.
+- Completed: replaced the package dry-run and packed-install smoke script's hard-coded temporary paths with product identity and package metadata derived from the current package name and version.
+- Completed: kept existing command names and current `.mcp.json` behavior unchanged while making the expected names explicit.
+
+#### Phase 32c: Verification and Manifests
+
+- Completed: added no-browser architecture tests that prove package metadata, plugin metadata, `.mcp.json`, MCP server metadata, and package smoke expectations agree with the identity helper.
+- Completed: extended packed-install smoke coverage to verify the packaged API exports the identity helper and that package import paths are derived from the current package name.
+- Completed: updated product manifests, repository index, README, changelog, security, release, verification, task tracker, and handoff with the rename-readiness boundary.
+
+#### Phase 32 Verification Plan
+
+- Verification must include `npm test`, `npm run test:pack`, `npm run test:pack-install`, `npm run release:check`, `./tools/product-gate`, and `git diff --check`.
+- Browser smoke tests are required only if browser runtime behavior changes; Phase 32 changes metadata, package smoke wiring, and no-browser tests only.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -877,6 +905,7 @@ Phase 31 turns the local stdio MCP adapter from one fixed allowlist into a launc
 - Phase 28 checks cover local agent workflow creation, workflow status recomputation, workflow index aggregation, workflow report output, workflow schema parity, local workflow receipts, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, no external evidence transfer, and no review artifact mutation.
 - Phase 30 checks cover the packed tarball install layout, packaged CLI entrypoints, package API imports, MCP stdio tool listing, schema/template/plugin file presence, selected workflow security docs, and no-publish local release boundaries.
 - Phase 31 checks cover MCP profile registry behavior, safe/full/admin launch selection, out-of-profile tool rejection, compatibility `MCP_TOOLS` exports, packed-install API profile helpers, and MCP-only workspace-confined `@file` handling without changing normal CLI behavior.
+- Phase 32 checks cover product identity metadata, package/plugin/MCP name alignment, identity-derived package dry-run paths, derived packed-install tarball paths, package API identity exports, and unchanged current names before any approved rename.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
 
 ## Recovery Path

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PRODUCT_IDENTITY } from '../src/product-identity.js';
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 
@@ -73,23 +74,28 @@ test('observe and supervise share reusable page evidence helpers', async () => {
 test('package keeps a standard local Node CLI surface', async () => {
   const pkg = JSON.parse(await readText('package.json'));
   assert.equal(pkg.type, 'module');
+  assert.equal(pkg.name, PRODUCT_IDENTITY.packageName);
   assert.equal(pkg.private, true);
   assert.equal(pkg.license, 'UNLICENSED');
   assert.equal(pkg.engines.node, '>=20');
-  assert.equal(pkg.bin['browser-debug'], './bin/browser-debug.js');
-  assert.equal(pkg.bin['browser-debug-mcp'], './bin/browser-debug-mcp.js');
+  assert.equal(pkg.bin[PRODUCT_IDENTITY.cliBinName], PRODUCT_IDENTITY.cliBinPath);
+  assert.equal(pkg.bin[PRODUCT_IDENTITY.mcpBinName], PRODUCT_IDENTITY.mcpBinPath);
   assert.equal(pkg.exports['.'], './src/api.js');
   assert.equal(pkg.exports['./schemas/*'], './schemas/*.schema.json');
   assert.ok(pkg.files.includes('.codex-plugin/'));
   assert.ok(pkg.files.includes('.mcp.json'));
   assert.ok(pkg.files.includes('templates/'));
-  assert.ok(pkg.files.includes('skills/browser-debug-review/SKILL.md'));
+  assert.ok(pkg.files.includes(PRODUCT_IDENTITY.pluginSkillPath));
   assert.ok(pkg.scripts.test);
   assert.ok(pkg.scripts['test:browser']);
   assert.ok(pkg.scripts['test:pack']);
   assert.ok(pkg.scripts['test:pack-install']);
   assert.ok(pkg.scripts['release:check']);
   assert.match(pkg.scripts['release:check'], /npm run test:pack-install/);
+  assert.match(pkg.scripts['test:pack'], /tools\/pack-dry-run\.mjs/);
+  assert.doesNotMatch(pkg.scripts['test:pack'], /browser-debug-cli-npm-cache/);
+  assert.match(pkg.scripts['test:pack-install'], /tools\/pack-install-smoke\.mjs/);
+  assert.doesNotMatch(pkg.scripts['test:pack-install'], /browser-debug-cli-0\.0\.0\.tgz/);
   assert.equal(pkg.scripts.postinstall, undefined);
   assert.equal(pkg.scripts.prepublishOnly, undefined);
   assert.doesNotMatch(JSON.stringify(pkg.scripts), /\b(?:gh|curl|wget|publish)\b/);
@@ -225,16 +231,37 @@ test('plugin metadata keeps local stdio MCP boundaries', async () => {
   const plugin = JSON.parse(await readText('.codex-plugin/plugin.json'));
   const mcp = JSON.parse(await readText('.mcp.json'));
   const skill = await readText('skills/browser-debug-review/SKILL.md');
+  const mcpServer = mcp.mcpServers[PRODUCT_IDENTITY.mcpServerName];
 
-  assert.equal(plugin.name, 'browser-debug-cli');
+  assert.equal(plugin.name, PRODUCT_IDENTITY.pluginName);
+  assert.equal(plugin.repository, PRODUCT_IDENTITY.repositoryUrl);
   assert.equal(plugin.license, 'UNLICENSED');
   assert.equal(plugin.mcpServers, './.mcp.json');
   assert.equal(plugin.skills, './skills/');
-  assert.equal(mcp.mcpServers['browser-debug-cli'].command, 'node');
-  assert.deepEqual(mcp.mcpServers['browser-debug-cli'].args, ['./bin/browser-debug-mcp.js']);
+  assert.equal(mcpServer.command, 'node');
+  assert.deepEqual(mcpServer.args, [PRODUCT_IDENTITY.mcpBinPath]);
   assert.doesNotMatch(JSON.stringify(mcp), /http|https|WebSocket|listen|curl|wget|token|password/i);
   assert.match(skill, /browser-debug review --target/);
   assert.match(skill, /upload artifacts|external upload/i);
+});
+
+test('product identity keeps rename-sensitive surfaces aligned', async () => {
+  const pkg = JSON.parse(await readText('package.json'));
+  const plugin = JSON.parse(await readText('.codex-plugin/plugin.json'));
+  const mcp = JSON.parse(await readText('.mcp.json'));
+  const profile = JSON.parse(await readText('ops/PRODUCT_PROFILE.json'));
+  const mcpSource = await readText('src/mcp.js');
+  const cliSource = await readText('src/cli.js');
+
+  assert.equal(pkg.name, PRODUCT_IDENTITY.packageName);
+  assert.equal(pkg.version, PRODUCT_IDENTITY.packageVersion);
+  assert.equal(profile.display_name.en, PRODUCT_IDENTITY.displayName);
+  assert.equal(profile.display_name.ja, PRODUCT_IDENTITY.displayName);
+  assert.equal(plugin.name, PRODUCT_IDENTITY.pluginName);
+  assert.equal(plugin.interface.displayName, PRODUCT_IDENTITY.displayName);
+  assert.ok(Object.hasOwn(mcp.mcpServers, PRODUCT_IDENTITY.mcpServerName));
+  assert.match(mcpSource, /PRODUCT_IDENTITY\.mcpServerName/);
+  assert.match(cliSource, /PRODUCT_IDENTITY\.mcpBinName/);
 });
 
 test('CI workflow stays generic and release-safe', async () => {
