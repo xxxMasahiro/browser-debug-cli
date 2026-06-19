@@ -39,12 +39,24 @@ import {
 export async function runCli(argv, context = {}) {
   const result = await executeCli(argv, context);
   if (result.stdout && context.stdout) {
-    context.stdout.write(result.stdout);
+    await writeStream(context.stdout, result.stdout);
   }
   if (result.stderr && context.stderr) {
-    context.stderr.write(result.stderr);
+    await writeStream(context.stderr, result.stderr);
   }
   return result.exitCode;
+}
+
+function writeStream(stream, text) {
+  return new Promise((resolve, reject) => {
+    stream.write(text, (error) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    });
+  });
 }
 
 export async function executeCli(argv, context = {}) {

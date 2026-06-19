@@ -163,7 +163,7 @@ Current status: completed for local deterministic review, target manifests, rout
 
 - Completed: added public `exports` for stable local core APIs while the package remains private and unreleased.
 - Completed: excluded internal product documents from the package file set while keeping public README, changelog, schemas, runtime source, and selected workflow security/release/verification docs.
-- Completed: kept local dry-run package verification through `npm run test:pack`; packed install smoke remains a release-hardening task before npm publication.
+- Completed: kept local dry-run package verification through `npm run test:pack` and added packed install smoke coverage through `npm run test:pack-install` without npm publication.
 - Completed as boundary: package naming, license choice, npm token handling, and publication remain approval-bound.
 
 ### Phase 8: Dogfood Review Workflow, Plugin Bundle, and Publication Readiness
@@ -778,6 +778,28 @@ The layer is additive. It must not change existing `agent_workflow` status meani
 - Stop if provider execution cannot be gated by a local dry-run plan, explicit `--execute`, env-only credentials, local receipts, and advisory-only normalization.
 - Stop if implementation requires OAuth/login automation, SaaS web UI automation, existing-browser-profile reuse, persistent credential storage, external upload beyond the bounded package/prompt policy, HTTP/socket MCP transport, MCP agent execution, arbitrary shell execution, marketplace mutation, npm publication, package rename, or license changes.
 
+### Phase 30: Release Hardening Without Publication
+
+Phase 30 hardens the local package release path without publishing, renaming the package, changing the license, registering a plugin, adding external upload, adding provider SDK dependencies, or changing runtime behavior. It verifies that the packed tarball exposes the expected CLI, API, MCP, schema, template, plugin, and workflow-security surfaces from an installed package layout.
+
+#### Phase 30a: Packed Install Smoke
+
+- Completed: added `npm run test:pack-install` as a no-publish packed tarball smoke check.
+- Completed: the smoke check creates a temporary install layout under `/tmp`, extracts the `npm pack` tarball, links existing local dependencies from the repository install, and avoids registry access, publication, postinstall hooks, external upload, credential handling, or marketplace mutation.
+- Completed: the smoke check verifies the packaged `browser-debug` CLI, `browser-debug-mcp` stdio entrypoint, package API imports, schema files, reusable target templates, plugin metadata, plugin skill, and selected workflow security documentation.
+- Completed: the smoke check verifies `doctor`, `schema list`, `target validate`, package API import, and MCP `tools/list` from the packed package layout.
+
+#### Phase 30b: Release Gate Wiring
+
+- Completed: wired `npm run test:pack-install` into `npm run release:check`, the product aggregate gate, local CI manifest validation, and the Node GitHub Actions job.
+- Completed: updated product manifests, repository index, release notes, verification docs, task tracker, and handoff to treat packed install smoke as local release-hardening evidence.
+- Completed as boundary: `npm publish`, package naming, license changes, npm token handling, plugin marketplace registration, model/API review outside the Phase 29 adapter boundary, HTTP/socket MCP, OAuth/login automation, existing profile reuse, and external upload remain approval-bound.
+
+#### Phase 30 Verification Plan
+
+- Verification must include `npm test`, `npm run test:pack`, `npm run test:pack-install`, `npm run release:check`, `./tools/product-gate`, and `git diff --check`.
+- Browser smoke tests are required only if browser runtime behavior changes; Phase 30 does not change Playwright runtime behavior.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -785,6 +807,7 @@ The layer is additive. It must not change existing `agent_workflow` status meani
 - `npm test`
 - `npm run test:browser`
 - `npm run test:pack`
+- `npm run test:pack-install`
 - `npm run release:check`
 - lesson-side `product-scaffold-check` with this repository path.
 - lesson-side `product-repository-authority status` with this repository path.
@@ -816,6 +839,7 @@ The layer is additive. It must not change existing `agent_workflow` status meani
 - Phase 26 checks cover local agent request status listing, pending/imported transitions, single-package filtering, request status schema parity, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, and no review artifact mutation.
 - Phase 27 checks cover local agent request detail output, selected-result matching, request detail schema parity, no artifact writes, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, and no review artifact mutation.
 - Phase 28 checks cover local agent workflow creation, workflow status recomputation, workflow index aggregation, workflow report output, workflow schema parity, local workflow receipts, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, no external evidence transfer, and no review artifact mutation.
+- Phase 30 checks cover the packed tarball install layout, packaged CLI entrypoints, package API imports, MCP stdio tool listing, schema/template/plugin file presence, selected workflow security docs, and no-publish local release boundaries.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
 
 ## Recovery Path

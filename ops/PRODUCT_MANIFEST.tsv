@@ -42,6 +42,7 @@ product.plugin_skill	optional	all	all	skills/browser-debug-review/SKILL.md	doc	f
 product.architecture_test	optional	all	all	tests/architecture.test.js	test	file_nonempty	workflow	Architecture regression tests for reusable and generic runtime boundaries.
 product.test	required	all	all	tests/cli.test.js	test	file_nonempty	workflow	No-browser CLI parser, JSON output, and doctor tests.
 product.browser_smoke	optional	all	all	tests/browser-smoke.test.js	test	file_nonempty	workflow	Optional Playwright browser smoke tests.
+product.pack_install_smoke	optional	all	all	tests/pack-install-smoke.test.js	test	file_nonempty	workflow	Packed tarball install-layout smoke tests for CLI, API, MCP, schemas, templates, and local release boundaries.
 product.requirements	required	all	all	docs/product/REQUIREMENTS.md	doc	file_nonempty	workflow	Canonical requirements.
 product.specification	required	all	all	docs/product/SPECIFICATION.md	doc	file_nonempty	workflow	Canonical specification.
 product.plan	required	all	all	docs/product/IMPLEMENTATION_PLAN.md	doc	file_nonempty	workflow	Canonical implementation plan.

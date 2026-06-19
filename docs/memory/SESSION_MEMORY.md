@@ -43,7 +43,7 @@ Read AGENTS.MD and docs/workflow/HANDOFF.md, confirm the current state, then res
 - Added `npm run test:browser` for real Playwright smoke coverage.
 - Strengthened browser smoke coverage for form controls, keyboard input, deterministic scroll, wait actions, screenshots, reports, and spec export.
 - Added deterministic headed/devtools launch-mode regression coverage without requiring a GUI display.
-- Added `npm run test:pack` local package dry-run verification using an ignored local npm cache.
+- Added `npm run test:pack` local package dry-run verification. The current script uses a `/tmp` npm cache so sandboxed product checks do not need to write cache data under the product repository.
 - Added `CHANGELOG.md` and `docs/workflow/RELEASE.md` for local release readiness without publishing.
 - Added browser smoke coverage for supervised ordered actions in one ephemeral context.
 - Added architecture regression coverage for generic runtime boundaries, shared evidence helpers, and local Node CLI packaging.

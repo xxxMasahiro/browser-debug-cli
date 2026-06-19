@@ -86,7 +86,9 @@ test('package keeps a standard local Node CLI surface', async () => {
   assert.ok(pkg.scripts.test);
   assert.ok(pkg.scripts['test:browser']);
   assert.ok(pkg.scripts['test:pack']);
+  assert.ok(pkg.scripts['test:pack-install']);
   assert.ok(pkg.scripts['release:check']);
+  assert.match(pkg.scripts['release:check'], /npm run test:pack-install/);
   assert.equal(pkg.scripts.postinstall, undefined);
   assert.equal(pkg.scripts.prepublishOnly, undefined);
   assert.doesNotMatch(JSON.stringify(pkg.scripts), /\b(?:gh|curl|wget|publish)\b/);
@@ -240,6 +242,7 @@ test('CI workflow stays generic and release-safe', async () => {
   assert.match(workflow, /run: npm ci/);
   assert.match(workflow, /run: npm test/);
   assert.match(workflow, /run: npm run test:pack/);
+  assert.match(workflow, /run: npm run test:pack-install/);
   assert.match(workflow, /run: npm run test:browser/);
   assert.doesNotMatch(workflow, /npm publish|gh repo|secrets\.|curl |wget /i);
 });

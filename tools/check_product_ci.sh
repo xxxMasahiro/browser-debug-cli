@@ -46,6 +46,7 @@ if [[ -s "$WORKFLOW" ]]; then
   require_pattern "$WORKFLOW" 'run: npm ci' 'locked dependency install'
   require_pattern "$WORKFLOW" 'run: npm test' 'no-browser tests'
   require_pattern "$WORKFLOW" 'run: npm run test:pack' 'package dry-run tests'
+  require_pattern "$WORKFLOW" 'run: npm run test:pack-install' 'packed install smoke tests'
   require_pattern "$WORKFLOW" 'run: npx playwright install --with-deps chromium' 'explicit Chromium install'
   require_pattern "$WORKFLOW" 'run: npm run test:browser' 'browser smoke tests'
   reject_pattern "$WORKFLOW" 'npm publish|gh repo|curl |wget |secrets\.' 'release, network upload, or secret usage'
