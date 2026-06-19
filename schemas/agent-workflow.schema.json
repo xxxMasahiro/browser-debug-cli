@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://browser-debug.local/schemas/agent-workflow.schema.json",
+  "title": "Browser Debug CLI Agent Workflow",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "status",
+    "workflow_path",
+    "package_path",
+    "steps",
+    "dashboard_handoff",
+    "provider_boundary",
+    "gate_effect",
+    "api_call_performed",
+    "automatic_upload",
+    "existing_review_mutated"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "waiting_for_agent",
+        "advisory_imported",
+        "package_missing"
+      ]
+    },
+    "created_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "updated_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "evaluated_at": {
+      "type": "string"
+    },
+    "workflow_path": {
+      "type": "string"
+    },
+    "workflow_receipt_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "package_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "package_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "prompt_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "receipt_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "review_artifact_index_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "review_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "task": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "surface": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "latest_result_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "result_paths": {
+      "type": "array"
+    },
+    "report_paths": {
+      "type": "array"
+    },
+    "advisory_findings": {
+      "type": "number"
+    },
+    "owner_decision_requests": {
+      "type": "number"
+    },
+    "steps": {
+      "type": "object"
+    },
+    "dashboard_handoff": {
+      "type": "object"
+    },
+    "request_status": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "request_detail": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "provider_boundary": {
+      "type": "object"
+    },
+    "gate_effect": {
+      "enum": [
+        "none"
+      ]
+    },
+    "external_evidence_transfer": {
+      "type": "boolean"
+    },
+    "api_call_performed": {
+      "type": "boolean"
+    },
+    "automatic_upload": {
+      "type": "boolean"
+    },
+    "existing_review_mutated": {
+      "type": "boolean"
+    },
+    "boundary": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

@@ -20,6 +20,7 @@ const ARTIFACT_DIRS = [
   'agent-packages',
   'agent-results',
   'agent-requests',
+  'agent-workflows',
   'receipts'
 ];
 

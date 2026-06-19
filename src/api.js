@@ -6,7 +6,11 @@ export {
   runAgentReport,
   runAgentRequestsList,
   runAgentRequestsShow,
-  runAgentSurfacesList
+  runAgentSurfacesList,
+  runAgentWorkflowCreate,
+  runAgentWorkflowIndex,
+  runAgentWorkflowReport,
+  runAgentWorkflowStatus
 } from './agent.js';
 export { runObserve } from './observe.js';
 export { buildArtifactCleanupPlan, runResourceArtifactsCleanup, runResourceArtifactsPlan } from './resource-artifacts.js';

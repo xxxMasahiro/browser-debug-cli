@@ -5,7 +5,11 @@ import {
   runAgentReport,
   runAgentRequestsList,
   runAgentRequestsShow,
-  runAgentSurfacesList
+  runAgentSurfacesList,
+  runAgentWorkflowCreate,
+  runAgentWorkflowIndex,
+  runAgentWorkflowReport,
+  runAgentWorkflowStatus
 } from './agent.js';
 import { daemonStatus, startDaemon, stopDaemon } from './daemon.js';
 import { runDoctor } from './doctor.js';
@@ -137,6 +141,22 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'agent requests show') {
       return runtimeResult(parsed.command, await (context.agentRequestsShowRunner ?? runAgentRequestsShow)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent workflow create') {
+      return runtimeResult(parsed.command, await (context.agentWorkflowCreateRunner ?? runAgentWorkflowCreate)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent workflow status') {
+      return runtimeResult(parsed.command, await (context.agentWorkflowStatusRunner ?? runAgentWorkflowStatus)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent workflow index') {
+      return runtimeResult(parsed.command, await (context.agentWorkflowIndexRunner ?? runAgentWorkflowIndex)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agent workflow report') {
+      return runtimeResult(parsed.command, await (context.agentWorkflowReportRunner ?? runAgentWorkflowReport)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'agent package') {
@@ -379,16 +399,30 @@ function usageText(topic) {
     ].join('\n');
   }
 
-  if (topic === 'agent' || topic === 'agent requests' || topic === 'agent requests list' || topic === 'agent requests show') {
+  if (
+    topic === 'agent'
+    || topic === 'agent requests'
+    || topic === 'agent requests list'
+    || topic === 'agent requests show'
+    || topic === 'agent workflow'
+    || topic === 'agent workflow create'
+    || topic === 'agent workflow status'
+    || topic === 'agent workflow index'
+    || topic === 'agent workflow report'
+  ) {
     return [
       `Usage: ${CLI_NAME} agent surfaces list [--json]`,
       `       ${CLI_NAME} agent package --review-index <review-artifact-index> [--surface <id>] [--json]`,
       `       ${CLI_NAME} agent requests list [--package <agent-package>] [--json]`,
       `       ${CLI_NAME} agent requests show --package <agent-package> [--agent-result <agent-result>] [--json]`,
+      `       ${CLI_NAME} agent workflow create --package <agent-package> [--name <name>] [--json]`,
+      `       ${CLI_NAME} agent workflow status --workflow <agent-workflow> [--json]`,
+      `       ${CLI_NAME} agent workflow index [--json]`,
+      `       ${CLI_NAME} agent workflow report --workflow <agent-workflow> [--json]`,
       `       ${CLI_NAME} agent ingest --package <agent-package> --input <agent-result-json> [--json]`,
       `       ${CLI_NAME} agent report --review-index <review-artifact-index> --agent-result <agent-result> [--json]`,
       '',
-      'Agent commands create local advisory handoff artifacts, show local request details, and import untrusted advisory JSON without provider API calls.'
+      'Agent commands create local advisory handoff artifacts, show local request and workflow status, and import untrusted advisory JSON without provider API calls.'
     ].join('\n');
   }
 

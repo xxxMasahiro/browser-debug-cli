@@ -311,6 +311,7 @@ test('schema commands expose machine-readable contracts', async () => {
     ['agent_task_package', '../schemas/agent-task-package.schema.json'],
     ['agent_request_status', '../schemas/agent-request-status.schema.json'],
     ['agent_request_detail', '../schemas/agent-request-detail.schema.json'],
+    ['agent_workflow', '../schemas/agent-workflow.schema.json'],
     ['agent_advisory_result', '../schemas/agent-advisory-result.schema.json'],
     ['agent_disclosure_policy', '../schemas/agent-disclosure-policy.schema.json']
   ];
@@ -452,6 +453,35 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   assert.equal(waitingDetailBody.data.agent_request_detail.existing_review_mutated, false);
   assert.deepEqual(waitingDetailBody.artifacts, []);
 
+  const workflowCreated = await executeCli([
+    'agent',
+    'workflow',
+    'create',
+    '--package',
+    '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+    '--name',
+    'Dashboard handoff',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agent-workflow-fixed'
+  });
+  assert.equal(workflowCreated.exitCode, 0);
+  const workflowCreatedBody = JSON.parse(workflowCreated.stdout);
+  assert.equal(workflowCreatedBody.command, 'agent workflow create');
+  assert.equal(workflowCreatedBody.data.agent_workflow.status, 'waiting_for_agent');
+  assert.equal(workflowCreatedBody.data.agent_workflow.workflow_path, '.browser-debug/agent-workflows/agent-workflow-fixed/workflow.json');
+  assert.equal(workflowCreatedBody.data.agent_workflow.steps.agent_review.status, 'waiting');
+  assert.equal(workflowCreatedBody.data.agent_workflow.provider_boundary.direct_provider_execution, false);
+  assert.equal(workflowCreatedBody.data.agent_workflow.provider_boundary.provider_api_call_performed, false);
+  assert.equal(workflowCreatedBody.data.agent_workflow.api_call_performed, false);
+  assert.equal(workflowCreatedBody.data.agent_workflow.automatic_upload, false);
+  assert.equal(workflowCreatedBody.data.agent_workflow.existing_review_mutated, false);
+  assert.equal(workflowCreatedBody.artifacts.some((artifact) => artifact.type === 'agent_workflow'), true);
+  const workflowFile = JSON.parse(await readFile(path.join(cwd, '.browser-debug', 'agent-workflows', 'agent-workflow-fixed', 'workflow.json'), 'utf8'));
+  assert.equal(workflowFile.dashboard_handoff.status_command, 'browser-debug agent workflow status --workflow .browser-debug/agent-workflows/agent-workflow-fixed/workflow.json --json');
+
   const advisoryInput = JSON.stringify({
     agent_advisory_findings: [{
       id: 'visual-density',
@@ -563,6 +593,74 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   assert.equal(importedDetailBody.data.agent_request_detail.api_call_performed, false);
   assert.equal(importedDetailBody.data.agent_request_detail.automatic_upload, false);
   assert.equal(importedDetailBody.data.agent_request_detail.existing_review_mutated, false);
+
+  const workflowStatus = await executeCli([
+    'agent',
+    'workflow',
+    'status',
+    '--workflow',
+    '.browser-debug/agent-workflows/agent-workflow-fixed/workflow.json',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(workflowStatus.exitCode, 0);
+  const workflowStatusBody = JSON.parse(workflowStatus.stdout);
+  assert.equal(workflowStatusBody.command, 'agent workflow status');
+  assert.equal(workflowStatusBody.data.agent_workflow_status.status, 'advisory_imported');
+  assert.equal(workflowStatusBody.data.agent_workflow_status.latest_result_path, '.browser-debug/agent-results/agent-result-fixed.json');
+  assert.equal(workflowStatusBody.data.agent_workflow_status.steps.ingest.status, 'completed');
+  assert.equal(workflowStatusBody.data.agent_workflow_status.steps.report.status, 'pending');
+  assert.equal(workflowStatusBody.data.agent_workflow_status.request_detail.agent_advisory_summary.advisory_findings, 1);
+  assert.equal(workflowStatusBody.data.agent_workflow_status.provider_boundary.direct_provider_execution, false);
+  assert.equal(workflowStatusBody.data.agent_workflow_status.provider_boundary.provider_api_call_performed, false);
+  assert.equal(workflowStatusBody.data.agent_workflow_status.api_call_performed, false);
+  assert.equal(workflowStatusBody.data.agent_workflow_status.existing_review_mutated, false);
+  assert.deepEqual(workflowStatusBody.artifacts, []);
+
+  const workflowIndex = await executeCli([
+    'agent',
+    'workflow',
+    'index',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(workflowIndex.exitCode, 0);
+  const workflowIndexBody = JSON.parse(workflowIndex.stdout);
+  assert.equal(workflowIndexBody.command, 'agent workflow index');
+  assert.equal(workflowIndexBody.data.summary.total, 1);
+  assert.equal(workflowIndexBody.data.summary.advisory_imported, 1);
+  assert.equal(workflowIndexBody.data.summary.report_pending, 1);
+  assert.equal(workflowIndexBody.data.summary.api_call_performed, false);
+  assert.equal(workflowIndexBody.data.summary.automatic_upload, false);
+  assert.equal(workflowIndexBody.data.summary.existing_review_mutated, false);
+
+  const workflowReport = await executeCli([
+    'agent',
+    'workflow',
+    'report',
+    '--workflow',
+    '.browser-debug/agent-workflows/agent-workflow-fixed/workflow.json',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agent-workflow-report-fixed'
+  });
+  assert.equal(workflowReport.exitCode, 0);
+  const workflowReportBody = JSON.parse(workflowReport.stdout);
+  assert.equal(workflowReportBody.command, 'agent workflow report');
+  assert.equal(workflowReportBody.data.agent_workflow_report.path, '.browser-debug/reports/agent-workflow-report-fixed.md');
+  assert.equal(workflowReportBody.data.agent_workflow_report.status, 'advisory_imported');
+  assert.equal(workflowReportBody.data.agent_workflow_report.existing_review_mutated, false);
+  assert.equal(workflowReportBody.data.provider_boundary.provider_api_call_performed, false);
+  assert.equal(workflowReportBody.artifacts.some((artifact) => artifact.type === 'agent_workflow_report'), true);
+  const workflowReportText = await readFile(path.join(cwd, '.browser-debug', 'reports', 'agent-workflow-report-fixed.md'), 'utf8');
+  assert.match(workflowReportText, /Agent Workflow Report/);
+  assert.match(workflowReportText, /Existing deterministic review findings/);
 
   await writeFile(
     path.join(cwd, '.browser-debug', 'agent-results', 'agent-result-other.json'),

@@ -31,6 +31,9 @@ product.target	optional	all	all	src/target.js	source	file_nonempty	workflow	Reus
 product.schemas	optional	all	all	schemas/review.schema.json	doc	file_nonempty	workflow	Public machine-readable schema files for review and adapter contracts.
 product.agent_surface_schema	optional	all	all	schemas/agent-surface.schema.json	doc	file_nonempty	workflow	Public schema for local subscription and future API provider surfaces.
 product.agent_task_package_schema	optional	all	all	schemas/agent-task-package.schema.json	doc	file_nonempty	workflow	Public schema for local agent evidence handoff packages.
+product.agent_request_status_schema	optional	all	all	schemas/agent-request-status.schema.json	doc	file_nonempty	workflow	Public schema for local agent request status output.
+product.agent_request_detail_schema	optional	all	all	schemas/agent-request-detail.schema.json	doc	file_nonempty	workflow	Public schema for local agent request detail output.
+product.agent_workflow_schema	optional	all	all	schemas/agent-workflow.schema.json	doc	file_nonempty	workflow	Public schema for local agent workflow status output.
 product.agent_advisory_result_schema	optional	all	all	schemas/agent-advisory-result.schema.json	doc	file_nonempty	workflow	Public schema for normalized untrusted agent advisory results.
 product.agent_disclosure_policy_schema	optional	all	all	schemas/agent-disclosure-policy.schema.json	doc	file_nonempty	workflow	Public schema for agent evidence disclosure policies.
 product.target_template	optional	all	all	templates/review-target-manifest.json	doc	file_nonempty	workflow	Reusable target manifest template for route and viewport review.

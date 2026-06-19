@@ -684,6 +684,19 @@ Phase 27 adds a read-only detail command for one local agent advisory handoff pa
 - Completed: machine-readable schema coverage includes `agent_request_detail`, and package API exports `runAgentRequestsShow`.
 - Completed: no-browser tests cover pending/imported detail output, schema parity, unchanged gate semantics, no artifact writes, no provider API calls, no automatic upload, and no review artifact mutation.
 
+### Phase 28: Local Agent Workflow Status
+
+Phase 28 adds a local workflow manifest and read-only workflow status/index layer for dashboard and local automation handoff. It builds on the Phase 25-27 agent package, request status, request detail, ingest, and report contracts. It remains provider-neutral, local-first, advisory-only, and additive. It does not add direct provider API calls, automatic upload, credential storage, MCP agent execution, external listeners, browser launch, review artifact mutation, external evidence transfer, or changes to deterministic review findings, `metrics.finding_count`, existing `action_plan`, or `quality_signals.release_readiness`.
+
+- Completed: `agent workflow create --package <path> --json` writes a local `.browser-debug/agent-workflows/<id>/workflow.json` manifest and workflow receipt from an existing agent package.
+- Completed: workflow manifests include package, prompt, request status/detail, dashboard handoff commands, step state, report-pending state, and explicit provider-boundary flags.
+- Completed: `agent workflow status --workflow <path> --json` recomputes current workflow state from local package/result metadata and reports `waiting_for_agent`, `advisory_imported`, or `package_missing` without writing artifacts.
+- Completed: `agent workflow index --json` aggregates local workflow manifests for dashboards and local automation, including waiting/imported/package-missing/report-pending counts and unchanged local boundary flags.
+- Completed: `agent workflow report --workflow <path> --json` writes a bounded local Markdown workflow status summary without mutating review artifacts.
+- Completed: machine-readable schema coverage includes `agent_workflow`, and package API exports `runAgentWorkflowCreate`, `runAgentWorkflowStatus`, `runAgentWorkflowIndex`, and `runAgentWorkflowReport`.
+- Completed: no-browser tests cover workflow creation, post-ingest status recomputation, index aggregation, workflow report output, schema parity, unchanged gate semantics, no provider API calls, no automatic upload, and no review artifact mutation.
+- Completed as an approval boundary: direct API/provider execution remains represented only as disabled provider-boundary metadata. No provider SDK, network request, credential loading, endpoint selection, model selection, MCP agent execution, or external evidence transfer was implemented.
+
 ## Verification Method
 
 - `./tools/product-gate`
@@ -721,6 +734,7 @@ Phase 27 adds a read-only detail command for one local agent advisory handoff pa
 - Phase 25 checks cover agent surface listing, evidence package generation, prompt and receipt artifacts, advisory result ingest, advisory report generation, schema parity, API-boundary status, unchanged deterministic gate semantics, and architecture boundaries that prevent provider API calls, automatic upload, credential storage, external listeners, shell execution, profile reuse, MCP agent execution, and review artifact mutation.
 - Phase 26 checks cover local agent request status listing, pending/imported transitions, single-package filtering, request status schema parity, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, and no review artifact mutation.
 - Phase 27 checks cover local agent request detail output, selected-result matching, request detail schema parity, no artifact writes, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, and no review artifact mutation.
+- Phase 28 checks cover local agent workflow creation, workflow status recomputation, workflow index aggregation, workflow report output, workflow schema parity, local workflow receipts, no browser launch, no provider API calls, no automatic upload, no credential storage, no MCP agent execution, no external evidence transfer, and no review artifact mutation.
 - Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
 
 ## Recovery Path

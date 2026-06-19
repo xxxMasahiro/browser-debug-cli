@@ -16,6 +16,7 @@ import { redact, truncateText } from './redaction.js';
 
 const DEFAULT_AGENT_SURFACE = 'local-subscription-agent';
 const DEFAULT_AGENT_TASK = 'experience_review';
+const DEFAULT_AGENT_WORKFLOW_NAME = 'local-agent-advisory-workflow';
 const MAX_AGENT_FINDINGS = 50;
 const MAX_OWNER_DECISIONS = 25;
 
@@ -48,6 +49,7 @@ export const AGENT_SURFACES = Object.freeze([
       'agent_task_package',
       'local_artifact_references',
       'prompt_handoff',
+      'agent_workflow_tracking',
       'agent_advisory_import'
     ],
     boundaries: {
@@ -70,6 +72,7 @@ export const AGENT_SURFACES = Object.freeze([
     capabilities: [
       'agent_task_package',
       'prompt_handoff',
+      'agent_workflow_tracking',
       'agent_advisory_import'
     ],
     boundaries: {
@@ -191,6 +194,238 @@ export async function runAgentRequestsShow(options = {}, context = {}) {
     warnings: [...packageRead.warnings, ...resultRead.warnings, ...resultSelection.warnings],
     errors: [],
     artifacts: []
+  };
+}
+
+export async function runAgentWorkflowCreate(options = {}, context = {}) {
+  const cwd = context.cwd ?? process.cwd();
+  const now = currentDate(context.now);
+  const artifactRootInput = options['artifact-root'] ?? DEFAULT_ARTIFACT_ROOT;
+  const root = await ensureArtifactRoot(cwd, artifactRootInput);
+  const id = context.createId?.('agent-workflow', now) ?? createArtifactId(now, 'agent-workflow');
+
+  const packageRead = await readAgentPackages(cwd, artifactRootInput, options.package);
+  if (!packageRead.ok) {
+    return errorResult(packageRead.error.code, packageRead.error.message, packageRead.error.details);
+  }
+  const [agentPackage] = packageRead.packages;
+  if (!agentPackage) {
+    return errorResult('AGENT_PACKAGE_NOT_FOUND', 'No agent package was found for the requested path.', {
+      package_path: options.package
+    });
+  }
+
+  const resultRead = await readAgentResults(cwd, artifactRootInput);
+  const status = requestStatusFromPackage(agentPackage, resultRead.results);
+  const resultSelection = await selectAgentResult({
+    cwd,
+    explicitResultPath: options['agent-result'],
+    agentPackage,
+    resultRead
+  });
+  if (!resultSelection.ok) {
+    return errorResult(resultSelection.error.code, resultSelection.error.message, resultSelection.error.details);
+  }
+
+  const workflowRel = artifactRelPath(artifactRootInput, 'agent-workflows', id, 'workflow.json');
+  const receiptRel = artifactRelPath(artifactRootInput, 'receipts', `${id}.json`);
+  const detail = requestDetailFromPackage({
+    agentPackage,
+    status,
+    selectedResult: resultSelection.selectedResult
+  });
+  const workflow = buildAgentWorkflowRecord({
+    id,
+    name: normalizeWorkflowName(options.name),
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    evaluatedAt: now.toISOString(),
+    workflowPath: workflowRel,
+    workflowReceiptPath: receiptRel,
+    requestStatus: status,
+    requestDetail: detail
+  });
+  const receipt = redact({
+    schema_version: SCHEMA_VERSION,
+    type: 'agent_workflow_receipt',
+    id,
+    created_at: now.toISOString(),
+    workflow_path: workflowRel,
+    package_path: status.package_path,
+    package_hash: hashJson(agentPackage.packet),
+    prompt_path: status.prompt_path,
+    latest_result_path: status.latest_result_path,
+    external_evidence_transfer: false,
+    api_call_performed: false,
+    automatic_upload: false,
+    credential_values_recorded: false,
+    existing_review_mutated: false
+  });
+
+  await writeJsonArtifact(root, ['agent-workflows', id, 'workflow.json'], workflow);
+  await writeJsonArtifact(root, ['receipts', `${id}.json`], receipt);
+
+  return {
+    status: 'ok',
+    data: {
+      agent_workflow: workflow,
+      agent_workflow_status: workflow,
+      agent_request: status,
+      provider_boundary: providerBoundary(),
+      boundary: commonBoundary()
+    },
+    warnings: [...packageRead.warnings, ...resultRead.warnings, ...resultSelection.warnings],
+    errors: [],
+    artifacts: [
+      artifactObject({
+        type: 'agent_workflow',
+        path: workflowRel,
+        description: 'Local agent workflow manifest for dashboard and automation handoff.'
+      }),
+      artifactObject({
+        type: 'agent_workflow_receipt',
+        path: receiptRel,
+        description: 'Content-free receipt for the local agent workflow manifest.'
+      })
+    ]
+  };
+}
+
+export async function runAgentWorkflowStatus(options = {}, context = {}) {
+  const cwd = context.cwd ?? process.cwd();
+  const now = currentDate(context.now);
+  const artifactRootInput = options['artifact-root'] ?? DEFAULT_ARTIFACT_ROOT;
+  const workflowRead = await readAgentWorkflows(cwd, artifactRootInput, options.workflow);
+  if (!workflowRead.ok) {
+    return errorResult(workflowRead.error.code, workflowRead.error.message, workflowRead.error.details);
+  }
+  const [agentWorkflow] = workflowRead.workflows;
+  if (!agentWorkflow) {
+    return errorResult('AGENT_WORKFLOW_NOT_FOUND', 'No agent workflow was found for the requested path.', {
+      workflow_path: options.workflow
+    });
+  }
+
+  const resultRead = await readAgentResults(cwd, artifactRootInput);
+  const statusResult = await workflowStatusFromRecord({
+    cwd,
+    artifactRootInput,
+    agentWorkflow,
+    resultRead,
+    now
+  });
+
+  return {
+    status: 'ok',
+    data: {
+      agent_workflow_status: statusResult.status,
+      provider_boundary: providerBoundary(),
+      boundary: commonBoundary()
+    },
+    warnings: [...workflowRead.warnings, ...resultRead.warnings, ...statusResult.warnings],
+    errors: [],
+    artifacts: []
+  };
+}
+
+export async function runAgentWorkflowIndex(options = {}, context = {}) {
+  const cwd = context.cwd ?? process.cwd();
+  const now = currentDate(context.now);
+  const artifactRootInput = options['artifact-root'] ?? DEFAULT_ARTIFACT_ROOT;
+  const workflowRead = await readAgentWorkflows(cwd, artifactRootInput);
+  if (!workflowRead.ok) {
+    return errorResult(workflowRead.error.code, workflowRead.error.message, workflowRead.error.details);
+  }
+  const resultRead = await readAgentResults(cwd, artifactRootInput);
+  const statusResults = await Promise.all(workflowRead.workflows.map((agentWorkflow) => workflowStatusFromRecord({
+    cwd,
+    artifactRootInput,
+    agentWorkflow,
+    resultRead,
+    now
+  })));
+  const statuses = statusResults
+    .map((result) => result.status)
+    .sort((left, right) => String(left.created_at ?? '').localeCompare(String(right.created_at ?? '')));
+
+  return {
+    status: 'ok',
+    data: {
+      agent_workflows: statuses,
+      summary: summarizeWorkflowStatuses(statuses),
+      provider_boundary: providerBoundary(),
+      boundary: commonBoundary()
+    },
+    warnings: [
+      ...workflowRead.warnings,
+      ...resultRead.warnings,
+      ...statusResults.flatMap((result) => result.warnings)
+    ],
+    errors: [],
+    artifacts: []
+  };
+}
+
+export async function runAgentWorkflowReport(options = {}, context = {}) {
+  const cwd = context.cwd ?? process.cwd();
+  const now = currentDate(context.now);
+  const artifactRootInput = options['artifact-root'] ?? DEFAULT_ARTIFACT_ROOT;
+  const root = await ensureArtifactRoot(cwd, artifactRootInput);
+  const id = context.createId?.('agent-workflow-report', now) ?? createArtifactId(now, 'agent-workflow-report');
+  const workflowRead = await readAgentWorkflows(cwd, artifactRootInput, options.workflow);
+  if (!workflowRead.ok) {
+    return errorResult(workflowRead.error.code, workflowRead.error.message, workflowRead.error.details);
+  }
+  const [agentWorkflow] = workflowRead.workflows;
+  if (!agentWorkflow) {
+    return errorResult('AGENT_WORKFLOW_NOT_FOUND', 'No agent workflow was found for the requested path.', {
+      workflow_path: options.workflow
+    });
+  }
+
+  const resultRead = await readAgentResults(cwd, artifactRootInput);
+  const statusResult = await workflowStatusFromRecord({
+    cwd,
+    artifactRootInput,
+    agentWorkflow,
+    resultRead,
+    now
+  });
+  const report = renderAgentWorkflowReport({
+    id,
+    now,
+    workflowStatus: statusResult.status
+  });
+  const reportRel = artifactRelPath(artifactRootInput, 'reports', `${id}.md`);
+  await writeTextArtifact(root, ['reports', `${id}.md`], report);
+
+  return {
+    status: 'ok',
+    data: {
+      agent_workflow_report: {
+        id,
+        path: reportRel,
+        workflow_path: statusResult.status.workflow_path,
+        package_path: statusResult.status.package_path,
+        status: statusResult.status.status,
+        advisory_findings: statusResult.status.advisory_findings,
+        owner_decision_requests: statusResult.status.owner_decision_requests,
+        gate_effect: 'none',
+        existing_review_mutated: false
+      },
+      agent_workflow_status: statusResult.status,
+      provider_boundary: providerBoundary(),
+      boundary: commonBoundary()
+    },
+    warnings: [...workflowRead.warnings, ...resultRead.warnings, ...statusResult.warnings],
+    errors: [],
+    artifacts: [
+      artifactObject({
+        type: 'agent_workflow_report',
+        path: reportRel,
+        description: 'Markdown report for local agent workflow status.'
+      })
+    ]
   };
 }
 
@@ -628,6 +863,116 @@ async function readAgentResults(cwd, artifactRootInput) {
   return { results, warnings };
 }
 
+async function readAgentWorkflows(cwd, artifactRootInput, workflowPath) {
+  if (workflowPath) {
+    const input = await readWorkspaceJson(cwd, workflowPath, 'agent workflow');
+    if (!input.ok) {
+      return input;
+    }
+    return {
+      ok: true,
+      workflows: [{
+        workflow: input.value,
+        workflow_path: input.relativePath
+      }],
+      warnings: []
+    };
+  }
+
+  const root = resolveArtifactRoot(cwd, artifactRootInput);
+  const workflowRoot = path.join(root, 'agent-workflows');
+  const entries = await readDirectoryOrEmpty(workflowRoot);
+  const workflows = [];
+  const warnings = [];
+  for (const entry of entries.filter((candidate) => candidate.isDirectory())) {
+    const relPath = artifactRelPath(artifactRootInput, 'agent-workflows', entry.name, 'workflow.json');
+    const filePath = path.join(workflowRoot, entry.name, 'workflow.json');
+    try {
+      workflows.push({
+        workflow: JSON.parse(await readFile(filePath, 'utf8')),
+        workflow_path: relPath
+      });
+    } catch (error) {
+      warnings.push({
+        code: 'AGENT_WORKFLOW_INDEX_READ_FAILED',
+        message: 'Could not read an agent workflow while listing workflow status.',
+        details: { path: relPath, reason: error.message }
+      });
+    }
+  }
+  return { ok: true, workflows, warnings };
+}
+
+async function workflowStatusFromRecord({ cwd, artifactRootInput, agentWorkflow, resultRead, now }) {
+  const workflow = agentWorkflow.workflow ?? {};
+  const workflowPath = agentWorkflow.workflow_path;
+  const packagePath = stringOrNull(workflow.package_path);
+  if (!packagePath) {
+    return {
+      status: missingAgentWorkflowStatus({
+        workflow,
+        workflowPath,
+        reason: 'workflow package path is missing',
+        now
+      }),
+      warnings: [{
+        code: 'AGENT_WORKFLOW_PACKAGE_PATH_MISSING',
+        message: 'The agent workflow does not include a package path.',
+        details: { workflow_path: workflowPath }
+      }]
+    };
+  }
+
+  const packageRead = await readAgentPackages(cwd, artifactRootInput, packagePath);
+  if (!packageRead.ok || packageRead.packages.length === 0) {
+    return {
+      status: missingAgentWorkflowStatus({
+        workflow,
+        workflowPath,
+        reason: packageRead.error?.message ?? 'agent package was not found',
+        now
+      }),
+      warnings: [{
+        code: 'AGENT_WORKFLOW_PACKAGE_NOT_FOUND',
+        message: 'The agent workflow package could not be read.',
+        details: {
+          workflow_path: workflowPath,
+          package_path: packagePath,
+          reason: packageRead.error?.message ?? 'not found'
+        }
+      }]
+    };
+  }
+
+  const [agentPackage] = packageRead.packages;
+  const requestStatus = requestStatusFromPackage(agentPackage, resultRead.results);
+  const resultSelection = await selectAgentResult({
+    cwd,
+    explicitResultPath: null,
+    agentPackage,
+    resultRead
+  });
+  const requestDetail = requestDetailFromPackage({
+    agentPackage,
+    status: requestStatus,
+    selectedResult: resultSelection.selectedResult
+  });
+  return {
+    status: buildAgentWorkflowRecord({
+      id: stringOrNull(workflow.id) ?? workflowIdFromPath(workflowPath),
+      name: normalizeWorkflowName(workflow.name),
+      createdAt: stringOrNull(workflow.created_at) ?? stringOrNull(requestStatus.created_at) ?? now.toISOString(),
+      updatedAt: stringOrNull(workflow.updated_at) ?? stringOrNull(workflow.created_at) ?? now.toISOString(),
+      evaluatedAt: now.toISOString(),
+      workflowPath,
+      workflowReceiptPath: stringOrNull(workflow.workflow_receipt_path) ?? stringOrNull(workflow.receipt_path),
+      requestStatus,
+      requestDetail
+    }),
+    warnings: [...packageRead.warnings, ...resultSelection.warnings]
+  };
+}
+
 async function readDirectoryOrEmpty(directory) {
   try {
     return await readdir(directory, { withFileTypes: true });
@@ -691,6 +1036,172 @@ function summarizeRequestStatuses(statuses) {
       summary.advisory_imported += 1;
     }
     summary.external_evidence_transfer = summary.external_evidence_transfer || status.external_evidence_transfer;
+  }
+  return summary;
+}
+
+function buildAgentWorkflowRecord({
+  id,
+  name,
+  createdAt,
+  updatedAt,
+  evaluatedAt,
+  workflowPath,
+  workflowReceiptPath,
+  requestStatus,
+  requestDetail
+}) {
+  const reportCommand = requestDetail.dashboard_handoff?.report_command ?? null;
+  return redact({
+    schema_version: SCHEMA_VERSION,
+    id,
+    name,
+    status: requestStatus.status,
+    created_at: createdAt,
+    updated_at: updatedAt,
+    evaluated_at: evaluatedAt,
+    workflow_path: workflowPath,
+    workflow_receipt_path: workflowReceiptPath,
+    package_id: requestStatus.package_id,
+    package_path: requestStatus.package_path,
+    prompt_path: requestStatus.prompt_path,
+    receipt_path: requestStatus.receipt_path,
+    review_artifact_index_path: requestStatus.review_artifact_index_path,
+    review_id: requestStatus.review_id,
+    task: requestStatus.task,
+    surface: requestStatus.surface,
+    latest_result_path: requestStatus.latest_result_path,
+    result_paths: requestStatus.result_paths,
+    report_paths: [],
+    advisory_findings: requestStatus.advisory_findings,
+    owner_decision_requests: requestStatus.owner_decision_requests,
+    steps: {
+      package: {
+        status: 'completed',
+        path: requestStatus.package_path,
+        prompt_path: requestStatus.prompt_path
+      },
+      agent_review: {
+        status: requestStatus.status === 'advisory_imported' ? 'completed' : 'waiting',
+        prompt_path: requestStatus.prompt_path,
+        expected_schema: 'agent_advisory_result'
+      },
+      ingest: {
+        status: requestStatus.latest_result_path ? 'completed' : 'pending',
+        latest_result_path: requestStatus.latest_result_path
+      },
+      report: {
+        status: requestStatus.latest_result_path ? 'pending' : 'blocked_waiting_for_agent',
+        suggested_command: reportCommand
+      }
+    },
+    dashboard_handoff: {
+      status_label: requestStatus.status,
+      next_step: requestStatus.next_step,
+      package_path: requestStatus.package_path,
+      prompt_path: requestStatus.prompt_path,
+      agent_result_path: requestStatus.latest_result_path,
+      ingest_command: `browser-debug agent ingest --package ${requestStatus.package_path} --input @agent-advisory-result.json --json`,
+      report_command: reportCommand,
+      status_command: `browser-debug agent workflow status --workflow ${workflowPath} --json`,
+      index_command: 'browser-debug agent workflow index --json'
+    },
+    request_status: requestStatus,
+    request_detail: requestDetail,
+    provider_boundary: providerBoundary(),
+    gate_effect: 'none',
+    external_evidence_transfer: requestStatus.external_evidence_transfer,
+    api_call_performed: false,
+    automatic_upload: false,
+    existing_review_mutated: false,
+    boundary: commonBoundary()
+  });
+}
+
+function missingAgentWorkflowStatus({ workflow, workflowPath, reason, now }) {
+  const packagePath = stringOrNull(workflow.package_path);
+  return redact({
+    schema_version: SCHEMA_VERSION,
+    id: stringOrNull(workflow.id) ?? workflowIdFromPath(workflowPath),
+    name: normalizeWorkflowName(workflow.name),
+    status: 'package_missing',
+    created_at: stringOrNull(workflow.created_at),
+    updated_at: stringOrNull(workflow.updated_at),
+    evaluated_at: now.toISOString(),
+    workflow_path: workflowPath,
+    workflow_receipt_path: stringOrNull(workflow.workflow_receipt_path) ?? stringOrNull(workflow.receipt_path),
+    package_id: stringOrNull(workflow.package_id),
+    package_path: packagePath,
+    prompt_path: stringOrNull(workflow.prompt_path),
+    receipt_path: stringOrNull(workflow.receipt_path),
+    review_artifact_index_path: stringOrNull(workflow.review_artifact_index_path),
+    review_id: stringOrNull(workflow.review_id),
+    task: stringOrNull(workflow.task),
+    surface: workflow.surface && typeof workflow.surface === 'object' ? surfaceSummaryFromPacket(workflow.surface) : null,
+    latest_result_path: null,
+    result_paths: [],
+    report_paths: [],
+    advisory_findings: 0,
+    owner_decision_requests: 0,
+    steps: {
+      package: { status: 'missing', path: packagePath },
+      agent_review: { status: 'blocked_package_missing' },
+      ingest: { status: 'blocked_package_missing' },
+      report: { status: 'blocked_package_missing' }
+    },
+    dashboard_handoff: {
+      status_label: 'package_missing',
+      next_step: 'Restore the referenced local agent package or create a new agent workflow from an existing package.',
+      package_path: packagePath,
+      prompt_path: stringOrNull(workflow.prompt_path),
+      agent_result_path: null,
+      ingest_command: null,
+      report_command: null,
+      status_command: `browser-debug agent workflow status --workflow ${workflowPath} --json`,
+      index_command: 'browser-debug agent workflow index --json'
+    },
+    request_status: null,
+    request_detail: null,
+    provider_boundary: providerBoundary(),
+    gate_effect: 'none',
+    external_evidence_transfer: false,
+    api_call_performed: false,
+    automatic_upload: false,
+    existing_review_mutated: false,
+    reason,
+    boundary: commonBoundary()
+  });
+}
+
+function summarizeWorkflowStatuses(statuses) {
+  const summary = {
+    total: statuses.length,
+    waiting_for_agent: 0,
+    advisory_imported: 0,
+    package_missing: 0,
+    report_pending: 0,
+    external_evidence_transfer: false,
+    api_call_performed: false,
+    automatic_upload: false,
+    existing_review_mutated: false
+  };
+  for (const status of statuses) {
+    if (status.status === 'waiting_for_agent') {
+      summary.waiting_for_agent += 1;
+    }
+    if (status.status === 'advisory_imported') {
+      summary.advisory_imported += 1;
+    }
+    if (status.status === 'package_missing') {
+      summary.package_missing += 1;
+    }
+    if (status.steps?.report?.status === 'pending') {
+      summary.report_pending += 1;
+    }
+    summary.external_evidence_transfer = summary.external_evidence_transfer || Boolean(status.external_evidence_transfer);
+    summary.api_call_performed = summary.api_call_performed || Boolean(status.api_call_performed);
+    summary.automatic_upload = summary.automatic_upload || Boolean(status.automatic_upload);
+    summary.existing_review_mutated = summary.existing_review_mutated || Boolean(status.existing_review_mutated);
   }
   return summary;
 }
@@ -1030,6 +1541,48 @@ function renderAgentReport({ id, now, reviewIndex, reviewIndexPath, agentResult,
   return `${lines.join('\n')}\n`;
 }
 
+function renderAgentWorkflowReport({ id, now, workflowStatus }) {
+  const steps = workflowStatus.steps ?? {};
+  const advisorySummary = workflowStatus.request_detail?.agent_advisory_summary ?? null;
+  const lines = [
+    `# Browser Debug Agent Workflow Report: ${id}`,
+    '',
+    `- Generated at: ${now.toISOString()}`,
+    `- Workflow: ${workflowStatus.workflow_path}`,
+    `- Package: ${workflowStatus.package_path ?? 'missing'}`,
+    `- Status: ${workflowStatus.status}`,
+    '- Gate effect: none',
+    '- Existing review mutated: false',
+    '',
+    '## Boundary',
+    '',
+    '- Workflow output is local advisory handoff data.',
+    '- Existing deterministic review findings, metrics, action plans, and release readiness remain unchanged.',
+    '- No API call, external upload, shell command, cleanup, profile reuse, credential storage, or MCP agent execution is performed by this report.',
+    '',
+    '## Steps',
+    '',
+    `- Package: ${steps.package?.status ?? 'unknown'}`,
+    `- Agent review: ${steps.agent_review?.status ?? 'unknown'}`,
+    `- Ingest: ${steps.ingest?.status ?? 'unknown'}`,
+    `- Report: ${steps.report?.status ?? 'unknown'}`,
+    '',
+    '## Advisory Summary',
+    ''
+  ];
+  if (advisorySummary) {
+    lines.push(`- Advisory findings: ${advisorySummary.advisory_findings}`);
+    lines.push(`- Owner decision requests: ${advisorySummary.owner_decision_requests}`);
+    lines.push(`- Action items: ${advisorySummary.action_items}`);
+    lines.push('');
+  } else {
+    lines.push('No imported advisory result is linked to this workflow yet.', '');
+  }
+  lines.push('## Next Step', '');
+  lines.push(`- ${workflowStatus.dashboard_handoff?.next_step ?? 'Review the workflow status JSON for the next local handoff step.'}`, '');
+  return `${lines.join('\n')}\n`;
+}
+
 function normalizeArtifactReferences(artifacts) {
   if (!Array.isArray(artifacts)) {
     return [];
@@ -1153,6 +1706,21 @@ function commonBoundary() {
   };
 }
 
+function providerBoundary() {
+  return {
+    direct_provider_execution: false,
+    provider_api_call_performed: false,
+    external_evidence_transfer: false,
+    automatic_upload: false,
+    credential_storage: false,
+    persistent_credential_storage: false,
+    browser_profile_reuse: false,
+    mcp_agent_execution: false,
+    implemented: false,
+    approval_required_before_provider_execution: true
+  };
+}
+
 function findSurface(id) {
   return AGENT_SURFACES.find((surface) => surface.id === id) ?? null;
 }
@@ -1172,6 +1740,16 @@ function surfaceSummary(surface) {
 function normalizeTask(value) {
   const task = truncateText(value, 120);
   return task || DEFAULT_AGENT_TASK;
+}
+
+function normalizeWorkflowName(value) {
+  const name = truncateText(value ?? DEFAULT_AGENT_WORKFLOW_NAME, 160);
+  return name || DEFAULT_AGENT_WORKFLOW_NAME;
+}
+
+function workflowIdFromPath(workflowPath) {
+  const fileName = path.posix.basename(path.posix.dirname(String(workflowPath).replace(/\\/g, '/')));
+  return fileName || 'agent-workflow';
 }
 
 function normalizeStringArray(values) {

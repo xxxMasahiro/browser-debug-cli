@@ -49,6 +49,10 @@ browser-debug agent surfaces list --json
 browser-debug agent package --review-index <review-artifact-index> --surface <surface-id> --json
 browser-debug agent requests list --json
 browser-debug agent requests show --package <agent-package> --json
+browser-debug agent workflow create --package <agent-package> --json
+browser-debug agent workflow status --workflow <agent-workflow> --json
+browser-debug agent workflow index --json
+browser-debug agent workflow report --workflow <agent-workflow> --json
 browser-debug agent ingest --package <agent-package> --input <agent-result-json> --json
 browser-debug agent report --review-index <review-artifact-index> --agent-result <agent-result> --json
 browser-debug target init --url <url> --json
@@ -95,6 +99,10 @@ Implemented behavior:
 - `agent package --review-index <path> --surface <id> --json` reads an explicitly provided local review artifact index, creates `.browser-debug/agent-packages/<id>/packet.json`, `.browser-debug/agent-packages/<id>/prompt.md`, and an evidence-packet receipt. The package includes bounded triage, coverage, evidence-class, rerun, and local artifact-reference metadata only. It does not copy raw screenshot bytes, trace contents, raw DOM, console payloads, network payloads, reports, or sourceData values.
 - `agent requests list --json` scans local `.browser-debug/agent-packages/` and `.browser-debug/agent-results/` metadata and reports whether each advisory package is `waiting_for_agent` or `advisory_imported`. `--package <path>` narrows the status to one workspace-relative package. The command is read-only, does not launch a browser, does not contact providers, does not upload evidence, does not store credentials, does not expose MCP agent execution, and does not mutate review artifacts.
 - `agent requests show --package <path> --json` reads one workspace-relative package and returns package metadata, disclosure policy, local artifact-reference summaries, source review index metadata, selected/latest result paths, bounded advisory result summary, and dashboard handoff hints. `--agent-result <path>` can select a specific matching workspace-relative result. The command is read-only, writes no artifacts, does not launch a browser, does not contact providers, does not upload evidence, does not store credentials, does not expose MCP agent execution, and does not mutate review artifacts.
+- `agent workflow create --package <path> --json` reads one workspace-relative package, writes `.browser-debug/agent-workflows/<id>/workflow.json` plus a workflow receipt, and records dashboard-oriented package, prompt, agent-review, ingest, report-pending, request status, and provider-boundary metadata. The manifest contains local references and bounded metadata only; it does not copy raw artifact bytes, execute agents, contact providers, upload evidence, store credentials, launch a browser, expose MCP agent execution, or mutate review artifacts.
+- `agent workflow status --workflow <path> --json` reads one workspace-relative workflow manifest, recomputes current status from local package/result metadata, and reports `waiting_for_agent`, `advisory_imported`, or `package_missing` with dashboard handoff commands. The command is read-only and writes no artifacts.
+- `agent workflow index --json` scans local `.browser-debug/agent-workflows/` manifests and returns aggregate workflow status counts, report-pending counts, and explicit provider boundary flags without writing artifacts, launching a browser, contacting providers, uploading evidence, storing credentials, exposing MCP agent execution, or mutating review artifacts.
+- `agent workflow report --workflow <path> --json` reads one workflow status snapshot, writes a bounded Markdown summary under `.browser-debug/reports/`, and keeps deterministic review artifacts unchanged. It does not launch a browser, contact providers, upload evidence, store credentials, expose MCP agent execution, or mutate review artifacts.
 - `agent ingest --package <path> --input <json> --json` validates and normalizes untrusted agent output from inline JSON, stdin, or a workspace-relative `@file` into `agent_advisory`, `agent_advisory_findings`, `agent_advisory_action_plan`, `agent_advisory_readiness`, and `owner_decision_requests`. These outputs are separate from review `findings`, `metrics.finding_count`, existing `action_plan`, and `quality_signals.release_readiness`.
 - `agent report --review-index <path> --agent-result <path> --json` writes a separate Markdown advisory report under `.browser-debug/reports/` without mutating existing review artifacts.
 - `session start --url <url>` creates local session metadata and can attach the first observation.
@@ -361,6 +369,19 @@ dashboard handoff hints and local safety boundary flags
 ```
 
 The request detail command is read-only over local package/result metadata. It does not write artifacts, execute an agent, call a provider API, upload evidence, store credentials, mutate review artifacts, or change deterministic gates.
+
+`agent_workflow` records one local dashboard or automation handoff workflow:
+
+```text
+workflow id, name, path, receipt path, and evaluated time
+package path, prompt path, request status, and request detail
+step state for package, agent review, ingest, and report
+dashboard handoff commands for status, index, ingest, and report
+provider boundary flags
+local safety boundary flags
+```
+
+Workflow create writes only local workflow metadata and a receipt under `.browser-debug/`. Workflow status and index are read-only over workflow/package/result metadata. Workflow report writes a bounded local Markdown status summary. These commands do not execute an agent, call a provider API, upload evidence, store credentials, mutate review artifacts, expose MCP agent execution, or change deterministic gates.
 
 `agent_advisory_result` records imported advisory output as untrusted text. It may include visual design, content information architecture, user journey, mock interpretation, implementation diagnosis, accessibility advisory, and evidence-quality categories. It must set `gate_effect="none"`, `legacy_action_plan_unchanged=true`, `legacy_release_readiness_unchanged=true`, and `blocking_release_gate=false`. Imported advisory output must never execute shell commands, browser actions, file edits, cleanup, publication, dependency changes, manifest mutations, or external uploads.
 
