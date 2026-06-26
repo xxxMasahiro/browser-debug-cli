@@ -124,6 +124,11 @@ import {
   API_PROVIDER_CREDENTIAL_ENV,
   API_PROVIDER_ENDPOINT_ENV
 } from '../src/agent-execution-providers.js';
+import {
+  agenticHumanReviewBoundary,
+  runAgenticHumanReviewPlan,
+  runAgenticHumanReviewRun
+} from '../src/agentic-human-review.js';
 
 const fixedNow = '2026-06-17T00:00:00.000Z';
 
@@ -2052,6 +2057,11 @@ test('schema commands expose machine-readable contracts', async () => {
     ['agent_request_detail', '../schemas/agent-request-detail.schema.json'],
     ['agent_workflow', '../schemas/agent-workflow.schema.json'],
     ['agent_execution', '../schemas/agent-execution.schema.json'],
+    ['agentic_human_review_plan', '../schemas/agentic-human-review-plan.schema.json'],
+    ['agentic_human_review_package', '../schemas/agentic-human-review-package.schema.json'],
+    ['human_review_rubric', '../schemas/human-review-rubric.schema.json'],
+    ['agentic_human_review_advisory', '../schemas/agentic-human-review-advisory.schema.json'],
+    ['agentic_human_review_receipt', '../schemas/agentic-human-review-receipt.schema.json'],
     ['agent_advisory_result', '../schemas/agent-advisory-result.schema.json'],
     ['agent_disclosure_policy', '../schemas/agent-disclosure-policy.schema.json']
   ];
@@ -3239,6 +3249,390 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   assert.match(report, /Existing deterministic review findings/);
 });
 
+test('agentic human review enforces plan approval, transfer flags, and advisory-only output', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'trace-cue-agentic-review-'));
+  const png = minimalPngBuffer(160, 90);
+  await writeFile(path.join(cwd, 'screen.png'), png);
+
+  const imageReview = await executeCli(['review', '--image', 'screen.png', '--json'], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'image-review-fixed'
+  });
+  assert.equal(imageReview.exitCode, 0);
+  const reviewIndexPath = '.browser-debug/review-artifacts/image-review-fixed.json';
+  const originalReviewText = await readFile(path.join(cwd, '.browser-debug', 'reviews', 'image-review-fixed.json'), 'utf8');
+  const originalIndexText = await readFile(path.join(cwd, reviewIndexPath), 'utf8');
+
+  const parsedPlan = parseCliArgs([
+    'agentic',
+    'review',
+    'plan',
+    '--review-index',
+    reviewIndexPath,
+    '--intent',
+    'Review the visual UI, page text, readability, trust, and likely user reaction.',
+    '--effort',
+    'xhigh',
+    '--default-subagent-effort',
+    'high',
+    '--role-efforts',
+    'critic_reviewer:xhigh,verification_reviewer:xhigh',
+    '--json'
+  ]);
+  assert.equal(parsedPlan.ok, true);
+  assert.equal(parsedPlan.command, 'agentic review plan');
+
+  const planResult = await executeCli([
+    'agentic',
+    'review',
+    'plan',
+    '--review-index',
+    reviewIndexPath,
+    '--intent',
+    'Review the visual UI, page text, readability, trust, and likely user reaction.',
+    '--effort',
+    'xhigh',
+    '--default-subagent-effort',
+    'high',
+    '--role-efforts',
+    'critic_reviewer:xhigh,verification_reviewer:xhigh',
+    '--surface',
+    'local-subscription-agent',
+    '--provider',
+    'fake-agent',
+    '--model',
+    'fake-model',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agentic-plan-fixed'
+  });
+  assert.equal(planResult.exitCode, 0);
+  const planBody = JSON.parse(planResult.stdout);
+  assert.equal(planBody.command, 'agentic review plan');
+  assert.match(planBody.data.plan_hash, /^[a-f0-9]{64}$/);
+  assert.equal(planBody.data.approval_required, true);
+  assert.equal(planBody.data.boundary.provider_call_performed, false);
+  assert.equal(planBody.data.boundary.api_call_performed, false);
+  assert.equal(planBody.data.boundary.mcp_execution_exposed, false);
+  assert.equal(planBody.data.agentic_human_review_plan.execution.provider_call_performed, false);
+  assert.equal(planBody.data.agentic_human_review_plan.review_effort.mode, 'xhigh');
+  assert.equal(planBody.data.agentic_human_review_plan.review_effort.role_count >= 5, true);
+  assert.equal(planBody.data.agentic_human_review_plan.review_effort.critic_or_verifier_included, true);
+  assert.deepEqual(
+    planBody.data.agentic_human_review_plan.transfer_permissions.required_flags.slice().sort(),
+    ['allow-page-text', 'allow-raw-pixels']
+  );
+  assert.match(planBody.data.agentic_human_review_plan.human_explanation.exact_run_command, /agentic review run/);
+  assert.match(planBody.data.agentic_human_review_plan.human_explanation.exact_run_command, /--allow-page-text/);
+  assert.match(planBody.data.agentic_human_review_plan.human_explanation.exact_run_command, /--allow-raw-pixels/);
+  assert.equal(planBody.artifacts.some((artifact) => artifact.type === 'agentic_human_review_plan'), true);
+  assert.equal(planBody.artifacts.some((artifact) => artifact.type === 'agentic_human_review_package'), true);
+  assert.equal(JSON.stringify(planBody).includes(png.toString('base64')), false);
+
+  const directPlan = await runAgenticHumanReviewPlan({
+    'review-index': reviewIndexPath,
+    intent: 'Review the visible hierarchy and wording as a person would.',
+    provider: 'fake-agent',
+    model: 'fake-model'
+  }, {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agentic-direct-plan'
+  });
+  assert.equal(directPlan.status, 'ok');
+  assert.equal(directPlan.data.agentic_human_review_plan.execution.provider_call_performed, false);
+  assert.equal(agenticHumanReviewBoundary().mcp_execution_exposed, false);
+
+  const planPath = '.browser-debug/agentic-human-review-plans/agentic-plan-fixed/plan.json';
+  const planFilePath = path.join(cwd, planPath);
+  const planText = await readFile(planFilePath, 'utf8');
+  const planFile = JSON.parse(planText);
+  const planHash = planFile.plan_hash;
+  assert.equal(planHash, planBody.data.plan_hash);
+  assert.equal(planFile.approval.required_plan_hash, planHash);
+
+  const directRunWithoutExecute = await runAgenticHumanReviewRun({
+    plan: planPath,
+    'plan-hash': planHash
+  }, {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(directRunWithoutExecute.status, 'error');
+  assert.equal(directRunWithoutExecute.errors[0].code, 'AGENTIC_REVIEW_RUN_REQUIRES_EXECUTE');
+
+  const runWithoutExecute = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    planPath,
+    '--plan-hash',
+    planHash,
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(runWithoutExecute.exitCode, 2);
+  assert.equal(JSON.parse(runWithoutExecute.stdout).errors[0].code, 'MISSING_REQUIRED_OPTION');
+
+  const runMissingFlag = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    planPath,
+    '--plan-hash',
+    planHash,
+    '--allow-raw-pixels',
+    '--execute',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(runMissingFlag.exitCode, 1);
+  assert.equal(JSON.parse(runMissingFlag.stdout).errors[0].code, 'AGENTIC_REVIEW_TRANSFER_FLAGS_MISMATCH');
+
+  const runBadHash = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    planPath,
+    '--plan-hash',
+    '0'.repeat(64),
+    '--allow-page-text',
+    '--allow-raw-pixels',
+    '--execute',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(runBadHash.exitCode, 1);
+  assert.equal(JSON.parse(runBadHash.stdout).errors[0].code, 'AGENTIC_REVIEW_PLAN_HASH_MISMATCH');
+
+  await writeFile(planFilePath, `${JSON.stringify({ ...planFile, intent: 'tampered intent' }, null, 2)}\n`, 'utf8');
+  const runTampered = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    planPath,
+    '--plan-hash',
+    planHash,
+    '--allow-page-text',
+    '--allow-raw-pixels',
+    '--execute',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(runTampered.exitCode, 1);
+  assert.equal(JSON.parse(runTampered.stdout).errors[0].code, 'AGENTIC_REVIEW_PLAN_MODIFIED');
+  await writeFile(planFilePath, planText, 'utf8');
+
+  const agentExecutionBypass = await executeCli([
+    'agent',
+    'execution',
+    'plan',
+    '--package',
+    '.browser-debug/agentic-human-review-packages/agentic-plan-fixed/package.json',
+    '--surface',
+    'local-subscription-agent',
+    '--provider',
+    'fake-agent',
+    '--model',
+    'fake-model',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(agentExecutionBypass.exitCode, 1);
+  assert.equal(JSON.parse(agentExecutionBypass.stdout).errors[0].code, 'AGENT_EXECUTION_AGENTIC_REVIEW_UNSUPPORTED');
+
+  const runResult = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    planPath,
+    '--plan-hash',
+    planHash,
+    '--allow-page-text',
+    '--allow-raw-pixels',
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: (prefix) => {
+      if (prefix === 'agentic-human-review-execution') {
+        return 'agentic-execution-fixed';
+      }
+      if (prefix === 'agentic-human-review-result') {
+        return 'agentic-result-fixed';
+      }
+      return 'unexpected-agentic-id';
+    }
+  });
+  assert.equal(runResult.exitCode, 0);
+  const runBody = JSON.parse(runResult.stdout);
+  assert.equal(runBody.command, 'agentic review run');
+  assert.equal(runBody.data.agentic_human_review_execution.status, 'completed');
+  assert.equal(runBody.data.agentic_human_review_execution.plan_hash, planHash);
+  assert.equal(runBody.data.agentic_human_review_execution.provider_call_performed, true);
+  assert.equal(runBody.data.agentic_human_review_execution.api_call_performed, false);
+  assert.equal(runBody.data.agentic_human_review_execution.raw_provider_response_stored, false);
+  assert.equal(runBody.data.agentic_human_review_execution.credential_values_recorded, false);
+  assert.equal(runBody.data.agentic_human_review_execution.existing_review_mutated, false);
+  assert.equal(runBody.data.agentic_human_review_execution.mcp_execution_exposed, false);
+  assert.deepEqual(runBody.data.agentic_human_review_execution.transfer_permissions.supplied_flags, ['allow-page-text', 'allow-raw-pixels']);
+  assert.equal(runBody.data.agentic_human_review_advisory.gate_effect, 'none');
+  assert.equal(JSON.stringify(runBody).includes(png.toString('base64')), false);
+
+  const resultText = await readFile(path.join(cwd, '.browser-debug', 'agentic-human-review-results', 'agentic-execution-fixed', 'result.json'), 'utf8');
+  const resultFile = JSON.parse(resultText);
+  assert.equal(resultFile.result_type, 'agentic_human_review_advisory');
+  assert.equal(resultFile.agentic_human_review_advisory.source, 'agentic_human_review');
+  assert.equal(resultFile.agentic_human_review_readiness.advisory_only, true);
+  assert.equal(resultFile.agentic_human_review_readiness.deterministic_findings_unchanged, true);
+  assert.equal(resultFile.agentic_human_review_readiness.gate_effect, 'none');
+  assert.equal(resultFile.boundary.mcp_execution_exposed, false);
+  assert.equal(resultFile.boundary.raw_provider_response_stored, false);
+  assert.equal(resultFile.boundary.credential_values_recorded, false);
+  assert.equal(JSON.stringify(resultFile).includes(png.toString('base64')), false);
+  const reportText = await readFile(path.join(cwd, '.browser-debug', 'reports', 'agentic-execution-fixed-agentic-human-review.md'), 'utf8');
+  assert.match(reportText, /Agentic Human Review/);
+  assert.match(reportText, /Advisory-only result/);
+
+  assert.equal(await readFile(path.join(cwd, '.browser-debug', 'reviews', 'image-review-fixed.json'), 'utf8'), originalReviewText);
+  assert.equal(await readFile(path.join(cwd, reviewIndexPath), 'utf8'), originalIndexText);
+
+  const statusResult = await executeCli([
+    'agentic',
+    'review',
+    'status',
+    '--execution',
+    '.browser-debug/agentic-human-review-results/agentic-execution-fixed/execution.json',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(statusResult.exitCode, 0);
+  const statusBody = JSON.parse(statusResult.stdout);
+  assert.equal(statusBody.command, 'agentic review status');
+  assert.equal(statusBody.data.agentic_human_review_status.status, 'completed');
+  assert.equal(statusBody.data.boundary.mcp_execution_exposed, false);
+
+  const listResult = await executeCli(['agentic', 'review', 'list', '--json'], { cwd, now: fixedNow });
+  assert.equal(listResult.exitCode, 0);
+  const listBody = JSON.parse(listResult.stdout);
+  assert.equal(listBody.command, 'agentic review list');
+  assert.equal(listBody.data.summary.total, 1);
+  assert.equal(listBody.data.summary.completed, 1);
+  assert.equal(listBody.data.boundary.mcp_execution_exposed, false);
+});
+
+test('agentic human review injected runner redacts sensitive advisory text', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'trace-cue-agentic-review-injected-'));
+  const png = minimalPngBuffer(120, 80);
+  await writeFile(path.join(cwd, 'screen.png'), png);
+
+  const imageReview = await executeCli(['review', '--image', 'screen.png', '--json'], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'image-review-injected'
+  });
+  assert.equal(imageReview.exitCode, 0);
+
+  const planResult = await executeCli([
+    'agentic',
+    'review',
+    'plan',
+    '--review-index',
+    '.browser-debug/review-artifacts/image-review-injected.json',
+    '--intent',
+    'Review text comprehension and likely emotional reaction.',
+    '--provider',
+    'injected-runner',
+    '--model',
+    'injected-local-model',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agentic-plan-injected'
+  });
+  assert.equal(planResult.exitCode, 0);
+  const planBody = JSON.parse(planResult.stdout);
+  const planPath = '.browser-debug/agentic-human-review-plans/agentic-plan-injected/plan.json';
+  const planHash = planBody.data.plan_hash;
+  const secretText = 'TRACE_CUE_TEST_SECRET: sentinel';
+
+  const runResult = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    planPath,
+    '--plan-hash',
+    planHash,
+    '--allow-page-text',
+    '--allow-raw-pixels',
+    '--provider',
+    'injected-runner',
+    '--model',
+    'injected-local-model',
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: (prefix) => {
+      if (prefix === 'agentic-human-review-execution') {
+        return 'agentic-execution-injected';
+      }
+      if (prefix === 'agentic-human-review-result') {
+        return 'agentic-result-injected';
+      }
+      return 'unexpected-agentic-injected-id';
+    },
+    agenticReviewRunner: async () => ({
+      summary: `Injected review completed. ${secretText}`,
+      subjective_perception: {
+        first_impression: [`The page likely feels clear at first glance. ${secretText}`],
+        emotional_reception: ['A cautious reader may want stronger reassurance.']
+      },
+      readability_comprehension: {
+        scanability: 'clear',
+        reading_load: 'medium',
+        meaning_gaps: [`Some claims need clearer proof. ${secretText}`]
+      },
+      role_opinions: [{
+        role: 'content_reviewer',
+        display_name: 'Content Reviewer',
+        effort: 'high',
+        summary: `Copy is understandable but should avoid hidden assumptions. ${secretText}`,
+        findings: [],
+        uncertainties: []
+      }],
+      findings: [{
+        id: 'injected-copy-risk',
+        category: 'copy_and_tone',
+        severity: 'medium',
+        message: `The main text needs more concrete evidence. ${secretText}`,
+        recommendation: `Revise the supporting copy. ${secretText}`
+      }],
+      owner_decision_requests: [{
+        id: 'owner-tone-decision',
+        question: `Should the tone be more direct? ${secretText}`,
+        reason: `Tone changes affect audience trust. ${secretText}`
+      }]
+    })
+  });
+  assert.equal(runResult.exitCode, 0);
+  assert.doesNotMatch(runResult.stdout, /sentinel/);
+  const resultText = await readFile(path.join(cwd, '.browser-debug', 'agentic-human-review-results', 'agentic-execution-injected', 'result.json'), 'utf8');
+  assert.doesNotMatch(resultText, /sentinel/);
+  const resultFile = JSON.parse(resultText);
+  assert.equal(resultFile.agentic_human_review_findings.length, 1);
+  assert.equal(resultFile.agentic_human_review_findings[0].source, 'agentic_human_review_advisory');
+  assert.equal(resultFile.boundary.raw_provider_response_stored, false);
+  const reportText = await readFile(path.join(cwd, '.browser-debug', 'reports', 'agentic-execution-injected-agentic-human-review.md'), 'utf8');
+  assert.doesNotMatch(reportText, /sentinel/);
+});
+
 test('target manifests and action candidates use generic review abstractions', () => {
   const template = createTargetManifest({
     url: 'https://example.test/app',
@@ -4140,6 +4534,14 @@ test('MCP execution gates report required approval boundaries without exposing e
   assert.equal(aggregationGateBody.data.execution_gates.operations[0].current_mcp_exposure.admin, false);
   assert.equal(aggregationGateBody.data.execution_gates.operations[0].required_gates.some((gate) => gate.id === 'source_attribution_required'), true);
 
+  const agenticGate = await executeCli(['mcp', 'execution', 'gates', '--operation', 'agentic_human_review_run', '--profile', 'admin', '--json'], { now: fixedNow });
+  assert.equal(agenticGate.exitCode, 0);
+  const agenticGateBody = JSON.parse(agenticGate.stdout);
+  assert.equal(agenticGateBody.data.execution_gates.operations[0].current_mcp_exposure.admin, false);
+  assert.equal(agenticGateBody.data.execution_gates.operations[0].required_gates.some((gate) => gate.id === 'approved_plan_hash'), true);
+  assert.equal(agenticGateBody.data.execution_gates.operations[0].required_gates.some((gate) => gate.id === 'transfer_permission_flags'), true);
+  assert.equal(agenticGateBody.data.execution_gates.operations[0].required_gates.some((gate) => gate.id === 'mcp_exclusion'), true);
+
   const invalid = await executeCli(['mcp', 'execution', 'gates', '--operation', 'wide_open', '--json'], { now: fixedNow });
   assert.equal(invalid.exitCode, 1);
   assert.equal(JSON.parse(invalid.stdout).errors[0].code, 'INVALID_MCP_EXECUTION_GATE_OPERATION');
@@ -4171,6 +4573,20 @@ test('operation registry reports roadmap risks without enabling execution', asyn
   assert.equal(apiReport.report.operations[0].risk.release_bound, true);
   assert.equal(apiReport.report.boundary.npm_publish_performed, false);
   assert.equal(operationRegistryBoundary().mcp_write_execute_exposed, false);
+
+  const agenticRegistry = await executeCli(['operation', 'registry', '--operation', 'agentic_human_review_run', '--json'], { now: fixedNow });
+  assert.equal(agenticRegistry.exitCode, 0);
+  const agenticRegistryBody = JSON.parse(agenticRegistry.stdout);
+  const agenticRunOperation = agenticRegistryBody.data.operation_registry.operations[0];
+  assert.equal(agenticRunOperation.id, 'agentic_human_review_run');
+  assert.equal(agenticRunOperation.current_status, 'cli_only_available');
+  assert.equal(agenticRunOperation.current_mcp_exposure.safe, false);
+  assert.equal(agenticRunOperation.current_mcp_exposure.full, false);
+  assert.equal(agenticRunOperation.current_mcp_exposure.admin, false);
+  assert.equal(agenticRunOperation.capability_excluded, true);
+  assert.equal(agenticRunOperation.required_gates.some((gate) => gate.id === 'approved_plan_hash'), true);
+  assert.equal(agenticRunOperation.required_gates.some((gate) => gate.id === 'raw_provider_response_not_stored'), true);
+  assert.equal(agenticRegistryBody.data.operation_registry.summary.write_execute_tools_exposed, false);
 
   const result = await executeCli(['operation', 'registry', '--group', 'release_identity', '--json'], { now: fixedNow });
   assert.equal(result.exitCode, 0);
@@ -4671,7 +5087,7 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_admin_readiness'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_provider_readiness'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review_target'), true);
-  assert.equal(listed.result.tools.some((tool) => /agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_aggregate|desktop_review_provider|capture_handoff|shell_run|shell_execute/i.test(tool.name)), false);
+  assert.equal(listed.result.tools.some((tool) => /agentic.*review|human_review|agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_aggregate|desktop_review_provider|capture_handoff|raw_pixel|page_text|shell_run|shell_execute/i.test(tool.name)), false);
   assert.equal(listed.result.tools.every((tool) => tool.effects.shellUsed === false), true);
 
   const safeListed = await handleMcpRequest({ jsonrpc: '2.0', id: 11, method: 'tools/list' }, { mcpProfile: 'safe' });
@@ -4708,7 +5124,7 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(safeToolNames.includes('browser_debug_observe'), false);
   assert.equal(safeToolNames.includes('browser_debug_target_init'), false);
   assert.equal(safeToolNames.includes('browser_debug_review_target'), false);
-  assert.equal(safeToolNames.some((name) => /agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_run|visual_review_aggregate|desktop_review_provider|capture_handoff|shell_run|shell_execute/i.test(name)), false);
+  assert.equal(safeToolNames.some((name) => /agentic.*review|human_review|agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_run|visual_review_aggregate|desktop_review_provider|capture_handoff|raw_pixel|page_text|shell_run|shell_execute/i.test(name)), false);
   assert.equal(safeListed.result.tools.every((tool) => tool.effects.browserLaunched === false), true);
   assert.equal(safeListed.result.tools.every((tool) => tool.effects.deletesFiles === false), true);
   assert.equal(safeListed.result.tools.every((tool) => tool.effects.providerCall === false), true);
@@ -4731,6 +5147,7 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   const adminToolNames = adminListed.result.tools.map((tool) => tool.name);
   assert.equal(adminToolNames.includes('browser_debug_agent_execution_plan'), true);
   assert.equal(adminToolNames.includes('browser_debug_agent_execution_run'), true);
+  assert.equal(adminToolNames.some((name) => /agentic.*review|human_review|raw_pixel|page_text/i.test(name)), false);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_agent_execution_plan'), false);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_agent_execution_run'), false);
   assert.equal(adminListed.result.tools.find((tool) => tool.name === 'browser_debug_agent_execution_run').effects.providerCall, true);
@@ -4822,12 +5239,20 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.cleanup_execution_exposed, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agent_execution_plan_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agent_execution_run_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agentic_human_review_plan_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agentic_human_review_run_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agentic_human_review_raw_pixel_transfer_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agentic_human_review_page_text_transfer_exposed, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.provider_api_execution_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.shell_tools_exposed, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.cleanup_execution, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.cleanup_plan, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agent_execution_plan, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agent_execution_run, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agentic_human_review_plan, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agentic_human_review_run, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agentic_human_review_raw_pixel_transfer, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agentic_human_review_page_text_transfer, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.provider_api_execution, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.arbitrary_shell, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.http_full_or_admin, false);
@@ -4877,6 +5302,12 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.final_readiness, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.constrained_shell_execution, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.raw_image_transfer, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.raw_page_text_transfer, false);
+  assert.ok(excludedOperationIds.includes('agentic_human_review_plan'));
+  assert.ok(excludedOperationIds.includes('agentic_human_review_package'));
+  assert.ok(excludedOperationIds.includes('agentic_human_review_run'));
+  assert.ok(excludedOperationIds.includes('agentic_human_review_raw_pixel_transfer'));
+  assert.ok(excludedOperationIds.includes('agentic_human_review_page_text_transfer'));
   assert.ok(excludedOperationIds.includes('resource_artifacts_cleanup_execute'));
   assert.equal(excludedOperationIds.includes('provider_api_execution'), false);
   assert.ok(excludedOperationIds.includes('translation_mcp_admin_execute'));

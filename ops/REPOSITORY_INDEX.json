@@ -237,6 +237,10 @@
       "role": "manifest"
     },
     {
+      "path": "src/agentic-human-review.js",
+      "role": "manifest"
+    },
+    {
       "path": "schemas/visual-review-result-preparation.schema.json",
       "role": "manifest"
     },
@@ -271,8 +275,54 @@
     {
       "path": "schemas/final-hardening-readiness.schema.json",
       "role": "manifest"
+    },
+    {
+      "path": "schemas/agentic-human-review-plan.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/agentic-human-review-package.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/human-review-rubric.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/agentic-human-review-advisory.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/agentic-human-review-receipt.schema.json",
+      "role": "manifest"
     }
   ],
+  "agentic_human_review_slice_26_33": {
+    "status": "complete",
+    "feature": "CLI-only Agentic Human Review owner layer",
+    "files": [
+      "src/agentic-human-review.js",
+      "schemas/agentic-human-review-plan.schema.json",
+      "schemas/agentic-human-review-package.schema.json",
+      "schemas/human-review-rubric.schema.json",
+      "schemas/agentic-human-review-advisory.schema.json",
+      "schemas/agentic-human-review-receipt.schema.json",
+      "tests/cli.test.js",
+      "tests/architecture.test.js",
+      "tests/pack-install-smoke.test.js"
+    ],
+    "boundaries": {
+      "advisory_only": true,
+      "plan_hash_required": true,
+      "exact_transfer_flags_required": true,
+      "generic_agent_execution_bypass_blocked": true,
+      "raw_provider_response_stored": false,
+      "credential_values_recorded": false,
+      "mcp_execution_exposed": false,
+      "existing_review_mutated": false,
+      "gate_effect": "none"
+    }
+  },
   "phase_45": {
     "status": "complete",
     "feature": "CLI visual review execution",

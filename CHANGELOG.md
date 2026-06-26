@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added Agentic Human Review Slice 26-33 with `agentic review plan/run/status/list`, xhigh-capable role orchestration metadata, plan-hash approval gates, exact evidence-transfer flags, deterministic fake/injected provider adapters, advisory-only human-like visual/UX/content/subjective review output, generic agent-execution bypass prevention, schema/API/package coverage, and no MCP exposure, browser launch, credential storage, raw provider response storage, deterministic review mutation, or release-gate changes.
 - Added Slice 21-25 / Phase 149-155 final hardening readiness with `final readiness`, cross-feature regression matrix metadata, local gate-plan metadata, safe MCP readiness inspection, schema/API/package coverage, and report-only boundaries for browser smoke, MCP smoke execution, remote CI, Git mutation, publication, provider calls, artifact migration, alias removal, shell execution, and product-doc promotion.
 - Added Slice 19-20 / Phase 140-148 constrained shell readiness with `shell readiness`, `shell plan`, fail-closed `shell run --execute`, use-case/threat/schema/readiness metadata, safe MCP readiness inspection, schema/API/package coverage, and no child-process/shell/env/credential/file/network/MCP-execution expansion.
 - Added Slice 18 / Phase 139 legacy alias removal readiness with `identity aliases removal-readiness`, fail-closed `identity aliases remove --execute`, safe MCP readiness inspection, schema/API/package coverage, and retained compatibility aliases.

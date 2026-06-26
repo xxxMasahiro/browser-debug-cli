@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/human-review-rubric.schema.json",
+  "title": "TraceCue Human Review Rubric",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "rubric_version",
+    "output_schema",
+    "areas",
+    "confidence_model",
+    "advisory_only",
+    "gate_effect"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "rubric_version": { "type": "string" },
+    "output_schema": { "const": "agentic_human_review_advisory" },
+    "areas": { "type": "array" },
+    "confidence_model": { "type": "array" },
+    "advisory_only": { "const": true },
+    "gate_effect": { "const": "none" }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/agentic-human-review-package.schema.json",
+  "title": "TraceCue Agentic Human Review Package",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "package_version",
+    "package_kind",
+    "id",
+    "created_at",
+    "package_path",
+    "task",
+    "source",
+    "visual_evidence",
+    "content_evidence",
+    "semantic_evidence",
+    "artifact_references",
+    "existing_review_state",
+    "disclosure",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "package_version": { "type": "string" },
+    "package_kind": { "const": "agentic_human_review_package" },
+    "id": { "type": "string" },
+    "created_at": { "type": "string" },
+    "package_path": { "type": "string" },
+    "task": { "type": "object" },
+    "source": { "type": "object" },
+    "visual_evidence": { "type": "object" },
+    "content_evidence": { "type": "object" },
+    "semantic_evidence": { "type": "object" },
+    "artifact_references": { "type": "array" },
+    "existing_review_state": { "type": "object" },
+    "disclosure": { "type": "object" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

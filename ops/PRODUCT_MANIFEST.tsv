@@ -12,6 +12,7 @@ product.mcp_bin	optional	all	all	bin/trace-cue-mcp.js	source	file_nonempty	workf
 product.source	required	all	all	src/cli.js	source	file_nonempty	workflow	CLI runtime entrypoint.
 product.public_api	optional	all	all	src/api.js	source	file_nonempty	workflow	Public local package API exports for reusable core functions.
 product.agent_advisory	optional	all	all	src/agent.js	source	file_nonempty	workflow	Local agent advisory package, ingest, report, and surface registry runtime.
+product.agentic_human_review	optional	all	all	src/agentic-human-review.js	source	file_nonempty	workflow	CLI-only Agentic Human Review planning, execution, status, and advisory normalization runtime with plan-hash and transfer-flag enforcement.
 product.input	optional	all	all	src/input.js	source	file_nonempty	workflow	Reusable structured input resolution helpers for inline, file, and stdin input.
 product.daemon	optional	all	all	src/daemon.js	source	file_nonempty	workflow	Local background browser daemon controller.
 product.daemon_worker	optional	all	all	src/daemon-worker.js	source	file_nonempty	workflow	Local background browser daemon worker process.
@@ -50,6 +51,11 @@ product.agent_request_detail_schema	optional	all	all	schemas/agent-request-detai
 product.agent_workflow_schema	optional	all	all	schemas/agent-workflow.schema.json	doc	file_nonempty	workflow	Public schema for local agent workflow status output.
 product.agent_advisory_result_schema	optional	all	all	schemas/agent-advisory-result.schema.json	doc	file_nonempty	workflow	Public schema for normalized untrusted agent advisory results.
 product.agent_disclosure_policy_schema	optional	all	all	schemas/agent-disclosure-policy.schema.json	doc	file_nonempty	workflow	Public schema for agent evidence disclosure policies.
+product.agentic_human_review_plan_schema	optional	all	all	schemas/agentic-human-review-plan.schema.json	doc	file_nonempty	workflow	Public schema for local Agentic Human Review plans.
+product.agentic_human_review_package_schema	optional	all	all	schemas/agentic-human-review-package.schema.json	doc	file_nonempty	workflow	Public schema for local Agentic Human Review metadata packages.
+product.agentic_human_review_advisory_schema	optional	all	all	schemas/agentic-human-review-advisory.schema.json	doc	file_nonempty	workflow	Public schema for normalized Agentic Human Review advisory results.
+product.agentic_human_review_receipt_schema	optional	all	all	schemas/agentic-human-review-receipt.schema.json	doc	file_nonempty	workflow	Public schema for Agentic Human Review planning, approval, and run receipts.
+product.human_review_rubric_schema	optional	all	all	schemas/human-review-rubric.schema.json	doc	file_nonempty	workflow	Public schema for Agentic Human Review rubric metadata.
 product.target_template	optional	all	all	templates/review-target-manifest.json	doc	file_nonempty	workflow	Reusable target manifest template for route and viewport review.
 product.status_dashboard_content_ux_template	optional	all	all	templates/status-dashboard-content-ux-target-manifest.json	doc	file_nonempty	workflow	Reusable manifest example for generic status-dashboard content UX advisory, review brief, and rubric review.
 product.plugin_skill	optional	all	all	skills/trace-cue-review/SKILL.md	doc	file_nonempty	workflow	Plugin-facing usage skill for local visual review workflows.

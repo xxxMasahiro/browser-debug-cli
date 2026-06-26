@@ -33,10 +33,15 @@ for rel in \
   bin/browser-debug.js \
   bin/browser-debug-mcp.js \
   schemas/artifact.schema.json \
+  schemas/agentic-human-review-advisory.schema.json \
+  schemas/agentic-human-review-package.schema.json \
+  schemas/agentic-human-review-plan.schema.json \
+  schemas/agentic-human-review-receipt.schema.json \
 	  schemas/capture-handoff.schema.json \
 	  schemas/capture-plan.schema.json \
 	  schemas/envelope.schema.json \
 	  schemas/finding.schema.json \
+  schemas/human-review-rubric.schema.json \
 	  schemas/identity-audit.schema.json \
 	  schemas/language-settings.schema.json \
   schemas/mcp-execution-gates.schema.json \
@@ -54,6 +59,7 @@ for rel in \
   schemas/visual-review-execution.schema.json \
   schemas/visual-review-result.schema.json \
   src/api.js \
+  src/agentic-human-review.js \
   src/capture-handoff.js \
 	  src/capture-plan.js \
 	  src/identity-audit.js \

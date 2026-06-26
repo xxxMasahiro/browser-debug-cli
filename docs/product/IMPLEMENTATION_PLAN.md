@@ -9,6 +9,16 @@
 
 ## Phase Plan
 
+### Agentic Human Review Roadmap Slice 26-33: Human-Like Visual, UX, Content, And Subjective Review
+
+Purpose: implement the requested Slice 26-33 continuation as a dedicated owner-layer Agentic Human Review feature. The feature lets TraceCue use AI-agent judgment for human-like visual perception, UI/UX review, screen-text comprehension, copy/content critique, subjective audience reaction, trust/risk assessment, and improvement advice from existing local review artifact indexes.
+
+Proposal scope: add `agentic review plan`, `agentic review run`, `agentic review status`, and `agentic review list`; define quick/standard/deep/xhigh review effort orchestration; create local agentic review packages, plan receipts, approval receipts, run receipts, advisory results, and Markdown reports; register schemas; report operation/capability boundaries; block generic `agent execution` from running agentic review packages; and prove MCP profiles expose no Agentic Human Review tools. Non-scope: browser capture, OS capture, raw-pixel transfer without exact plan-approved flags, MCP execution, SaaS web UI automation, generic shell execution, credential persistence, raw provider response storage, deterministic review mutation, release gate mutation, parent-repository changes, consumer-repository changes, package publication, or marketplace registration.
+
+Implementation order: add `src/agentic-human-review.js`, artifact directory support, parser/CLI/API exports, schema files and schema registry entries, operation registry/capability exclusions, MCP capability non-exposure flags, generic agent execution bypass guards, CLI/API/schema/MCP/architecture/packed-install/security tests, product structure/security gates, and product/workflow document and manifest synchronization. Execution must validate stored plan hash, supplied plan hash, exact command preview, provider/model/surface match, explicit `--execute`, and exact transfer flags before writing advisory-only output.
+
+Recovery: this slice is additive and local. Existing review, agent advisory, agent execution, visual review, capture, language, release, artifact-root, alias, shell, MCP profile, and safe HTTP behaviors remain unchanged. Rollback is a standard Git revert of the Agentic Human Review slice; no artifact migration, deletion, publication, remote mutation, credential storage, raw provider response persistence, or MCP permission expansion is involved.
+
 ### Phase 60: Operation Registry and Roadmap Risk Taxonomy Foundation
 
 Purpose: promote the draft roadmap groups 1-8 into a safe read-only operation governance foundation before any risky execution expansion. This phase records the xhigh pre-implementation review conclusion: the product needs a shared operation registry, risk taxonomy, and gate source of truth before provider MCP execution, cleanup execution, capture execution, translation execution, npm publication, artifact-root migration, legacy alias removal, constrained shell, or final release hardening are implemented.

@@ -13,6 +13,7 @@ test('runtime and tests avoid caller-specific implementation literals', async ()
     'src/agent.js',
     'src/agent-execution.js',
     'src/agent-execution-providers.js',
+    'src/agentic-human-review.js',
     'src/visual-review-provider-policy.js',
     'src/visual-review-result-preparation.js',
     'src/visual-review-dashboard.js',
@@ -215,6 +216,26 @@ test('standalone image review stays workspace-confined and provider-free', async
   assert.equal(schemaFile.title, 'TraceCue Image Review');
   assert.doesNotMatch(artifacts, /'image-reviews'/);
   assert.doesNotMatch(source, /from 'node:http'|from 'node:child_process'|createServer|\.listen\(|fetch\(|playwright|process\.env/);
+});
+
+test('agentic human review stays approval-gated, local-first, and outside MCP profiles', async () => {
+  const source = await readText('src/agentic-human-review.js');
+  const parser = await readText('src/parser.js');
+  const api = await readText('src/api.js');
+  const mcpProfiles = await readText('src/mcp-profiles.js');
+  const schemaFile = JSON.parse(await readText('schemas/agentic-human-review-advisory.schema.json'));
+
+  assert.match(source, /agentic_human_review_advisory/);
+  assert.match(source, /plan_hash/);
+  assert.match(source, /required_flags/);
+  assert.match(source, /mcp_execution_exposed:\s*false/);
+  assert.match(source, /raw_provider_response_stored:\s*false/);
+  assert.match(source, /credential_values_recorded:\s*false/);
+  assert.match(parser, /agentic review plan/);
+  assert.match(api, /runAgenticHumanReviewPlan/);
+  assert.equal(schemaFile.title, 'TraceCue Agentic Human Review Advisory');
+  assert.doesNotMatch(source, /from 'node:http'|from 'node:https'|from 'node:child_process'|createServer|\.listen\(|fetch\(|playwright|process\.env/);
+  assert.doesNotMatch(mcpProfiles, /agentic.*review|human_review|raw_pixel|page_text/i);
 });
 
 test('resource guard and artifact cleanup keep explicit local boundaries', async () => {

@@ -159,6 +159,99 @@ const OPERATIONS = Object.freeze([
     ]
   }),
   operation({
+    id: 'agentic_human_review_plan',
+    group: 'operation_governance',
+    command: 'agentic review plan',
+    category: 'agentic_human_review_planning',
+    cliAvailable: true,
+    currentStatus: 'cli_only_available',
+    proposedStage: 'owner_layer_planning_available',
+    risk: ['write', 'capture', 'provider'],
+    capabilityReason: 'Writes local approval-gated plans and packages for human-equivalent agentic review; MCP exposure is intentionally excluded.',
+    futureReview: 'Requires a separate MCP design before any planning or execution tool can be exposed outside the CLI.',
+    gates: [
+      gate('no_provider_call', 'Planning must not call local runners or provider APIs.'),
+      gate('plan_hash', 'Planning must create a canonical plan hash for exact run validation.'),
+      gate('disclosure_summary', 'Planning must explain the review scope, role split, and transfer permissions in human-readable language.'),
+      gate('mcp_exclusion', 'Agentic human review planning must remain outside all MCP profiles in this stage.'),
+      gate('gate_neutrality', 'Planning must not mutate deterministic review findings, release gates, or existing reviews.')
+    ]
+  }),
+  operation({
+    id: 'agentic_human_review_package',
+    group: 'operation_governance',
+    command: 'agentic review package',
+    category: 'agentic_human_review_package',
+    cliAvailable: true,
+    currentStatus: 'cli_only_available',
+    proposedStage: 'owner_layer_package_available',
+    risk: ['write', 'capture'],
+    capabilityReason: 'Creates local metadata packages for agentic human review without MCP exposure or provider execution.',
+    futureReview: 'Requires package disclosure review and a separate MCP approval before any package transport surface is added.',
+    gates: [
+      gate('workspace_confined', 'Package references must stay workspace-confined and artifact-root-confined.'),
+      gate('no_raw_pixel_json', 'Package JSON must not embed raw pixels.'),
+      gate('no_provider_call', 'Package creation must not call providers.'),
+      gate('mcp_exclusion', 'Agentic human review packages must not be executable through generic MCP or agent execution surfaces.'),
+      gate('gate_neutrality', 'Package creation must not mutate deterministic review findings, release gates, or existing reviews.')
+    ]
+  }),
+  operation({
+    id: 'agentic_human_review_run',
+    group: 'provider_mcp',
+    command: 'agentic review run --execute',
+    category: 'agentic_human_review_execution',
+    cliAvailable: true,
+    currentStatus: 'cli_only_available',
+    proposedStage: 'owner_layer_execution_available',
+    risk: ['provider', 'capture', 'write'],
+    capabilityReason: 'Runs approved local agentic human review plans from the CLI only and writes advisory-only results.',
+    futureReview: 'Requires a separate admin MCP design, transfer receipts, provider disclosure review, and multi-agent safety tests before any MCP exposure.',
+    gates: [
+      gate('approved_plan_hash', 'Execution must reference a plan whose canonical hash still matches the approved hash.'),
+      gate('explicit_execute_intent', 'Execution must require an explicit execute flag separate from planning.'),
+      gate('transfer_permission_flags', 'Raw-pixel and page-text transfer flags must exactly match the approved plan.'),
+      gate('credential_boundary', 'Credentials must remain environment-only and must never be passed as tool arguments or stored in receipts.'),
+      gate('raw_provider_response_not_stored', 'Raw provider responses must not be written to artifacts, receipts, or stdout.'),
+      gate('mcp_exclusion', 'Agentic human review execution must remain outside all MCP profiles in this stage.'),
+      gate('gate_neutrality', 'Execution must not mutate deterministic findings, release gates, or existing reviews.')
+    ]
+  }),
+  operation({
+    id: 'agentic_human_review_raw_pixel_transfer',
+    group: 'provider_mcp',
+    command: 'agentic review raw-pixel transfer',
+    category: 'agentic_human_review_transfer',
+    cliAvailable: false,
+    currentStatus: 'not_available',
+    proposedStage: 'external_transfer_gate_required',
+    risk: ['provider', 'capture'],
+    capabilityReason: 'Standalone raw-pixel transfer is not available through CLI or MCP; approved execution can only validate explicit plan-matched flags.',
+    futureReview: 'Requires explicit image-transfer approval, size/type/reference caps, local transfer receipts, and separate MCP exclusion review before any expansion.',
+    gates: [
+      gate('explicit_image_transfer_approval', 'Raw-pixel transfer requires explicit owner approval on the approved plan.'),
+      gate('transfer_receipt', 'Any future raw-pixel transfer must write a content-free receipt.'),
+      gate('mcp_exclusion', 'Standalone raw-pixel transfer must remain outside all MCP profiles in this stage.')
+    ]
+  }),
+  operation({
+    id: 'agentic_human_review_page_text_transfer',
+    group: 'provider_mcp',
+    command: 'agentic review page-text transfer',
+    category: 'agentic_human_review_transfer',
+    cliAvailable: false,
+    currentStatus: 'not_available',
+    proposedStage: 'external_transfer_gate_required',
+    risk: ['provider', 'read'],
+    capabilityReason: 'Standalone page-text transfer is not available through CLI or MCP; approved execution can only validate explicit plan-matched flags.',
+    futureReview: 'Requires explicit page-text approval, bounded content extraction, local transfer receipts, and separate MCP exclusion review before any expansion.',
+    gates: [
+      gate('explicit_page_text_approval', 'Page-text transfer requires explicit owner approval on the approved plan.'),
+      gate('transfer_receipt', 'Any future page-text transfer must write a content-free receipt.'),
+      gate('mcp_exclusion', 'Standalone page-text transfer must remain outside all MCP profiles in this stage.')
+    ]
+  }),
+  operation({
     id: 'provider_mcp_plan',
     group: 'provider_mcp',
     command: 'provider MCP plan',

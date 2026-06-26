@@ -10,6 +10,7 @@ import {
   writeJsonArtifact
 } from './artifacts.js';
 import { AGENT_SURFACES } from './agent.js';
+import { isAgenticHumanReviewPackage } from './agentic-human-review.js';
 import {
   executeAgentExecutionProvider,
   resolveAgentExecutionProvider
@@ -36,6 +37,13 @@ export async function runAgentExecutionPlan(options = {}, context = {}) {
   const packageRead = await readAgentPackage(cwd, options.package);
   if (!packageRead.ok) {
     return errorResult(packageRead.error.code, packageRead.error.message, packageRead.error.details);
+  }
+  if (isAgenticHumanReviewPackage(packageRead.agentPackage)) {
+    return errorResult('AGENT_EXECUTION_AGENTIC_REVIEW_UNSUPPORTED', 'agentic human review packages must use agentic review plan/run and cannot be executed through generic agent execution.', {
+      package: options.package,
+      required_command: `${CLI_NAME} agentic review plan --review-index <review-artifact-index> --json`,
+      mcp_execution_exposed: false
+    });
   }
   const surface = findSurface(options.surface);
   if (!surface) {
@@ -120,6 +128,13 @@ export async function runAgentExecutionRun(options = {}, context = {}) {
   const packageRead = await readAgentPackage(cwd, options.package);
   if (!packageRead.ok) {
     return errorResult(packageRead.error.code, packageRead.error.message, packageRead.error.details);
+  }
+  if (isAgenticHumanReviewPackage(packageRead.agentPackage)) {
+    return errorResult('AGENT_EXECUTION_AGENTIC_REVIEW_UNSUPPORTED', 'agentic human review packages must use agentic review plan/run and cannot be executed through generic agent execution.', {
+      package: options.package,
+      required_command: `${CLI_NAME} agentic review run --plan <agentic-human-review-plan> --plan-hash <sha256> --execute --json`,
+      mcp_execution_exposed: false
+    });
   }
 
   const surface = findSurface(options.surface);

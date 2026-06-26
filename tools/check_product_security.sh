@@ -82,6 +82,15 @@ if grep -RInE 'createServer|listen\(|WebSocket|EventSource|curl |wget |npm publi
 fi
 rm -f /tmp/trace-cue-plugin-security.$$
 
+if grep -RInE 'browser_debug_agentic.*review|agentic_human_review|raw_pixel_transfer|page_text_transfer' \
+  "$ROOT/.codex-plugin" "$ROOT/.mcp.json" "$ROOT/src/mcp-profiles.js" >/tmp/trace-cue-agentic-mcp-security.$$ 2>/dev/null; then
+  while IFS= read -r line; do
+    printf 'agentic human review must not be exposed through MCP or plugin metadata: %s\n' "${line#$ROOT/}" >&2
+  done </tmp/trace-cue-agentic-mcp-security.$$
+  failed=1
+fi
+rm -f /tmp/trace-cue-agentic-mcp-security.$$
+
 [[ "$failed" -eq 0 ]] || {
   printf 'Product security check failed.\n' >&2
   exit 1

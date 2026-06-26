@@ -6,6 +6,15 @@ export {
   runAgentExecutionStatus
 } from './agent-execution.js';
 export {
+  AGENTIC_HUMAN_REVIEW_VERSION,
+  agenticHumanReviewBoundary,
+  isAgenticHumanReviewPackage,
+  runAgenticHumanReviewList,
+  runAgenticHumanReviewPlan,
+  runAgenticHumanReviewRun,
+  runAgenticHumanReviewStatus
+} from './agentic-human-review.js';
+export {
   AGENT_EXECUTION_PROVIDERS,
   resolveAgentExecutionProvider
 } from './agent-execution-providers.js';

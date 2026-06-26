@@ -6,6 +6,12 @@ import {
   runAgentExecutionStatus
 } from './agent-execution.js';
 import {
+  runAgenticHumanReviewList,
+  runAgenticHumanReviewPlan,
+  runAgenticHumanReviewRun,
+  runAgenticHumanReviewStatus
+} from './agentic-human-review.js';
+import {
   runAgentIngest,
   runAgentPackage,
   runAgentReport,
@@ -243,6 +249,22 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'agent execution list') {
       return runtimeResult(parsed.command, await (context.agentExecutionListRunner ?? runAgentExecutionList)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agentic review plan') {
+      return runtimeResult(parsed.command, await (context.agenticHumanReviewPlanRunner ?? runAgenticHumanReviewPlan)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agentic review run') {
+      return runtimeResult(parsed.command, await (context.agenticHumanReviewRunRunner ?? runAgenticHumanReviewRun)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agentic review status') {
+      return runtimeResult(parsed.command, await (context.agenticHumanReviewStatusRunner ?? runAgenticHumanReviewStatus)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agentic review list') {
+      return runtimeResult(parsed.command, await (context.agenticHumanReviewListRunner ?? runAgenticHumanReviewList)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'visual review plan') {
@@ -723,6 +745,24 @@ function usageText(topic) {
   }
 
   if (
+    topic === 'agentic'
+    || topic === 'agentic review'
+    || topic === 'agentic review plan'
+    || topic === 'agentic review run'
+    || topic === 'agentic review status'
+    || topic === 'agentic review list'
+  ) {
+    return [
+      `Usage: ${CLI_NAME} agentic review plan --review-index <review-artifact-index> [--intent <text>|--input <text|@file|->] [--effort quick|standard|deep|xhigh] [--json]`,
+      `       ${CLI_NAME} agentic review run --plan <plan> --plan-hash <sha256> [--allow-raw-pixels] [--allow-page-text] --execute [--json]`,
+      `       ${CLI_NAME} agentic review status --execution <agentic-human-review-execution> [--json]`,
+      `       ${CLI_NAME} agentic review list [--json]`,
+      '',
+      'Plans and runs CLI-only agentic human review. Planning explains the human-review scope, sub-agent roles, transfer flags, and exact approved run command without provider execution. Running requires a matching plan hash, explicit --execute, and exact transfer flags, writes advisory-only output, and remains excluded from MCP execution.'
+    ].join('\n');
+  }
+
+  if (
     topic === 'visual'
     || topic === 'visual review'
     || topic === 'visual review prepare'
@@ -929,6 +969,8 @@ function usageText(topic) {
     '  review --url <url> --json',
     '  review --target <manifest> --json',
     '  review --image <path> --capture-handoff <path> --json',
+    '  agentic review plan --review-index <path> --json',
+    '  agentic review run --plan <path> --plan-hash <sha256> --execute --json',
     '  visual review plan --capture-handoff <path> --json',
     '  visual review dashboard --json',
     '  visual review aggregate --preparation <path> --json',

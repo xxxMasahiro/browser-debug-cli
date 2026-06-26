@@ -79,7 +79,13 @@ async function main() {
     await assertFile(packageDir, 'src/visual-review-execution.js');
     await assertFile(packageDir, 'src/visual-review-dashboard.js');
     await assertFile(packageDir, 'src/visual-review-aggregation.js');
+    await assertFile(packageDir, 'src/agentic-human-review.js');
     await assertFile(packageDir, 'schemas/agent-execution.schema.json');
+    await assertFile(packageDir, 'schemas/agentic-human-review-plan.schema.json');
+    await assertFile(packageDir, 'schemas/agentic-human-review-package.schema.json');
+    await assertFile(packageDir, 'schemas/human-review-rubric.schema.json');
+    await assertFile(packageDir, 'schemas/agentic-human-review-advisory.schema.json');
+    await assertFile(packageDir, 'schemas/agentic-human-review-receipt.schema.json');
     await assertFile(packageDir, 'schemas/capture-handoff.schema.json');
     await assertFile(packageDir, 'schemas/capture-plan.schema.json');
     await assertFile(packageDir, 'schemas/identity-audit.schema.json');
@@ -172,6 +178,11 @@ async function main() {
     const visualReviewExecutionSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('visual-review-execution'));
     const visualReviewResultSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('visual-review-result'));
     const visualReviewAggregationSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('visual-review-aggregation'));
+    const agenticHumanReviewPlanSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-plan'));
+    const agenticHumanReviewPackageSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-package'));
+    const humanReviewRubricSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('human-review-rubric'));
+    const agenticHumanReviewAdvisorySchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-advisory'));
+    const agenticHumanReviewReceiptSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-receipt'));
     assert.equal(path.normalize(apiPath), path.join(packageDir, 'src/api.js'));
     assert.equal(path.normalize(reviewSchemaPath), path.join(packageDir, 'schemas/review.schema.json'));
     assert.equal(path.normalize(visualEvidenceSchemaPath), path.join(packageDir, 'schemas/visual-evidence.schema.json'));
@@ -201,6 +212,11 @@ async function main() {
     assert.equal(path.normalize(visualReviewExecutionSchemaPath), path.join(packageDir, 'schemas/visual-review-execution.schema.json'));
     assert.equal(path.normalize(visualReviewResultSchemaPath), path.join(packageDir, 'schemas/visual-review-result.schema.json'));
     assert.equal(path.normalize(visualReviewAggregationSchemaPath), path.join(packageDir, 'schemas/visual-review-aggregation.schema.json'));
+    assert.equal(path.normalize(agenticHumanReviewPlanSchemaPath), path.join(packageDir, 'schemas/agentic-human-review-plan.schema.json'));
+    assert.equal(path.normalize(agenticHumanReviewPackageSchemaPath), path.join(packageDir, 'schemas/agentic-human-review-package.schema.json'));
+    assert.equal(path.normalize(humanReviewRubricSchemaPath), path.join(packageDir, 'schemas/human-review-rubric.schema.json'));
+    assert.equal(path.normalize(agenticHumanReviewAdvisorySchemaPath), path.join(packageDir, 'schemas/agentic-human-review-advisory.schema.json'));
+    assert.equal(path.normalize(agenticHumanReviewReceiptSchemaPath), path.join(packageDir, 'schemas/agentic-human-review-receipt.schema.json'));
 
     const api = await import(pathToFileURL(apiPath));
     assert.equal(typeof api.executeCli, 'function');
@@ -272,6 +288,14 @@ async function main() {
     assert.equal(typeof api.visualReviewDashboardBoundary, 'function');
     assert.equal(typeof api.runVisualReviewAggregation, 'function');
     assert.equal(typeof api.visualReviewAggregationBoundary, 'function');
+    assert.equal(api.AGENTIC_HUMAN_REVIEW_VERSION, '1.0.0');
+    assert.equal(typeof api.runAgenticHumanReviewPlan, 'function');
+    assert.equal(typeof api.runAgenticHumanReviewRun, 'function');
+    assert.equal(typeof api.runAgenticHumanReviewStatus, 'function');
+    assert.equal(typeof api.runAgenticHumanReviewList, 'function');
+    assert.equal(typeof api.agenticHumanReviewBoundary, 'function');
+    assert.equal(typeof api.isAgenticHumanReviewPackage, 'function');
+    assert.equal(api.agenticHumanReviewBoundary().mcp_execution_exposed, false);
     assert.equal(typeof api.buildOperationRegistryReport, 'function');
     assert.equal(typeof api.operationRegistryBoundary, 'function');
     assert.equal(typeof api.buildOperationRoadmapReport, 'function');
@@ -330,6 +354,11 @@ async function main() {
     assert.equal(api.schemaNames().includes('visual_review_execution'), true);
     assert.equal(api.schemaNames().includes('visual_review_result'), true);
     assert.equal(api.schemaNames().includes('visual_review_aggregation'), true);
+    assert.equal(api.schemaNames().includes('agentic_human_review_plan'), true);
+    assert.equal(api.schemaNames().includes('agentic_human_review_package'), true);
+    assert.equal(api.schemaNames().includes('human_review_rubric'), true);
+    assert.equal(api.schemaNames().includes('agentic_human_review_advisory'), true);
+    assert.equal(api.schemaNames().includes('agentic_human_review_receipt'), true);
     assert.equal(api.MCP_TOOLS.some((tool) => tool.name === 'browser_debug_visual_review_dashboard'), true);
     assert.equal(api.MCP_TOOLS.some((tool) => tool.name === 'browser_debug_language_settings'), true);
     assert.equal(api.MCP_TOOLS.some((tool) => tool.name === 'browser_debug_localization_resources'), true);
@@ -410,6 +439,9 @@ async function main() {
     assert.equal(capabilityReport.report.excluded_operations.some((operation) => operation.id === 'visual_review_run'), true);
     assert.equal(capabilityReport.report.excluded_operations.some((operation) => operation.id === 'visual_review_result_preparation'), true);
     assert.equal(capabilityReport.report.excluded_operations.some((operation) => operation.id === 'visual_review_aggregation'), true);
+    assert.equal(capabilityReport.report.excluded_operations.some((operation) => operation.id === 'agentic_human_review_run'), true);
+    assert.equal(capabilityReport.report.admin_policy.agentic_human_review_run_exposed, false);
+    assert.equal(capabilityReport.report.boundaries.agentic_human_review_run, false);
     assert.equal(capabilityReport.report.excluded_operations.some((operation) => operation.id === 'desktop_review_provider_preparation_plan'), true);
     assert.equal(capabilityReport.report.excluded_operations.some((operation) => operation.id === 'translation_mcp_admin_execute'), true);
     assert.equal(capabilityReport.report.excluded_operations.some((operation) => operation.id === 'npm_publish'), true);
@@ -538,6 +570,11 @@ async function main() {
     assert.ok(schemaNames.includes('visual_review_execution'));
     assert.ok(schemaNames.includes('visual_review_result'));
     assert.ok(schemaNames.includes('visual_review_aggregation'));
+    assert.ok(schemaNames.includes('agentic_human_review_plan'));
+    assert.ok(schemaNames.includes('agentic_human_review_package'));
+    assert.ok(schemaNames.includes('human_review_rubric'));
+    assert.ok(schemaNames.includes('agentic_human_review_advisory'));
+    assert.ok(schemaNames.includes('agentic_human_review_receipt'));
 
     const targetPath = path.join(installRoot, 'target.json');
     await writeFile(targetPath, JSON.stringify(targetManifestFixture(), null, 2), 'utf8');
@@ -568,7 +605,7 @@ async function main() {
     assert.equal(mcpBody.result.tools.some((tool) => tool.name === 'browser_debug_operation_policy'), true);
     assert.equal(mcpBody.result.tools.some((tool) => tool.name === 'browser_debug_operation_admin_readiness'), true);
     assert.equal(mcpBody.result.tools.some((tool) => tool.name === 'browser_debug_operation_provider_readiness'), true);
-    assert.equal(mcpBody.result.tools.some((tool) => /agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute/i.test(tool.name)), false);
+    assert.equal(mcpBody.result.tools.some((tool) => /agentic.*review|human_review|agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|raw_pixel|page_text/i.test(tool.name)), false);
 
     const safeMcpBody = await api.handleMcpRequest(
       { jsonrpc: '2.0', id: 2, method: 'tools/list' },
@@ -587,7 +624,7 @@ async function main() {
     assert.equal(safeMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_operation_roadmap'), true);
     assert.equal(safeMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_operation_contracts'), true);
     assert.equal(safeMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_operation_policy'), true);
-    assert.equal(safeMcpBody.result.tools.some((tool) => /agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute/i.test(tool.name)), false);
+    assert.equal(safeMcpBody.result.tools.some((tool) => /agentic.*review|human_review|agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|raw_pixel|page_text/i.test(tool.name)), false);
     const adminMcpBody = await api.handleMcpRequest(
       { jsonrpc: '2.0', id: 21, method: 'tools/list' },
       { cwd: installRoot, mcpProfile: 'admin' }
@@ -595,6 +632,7 @@ async function main() {
     assert.equal(adminMcpBody.result.profile.name, 'admin');
     assert.equal(adminMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_agent_execution_plan'), true);
     assert.equal(adminMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_agent_execution_run'), true);
+    assert.equal(adminMcpBody.result.tools.some((tool) => /agentic.*review|human_review|raw_pixel|page_text/i.test(tool.name)), false);
     assert.equal(safeMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_operation_admin_readiness'), true);
     assert.equal(safeMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_operation_provider_readiness'), true);
     assert.equal(safeMcpBody.result.tools.some((tool) => tool.name === 'browser_debug_review_target'), false);
@@ -651,7 +689,12 @@ async function main() {
     assert.equal(capabilityCli.exitCode, 0);
     const capabilityCliBody = JSON.parse(capabilityCli.stdout);
     assert.equal(capabilityCliBody.data.capabilities.admin_policy.agent_execution_run_exposed, true);
+    assert.equal(capabilityCliBody.data.capabilities.admin_policy.agentic_human_review_run_exposed, false);
+    assert.equal(capabilityCliBody.data.capabilities.boundaries.agentic_human_review_run, false);
     assert.equal(capabilityCliBody.data.capabilities.excluded_operations.some((operation) => operation.id === 'agent_execution_run'), false);
+    assert.equal(capabilityCliBody.data.capabilities.excluded_operations.some((operation) => operation.id === 'agentic_human_review_run'), true);
+    assert.equal(capabilityCliBody.data.capabilities.excluded_operations.some((operation) => operation.id === 'agentic_human_review_raw_pixel_transfer'), true);
+    assert.equal(capabilityCliBody.data.capabilities.excluded_operations.some((operation) => operation.id === 'agentic_human_review_page_text_transfer'), true);
     assert.equal(capabilityCliBody.data.capabilities.excluded_operations.some((operation) => operation.id === 'resource_artifacts_cleanup_execute'), true);
     assert.equal(capabilityCliBody.data.capabilities.excluded_operations.some((operation) => operation.id === 'constrained_shell_mcp_execute'), true);
 

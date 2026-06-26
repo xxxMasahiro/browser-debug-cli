@@ -148,6 +148,10 @@ function adminPolicy() {
     cleanup_execution_exposed: false,
     agent_execution_plan_exposed: adminToolNames.has('browser_debug_agent_execution_plan'),
     agent_execution_run_exposed: agentExecutionRunExposed,
+    agentic_human_review_plan_exposed: false,
+    agentic_human_review_run_exposed: false,
+    agentic_human_review_raw_pixel_transfer_exposed: false,
+    agentic_human_review_page_text_transfer_exposed: false,
     provider_api_execution_exposed: agentExecutionRunExposed,
     visual_provider_execution_exposed: false,
     visual_review_run_exposed: false,
@@ -186,6 +190,10 @@ function boundarySummary() {
     cleanup_execution: false,
     agent_execution_plan: adminPolicySummary.agent_execution_plan_exposed,
     agent_execution_run: adminPolicySummary.agent_execution_run_exposed,
+    agentic_human_review_plan: false,
+    agentic_human_review_run: false,
+    agentic_human_review_raw_pixel_transfer: false,
+    agentic_human_review_page_text_transfer: false,
     provider_api_execution: adminPolicySummary.provider_api_execution_exposed,
     visual_provider_execution: false,
     visual_review_run: false,
@@ -210,6 +218,7 @@ function boundarySummary() {
     constrained_shell_execution: false,
     final_readiness: adminPolicySummary.final_readiness_exposed,
     raw_image_transfer: false,
+    raw_page_text_transfer: false,
     arbitrary_shell: false,
     socket_transport: false,
     remote_http_listener: false,
@@ -225,7 +234,7 @@ function boundarySummary() {
 function nextSteps() {
   return [
     'Use this report to inspect current MCP tool/profile exposure before configuring a client.',
-    'Keep delete, visual review execution, shell, daemon/session, and credential-bearing operations on the CLI unless a later phase approves one operation at a time.',
+    'Keep delete, visual review execution, agentic human review execution, shell, daemon/session, and credential-bearing operations on the CLI unless a later phase approves one operation at a time.',
     'Use trace-cue mcp config for token-free client setup metadata.'
   ];
 }
