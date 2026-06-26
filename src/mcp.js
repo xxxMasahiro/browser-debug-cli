@@ -3,16 +3,27 @@ import { PACKAGE_VERSION } from './constants.js';
 import {
   DEFAULT_MCP_PROFILE,
   MCP_PROFILES,
+  MCP_TOOL_TAGS,
   getMcpTools,
+  getMcpToolsByTag,
   mcpProfileMetadata,
   mcpToolToCliArgs,
   resolveMcpProfile,
-  resolveMcpTool
+  resolveMcpTool,
+  validateMcpToolArgs
 } from './mcp-profiles.js';
 import { publicMcpTransportMetadata, resolveMcpTransportConfig } from './mcp-transport-policy.js';
-import { PRODUCT_IDENTITY, productIdentitySummary } from './product-identity.js';
+import { LEGACY_ALIAS_POLICY, PRODUCT_IDENTITY, productIdentitySummary } from './product-identity.js';
 
-export { DEFAULT_MCP_PROFILE, MCP_PROFILES, getMcpTools, mcpProfileMetadata, resolveMcpProfile };
+export {
+  DEFAULT_MCP_PROFILE,
+  MCP_PROFILES,
+  MCP_TOOL_TAGS,
+  getMcpTools,
+  getMcpToolsByTag,
+  mcpProfileMetadata,
+  resolveMcpProfile
+};
 
 export const MCP_TOOLS = Object.freeze(getMcpTools(DEFAULT_MCP_PROFILE));
 
@@ -38,6 +49,11 @@ export async function handleMcpRequest(request, context = {}) {
       metadata: {
         ...profileMetadata,
         identity: productIdentitySummary(),
+        compatibility: {
+          legacy_alias_policy: LEGACY_ALIAS_POLICY,
+          invoked_bin_name: context.invokedBinName ?? null,
+          legacy_invocation: PRODUCT_IDENTITY.legacyMcpBins.some((entry) => entry.name === context.invokedBinName)
+        },
         profile: profileMetadata
       }
     });
@@ -81,6 +97,10 @@ async function callTool(profile, name, args, context) {
   const resolved = resolveMcpTool(profile, name);
   if (!resolved.ok) {
     return { ok: false, message: resolved.message };
+  }
+  const validated = validateMcpToolArgs(resolved.tool, args);
+  if (!validated.ok) {
+    return { ok: false, message: validated.message };
   }
   const cliArgs = mcpToolToCliArgs(resolved.tool, args);
   const result = await executeCli(cliArgs, {

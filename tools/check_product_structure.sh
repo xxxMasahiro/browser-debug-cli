@@ -38,7 +38,14 @@ for rel in \
 	  schemas/envelope.schema.json \
 	  schemas/finding.schema.json \
 	  schemas/identity-audit.schema.json \
-	  schemas/mcp-execution-gates.schema.json \
+	  schemas/language-settings.schema.json \
+  schemas/mcp-execution-gates.schema.json \
+  schemas/operation-registry.schema.json \
+  schemas/operation-roadmap.schema.json \
+  schemas/operation-contracts.schema.json \
+  schemas/operation-policy.schema.json \
+  schemas/operation-admin-readiness.schema.json \
+  schemas/operation-provider-readiness.schema.json \
   schemas/mcp-tool.schema.json \
   schemas/review.schema.json \
   schemas/target-manifest.schema.json \
@@ -51,12 +58,20 @@ for rel in \
 	  src/capture-plan.js \
 	  src/identity-audit.js \
 	  src/input.js \
+  src/language-settings.js \
+  src/locale-policy.js \
   src/cli.js \
   src/daemon.js \
   src/daemon-worker.js \
   src/mcp.js \
   src/mcp-execution-gates.js \
   src/mcp-profiles.js \
+  src/operation-registry.js \
+  src/operation-roadmap.js \
+  src/operation-contracts.js \
+  src/operation-policy.js \
+  src/operation-admin-readiness.js \
+  src/operation-provider-readiness.js \
   src/page-evidence.js \
   src/product-identity.js \
   src/observe.js \
@@ -88,11 +103,13 @@ for rel in \
   ops/STAGE_MANIFEST.tsv \
   ops/TEST_PLAN_MANIFEST.tsv \
   ops/CI_MANIFEST.tsv \
+  ops/DASHBOARD_SETTINGS.json \
   ops/DESIGN_SYSTEM_MANIFEST.tsv \
   ops/DASHBOARD_MANIFEST.tsv \
   ops/PRODUCT_MANIFEST.tsv \
   ops/PRODUCT_OPERATION_MODE.tsv \
   ops/PRODUCT_PROFILE.json \
+  ops/OPERATION_POLICY.json \
   ops/REPOSITORY_INDEX.json \
   ops/SECURITY_MANIFEST.tsv \
   ops/EVIDENCE_DETAIL_MANIFEST.tsv \

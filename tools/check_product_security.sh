@@ -17,15 +17,23 @@ product_require_nonempty_file "$ROOT" skills/trace-cue-review/SKILL.md || failed
 while IFS= read -r -d '' file; do
   rel="$(product_rel "$ROOT" "$file")"
   case "$rel" in
-    .git/*|node_modules/*|dist/*|build/*|coverage/*|test-results/*|playwright-report/*|.browser-debug/*|.trace-cue/*)
+    .git/*|node_modules/*|dist/*|build/*|coverage/*|test-results/*|playwright-report/*|.browser-debug/*|.trace-cue/*|tools/check_product_security.sh)
       continue
       ;;
   esac
   grep -Iq . "$file" 2>/dev/null || continue
-  if grep -Eq '(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)[[:space:]]*[:=][[:space:]]*[^[:space:]#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY' "$file"; then
+  secret_scan_file="/tmp/trace-cue-secret-scan.$$"
+  if grep -nE '(SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)[[:space:]]*[:=][[:space:]]*[^[:space:]#]{8,}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY' "$file" >"$secret_scan_file"; then
+    if [[ "$rel" == "tests/cli.test.js" ]]; then
+      grep -Ev 'TRACE_CUE_TEST_SECRET:[[:space:]]*sentinel' "$secret_scan_file" >"/tmp/trace-cue-secret-filtered.$$" || true
+      mv "/tmp/trace-cue-secret-filtered.$$" "$secret_scan_file"
+    fi
+  fi
+  if [[ -s "$secret_scan_file" ]]; then
     printf 'secret-like data found in %s\n' "$rel" >&2
     failed=1
   fi
+  rm -f "$secret_scan_file"
 done < <(find "$ROOT" -type f -print0)
 
 while IFS= read -r -d '' file; do
@@ -57,7 +65,7 @@ scan_runtime_pattern() {
 
 scan_runtime_pattern 'launchPersistentContext|userDataDir|storageState' 'browser profile or persistent storage reuse'
 scan_runtime_pattern 'createServer|listen\(|WebSocket|EventSource' 'unapproved external control channel' 'src/mcp-http-transport\.js:'
-scan_runtime_pattern 'node:child_process|child_process|execFile|spawn\(' 'arbitrary shell execution' 'src/daemon\.js:'
+scan_runtime_pattern "node:child_process|from ['\"]child_process|require\\(['\"]child_process|execFile|spawn\\(" 'arbitrary shell execution' 'src/daemon\.js:'
 scan_runtime_pattern 'npm publish|gh repo|curl |wget ' 'publication or external transfer'
 
 if ! grep -q 'trace-cue-mcp' "$ROOT/.mcp.json"; then

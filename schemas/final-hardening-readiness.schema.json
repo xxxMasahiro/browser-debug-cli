@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/final-hardening-readiness.schema.json",
+  "title": "TraceCue Final Hardening Readiness",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "readiness_version",
+    "generated_at",
+    "status",
+    "product_identity",
+    "phase_range",
+    "regression_matrix",
+    "local_gate_plan",
+    "smoke_rebaseline",
+    "security_sweep",
+    "docs_english_scan",
+    "release_boundary",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "readiness_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "status": { "type": "string" },
+    "product_identity": { "type": "object" },
+    "phase_range": { "type": "object" },
+    "regression_matrix": { "type": "array" },
+    "local_gate_plan": { "type": "array" },
+    "smoke_rebaseline": { "type": "object" },
+    "security_sweep": { "type": "object" },
+    "docs_english_scan": { "type": "object" },
+    "release_boundary": { "type": "object" },
+    "next_steps": { "type": "array" },
+    "warnings": { "type": "array" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

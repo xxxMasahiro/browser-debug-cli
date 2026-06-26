@@ -1,6 +1,15 @@
 export const DEFAULT_MCP_PROFILE = 'full';
 export const MCP_PROFILE_NAMES = Object.freeze(['safe', 'full', 'admin']);
 
+export const MCP_TOOL_TAGS = Object.freeze({
+  AGENT_EXECUTION_STATUS_READ: 'agent_execution_status_read',
+  AGENT_EXECUTION_LIST_READ: 'agent_execution_list_read',
+  AGENT_EXECUTION_PLAN_WRITE: 'agent_execution_plan_write',
+  AGENT_EXECUTION_RUN_EXECUTE: 'agent_execution_run_execute',
+  PROVIDER_STATUS_LIST_READ: 'provider_status_list_read',
+  PROVIDER_EXECUTION_ADMIN: 'provider_execution_admin'
+});
+
 const SAFE_PROFILE_TOOLS = Object.freeze([
   'browser_debug_doctor',
   'browser_debug_target_validate',
@@ -14,9 +23,26 @@ const SAFE_PROFILE_TOOLS = Object.freeze([
   'browser_debug_agent_execution_status',
   'browser_debug_agent_execution_list',
   'browser_debug_visual_review_dashboard',
+  'browser_debug_capture_readiness',
   'browser_debug_capture_plan',
+  'browser_debug_language_settings',
+  'browser_debug_localization_resources',
+  'browser_debug_report_templates',
+  'browser_debug_translation_readiness',
+  'browser_debug_release_readiness',
+  'browser_debug_artifact_root_status',
+  'browser_debug_legacy_alias_audit',
+  'browser_debug_legacy_alias_removal_readiness',
+  'browser_debug_shell_readiness',
+  'browser_debug_final_readiness',
   'browser_debug_mcp_execution_gates',
   'browser_debug_mcp_capabilities',
+  'browser_debug_operation_registry',
+  'browser_debug_operation_roadmap',
+  'browser_debug_operation_contracts',
+  'browser_debug_operation_policy',
+  'browser_debug_operation_admin_readiness',
+  'browser_debug_operation_provider_readiness',
   'browser_debug_schema_list',
   'browser_debug_schema_get'
 ]);
@@ -37,12 +63,35 @@ const FULL_PROFILE_TOOLS = Object.freeze([
   'browser_debug_agent_execution_status',
   'browser_debug_agent_execution_list',
   'browser_debug_visual_review_dashboard',
+  'browser_debug_capture_readiness',
   'browser_debug_capture_plan',
+  'browser_debug_language_settings',
+  'browser_debug_localization_resources',
+  'browser_debug_report_templates',
+  'browser_debug_translation_readiness',
+  'browser_debug_release_readiness',
+  'browser_debug_artifact_root_status',
+  'browser_debug_legacy_alias_audit',
+  'browser_debug_legacy_alias_removal_readiness',
+  'browser_debug_shell_readiness',
+  'browser_debug_final_readiness',
   'browser_debug_mcp_execution_gates',
   'browser_debug_mcp_capabilities',
+  'browser_debug_operation_registry',
+  'browser_debug_operation_roadmap',
+  'browser_debug_operation_contracts',
+  'browser_debug_operation_policy',
+  'browser_debug_operation_admin_readiness',
+  'browser_debug_operation_provider_readiness',
   'browser_debug_review_target',
   'browser_debug_schema_list',
   'browser_debug_schema_get'
+]);
+
+const ADMIN_PROFILE_TOOLS = Object.freeze([
+  ...FULL_PROFILE_TOOLS,
+  'browser_debug_agent_execution_plan',
+  'browser_debug_agent_execution_run'
 ]);
 
 export const MCP_PROFILES = Object.freeze({
@@ -74,13 +123,13 @@ export const MCP_PROFILES = Object.freeze({
   }),
   admin: Object.freeze({
     name: 'admin',
-    description: 'Explicit local-maintenance MCP profile. Phase 31 keeps it equivalent to full.',
-    tools: FULL_PROFILE_TOOLS,
+    description: 'Explicit local-maintenance MCP profile with approved admin-only agent execution plan/run tools.',
+    tools: ADMIN_PROFILE_TOOLS,
     boundaries: Object.freeze({
       browser_launched: true,
       writes_artifacts: true,
       deletes_files: false,
-      provider_call: false,
+      provider_call: true,
       shell_used: false,
       external_listener: false
     })
@@ -197,6 +246,7 @@ const TOOL_REGISTRY = Object.freeze([
       }
     },
     effects: effects({ browserLaunched: false, writesArtifacts: false }),
+    validate: (args) => validateExactRequiredStrings(args, ['maxBytes', 'olderThan'], []),
     toCliArgs: (args) => {
       const output = ['resource', 'artifacts', 'plan'];
       if (args.maxBytes !== undefined) {
@@ -291,6 +341,10 @@ const TOOL_REGISTRY = Object.freeze([
     name: 'browser_debug_agent_execution_status',
     minimumProfile: 'safe',
     description: 'Read local agent execution status without executing providers.',
+    tags: [
+      MCP_TOOL_TAGS.AGENT_EXECUTION_STATUS_READ,
+      MCP_TOOL_TAGS.PROVIDER_STATUS_LIST_READ
+    ],
     inputSchema: {
       type: 'object',
       required: ['execution'],
@@ -306,6 +360,10 @@ const TOOL_REGISTRY = Object.freeze([
     name: 'browser_debug_agent_execution_list',
     minimumProfile: 'safe',
     description: 'List local agent execution metadata without executing providers.',
+    tags: [
+      MCP_TOOL_TAGS.AGENT_EXECUTION_LIST_READ,
+      MCP_TOOL_TAGS.PROVIDER_STATUS_LIST_READ
+    ],
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -317,6 +375,107 @@ const TOOL_REGISTRY = Object.freeze([
     toCliArgs: (args) => withOptionalOptions(['agent', 'execution', 'list'], args, {
       artifactRoot: '--artifact-root'
     })
+  },
+  {
+    name: 'browser_debug_agent_execution_plan',
+    minimumProfile: 'admin',
+    description: 'Create an admin-only local dry-run agent execution plan through MCP without executing providers.',
+    tags: [
+      MCP_TOOL_TAGS.AGENT_EXECUTION_PLAN_WRITE,
+      MCP_TOOL_TAGS.PROVIDER_EXECUTION_ADMIN
+    ],
+    inputSchema: {
+      type: 'object',
+      required: ['package', 'surface', 'provider', 'model', 'idempotencyKey'],
+      additionalProperties: false,
+      properties: {
+        package: { type: 'string' },
+        surface: { type: 'string' },
+        provider: { type: 'string' },
+        model: { type: 'string' },
+        idempotencyKey: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: true, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, [
+      'package',
+      'surface',
+      'provider',
+      'model',
+      'idempotencyKey',
+      'artifactRoot'
+    ], ['package', 'surface', 'provider', 'model', 'idempotencyKey']),
+    toCliArgs: (args) => withOptionalOptions(['agent', 'execution', 'plan'], args, {
+      package: '--package',
+      surface: '--surface',
+      provider: '--provider',
+      model: '--model',
+      idempotencyKey: '--idempotency-key',
+      artifactRoot: '--artifact-root'
+    })
+  },
+  {
+    name: 'browser_debug_agent_execution_run',
+    minimumProfile: 'admin',
+    description: 'Run a matching admin-only agent execution plan through MCP with explicit execute intent.',
+    tags: [
+      MCP_TOOL_TAGS.AGENT_EXECUTION_RUN_EXECUTE,
+      MCP_TOOL_TAGS.PROVIDER_EXECUTION_ADMIN
+    ],
+    inputSchema: {
+      type: 'object',
+      required: ['execution', 'package', 'surface', 'provider', 'model', 'execute', 'idempotencyKey'],
+      additionalProperties: false,
+      properties: {
+        execution: { type: 'string' },
+        package: { type: 'string' },
+        surface: { type: 'string' },
+        provider: { type: 'string' },
+        model: { type: 'string' },
+        execute: { type: 'boolean', const: true },
+        idempotencyKey: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: true, providerCall: true }),
+    validate: (args) => {
+      const required = validateExactRequiredStrings(args, [
+        'execution',
+        'package',
+        'surface',
+        'provider',
+        'model',
+        'execute',
+        'idempotencyKey',
+        'artifactRoot'
+      ], ['execution', 'package', 'surface', 'provider', 'model', 'idempotencyKey']);
+      if (!required.ok) {
+        return required;
+      }
+      if (args.execute !== true) {
+        return {
+          ok: false,
+          message: 'browser_debug_agent_execution_run requires execute: true.'
+        };
+      }
+      return { ok: true };
+    },
+    toCliArgs: (args) => {
+      const output = withOptionalOptions(['agent', 'execution', 'run'], args, {
+        execution: '--execution',
+        package: '--package',
+        surface: '--surface',
+        provider: '--provider',
+        model: '--model',
+        idempotencyKey: '--idempotency-key',
+        artifactRoot: '--artifact-root'
+      });
+      if (args.execute === true) {
+        output.splice(-1, 0, '--execute');
+      }
+      return output;
+    }
   },
   {
     name: 'browser_debug_visual_review_dashboard',
@@ -356,6 +515,23 @@ const TOOL_REGISTRY = Object.freeze([
     toCliArgs: (args) => withCommonOptions(['review', '--target', args.target], args)
   },
   {
+    name: 'browser_debug_capture_readiness',
+    minimumProfile: 'safe',
+    description: 'Inspect screen, window, and desktop app capture readiness without capturing pixels.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        source: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, ['source'], []),
+    toCliArgs: (args) => withOptionalOptions(['capture', 'readiness'], args, {
+      source: '--source'
+    })
+  },
+  {
     name: 'browser_debug_capture_plan',
     minimumProfile: 'safe',
     description: 'Inspect read-only screen, window, and desktop app capture planning requirements without capturing pixels.',
@@ -367,9 +543,131 @@ const TOOL_REGISTRY = Object.freeze([
       }
     },
     effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, ['source'], []),
     toCliArgs: (args) => withOptionalOptions(['capture', 'plan'], args, {
       source: '--source'
     })
+  },
+  {
+    name: 'browser_debug_language_settings',
+    minimumProfile: 'safe',
+    description: 'Inspect local dashboard display locale and artifact output language settings without writing files or executing providers.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {} },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    toCliArgs: () => ['settings', 'language', '--json']
+  },
+  {
+    name: 'browser_debug_localization_resources',
+    minimumProfile: 'safe',
+    description: 'Inspect provider-free dashboard UI locale resources without translating raw evidence.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        locale: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, ['locale'], []),
+    toCliArgs: (args) => withOptionalOptions(['settings', 'locale', 'resources'], args, {
+      locale: '--locale'
+    })
+  },
+  {
+    name: 'browser_debug_report_templates',
+    minimumProfile: 'safe',
+    description: 'Inspect provider-free report template locale resources without translating raw evidence.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        locale: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, ['locale'], []),
+    toCliArgs: (args) => withOptionalOptions(['settings', 'report', 'templates'], args, {
+      locale: '--locale'
+    })
+  },
+  {
+    name: 'browser_debug_translation_readiness',
+    minimumProfile: 'safe',
+    description: 'Inspect translation readiness without provider calls, credentials, or raw evidence translation.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        locale: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, ['locale'], []),
+    toCliArgs: (args) => withOptionalOptions(['translation', 'readiness'], args, {
+      locale: '--locale'
+    })
+  },
+  {
+    name: 'browser_debug_release_readiness',
+    minimumProfile: 'safe',
+    description: 'Inspect local release readiness and npm publication boundaries without contacting npm or reading credentials.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {} },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, [], []),
+    toCliArgs: () => ['release', 'readiness', '--json']
+  },
+  {
+    name: 'browser_debug_artifact_root_status',
+    minimumProfile: 'safe',
+    description: 'Inspect artifact-root compatibility policy and migration boundaries without writing artifacts.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, ['artifactRoot'], []),
+    toCliArgs: (args) => withOptionalOptions(['artifact-root', 'status'], args, {
+      artifactRoot: '--artifact-root'
+    })
+  },
+  {
+    name: 'browser_debug_legacy_alias_audit',
+    minimumProfile: 'safe',
+    description: 'Inspect retained legacy alias compatibility without removing aliases or changing MCP permissions.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {} },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, [], []),
+    toCliArgs: () => ['identity', 'aliases', '--json']
+  },
+  {
+    name: 'browser_debug_legacy_alias_removal_readiness',
+    minimumProfile: 'safe',
+    description: 'Inspect legacy alias removal readiness without removing aliases or changing compatibility surfaces.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {} },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    validate: (args) => validateExactRequiredStrings(args, [], []),
+    toCliArgs: () => ['identity', 'aliases', 'removal-readiness', '--json']
+  },
+  {
+    name: 'browser_debug_shell_readiness',
+    minimumProfile: 'safe',
+    description: 'Inspect constrained shell use-case, threat-model, and plan-only readiness without executing commands.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {} },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false, shellUsed: false }),
+    validate: (args) => validateExactRequiredStrings(args, [], []),
+    toCliArgs: () => ['shell', 'readiness', '--json']
+  },
+  {
+    name: 'browser_debug_final_readiness',
+    minimumProfile: 'safe',
+    description: 'Inspect local final hardening readiness without running gates, launching browsers, publishing, or triggering remote CI.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: {} },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false, shellUsed: false }),
+    validate: (args) => validateExactRequiredStrings(args, [], []),
+    toCliArgs: () => ['final', 'readiness', '--json']
   },
   {
     name: 'browser_debug_mcp_execution_gates',
@@ -405,6 +703,118 @@ const TOOL_REGISTRY = Object.freeze([
     toCliArgs: (args) => withOptionalOptions(['mcp', 'capabilities'], args, {
       profile: '--profile',
       scope: '--scope'
+    })
+  },
+  {
+    name: 'browser_debug_operation_registry',
+    minimumProfile: 'safe',
+    description: 'Inspect the read-only operation registry, risk taxonomy, and approval gates without changing state.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        operation: { type: 'string' },
+        group: { type: 'string' },
+        risk: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    toCliArgs: (args) => withOptionalOptions(['operation', 'registry'], args, {
+      operation: '--operation',
+      group: '--group',
+      risk: '--risk'
+    })
+  },
+  {
+    name: 'browser_debug_operation_roadmap',
+    minimumProfile: 'safe',
+    description: 'Inspect the read-only operation roadmap A/B/C boundary contracts without changing state.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        phase: { type: 'string' },
+        group: { type: 'string' },
+        risk: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    toCliArgs: (args) => withOptionalOptions(['operation', 'roadmap'], args, {
+      phase: '--phase',
+      group: '--group',
+      risk: '--risk'
+    })
+  },
+  {
+    name: 'browser_debug_operation_contracts',
+    minimumProfile: 'safe',
+    description: 'Inspect shared read-only operation contracts for risk, gate, token, and receipt boundaries without changing state.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        scope: { type: 'string' },
+        operation: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    toCliArgs: (args) => withOptionalOptions(['operation', 'contracts'], args, {
+      scope: '--scope',
+      operation: '--operation'
+    })
+  },
+  {
+    name: 'browser_debug_operation_policy',
+    minimumProfile: 'safe',
+    description: 'Inspect read-only operation policy and readiness for admin defaults, CLI planning, harness disabled state, and MCP readiness.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        scope: { type: 'string' },
+        operation: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    toCliArgs: (args) => withOptionalOptions(['operation', 'policy'], args, {
+      scope: '--scope',
+      operation: '--operation'
+    })
+  },
+  {
+    name: 'browser_debug_operation_admin_readiness',
+    minimumProfile: 'safe',
+    description: 'Inspect read-only MCP admin token-flow and harness readiness without issuing tokens or enabling execution.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        scope: { type: 'string' },
+        operation: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    toCliArgs: (args) => withOptionalOptions(['operation', 'admin-readiness'], args, {
+      scope: '--scope',
+      operation: '--operation'
+    })
+  },
+  {
+    name: 'browser_debug_operation_provider_readiness',
+    minimumProfile: 'safe',
+    description: 'Inspect read-only provider MCP planning, disclosure, and credential-guard readiness without calling providers.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        scope: { type: 'string' },
+        operation: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false, providerCall: false }),
+    toCliArgs: (args) => withOptionalOptions(['operation', 'provider-readiness'], args, {
+      scope: '--scope',
+      operation: '--operation'
     })
   },
   {
@@ -452,6 +862,10 @@ export function getMcpTools(profile = DEFAULT_MCP_PROFILE) {
   return resolved.definition.tools.map((name) => publicTool(TOOL_BY_NAME.get(name)));
 }
 
+export function getMcpToolsByTag(profile = DEFAULT_MCP_PROFILE, tag) {
+  return getMcpTools(profile).filter((tool) => tool.tags.includes(tag));
+}
+
 export function resolveMcpTool(profile, name) {
   const resolved = resolveMcpProfile(profile);
   if (!resolved.ok) {
@@ -479,6 +893,14 @@ export function mcpToolToCliArgs(tool, args = {}) {
   return definition.toCliArgs(args);
 }
 
+export function validateMcpToolArgs(tool, args = {}) {
+  const definition = typeof tool === 'string' ? TOOL_BY_NAME.get(tool) : tool;
+  if (!definition || typeof definition.validate !== 'function') {
+    return { ok: true };
+  }
+  return definition.validate(args ?? {});
+}
+
 export function mcpProfileMetadata(profile = DEFAULT_MCP_PROFILE) {
   const resolved = resolveMcpProfile(profile);
   if (!resolved.ok) {
@@ -499,7 +921,8 @@ function publicTool(tool) {
     description: tool.description,
     inputSchema: tool.inputSchema,
     minimumProfile: tool.minimumProfile,
-    effects: tool.effects
+    effects: tool.effects,
+    tags: Object.freeze([...(tool.tags ?? [])])
   };
 }
 
@@ -546,4 +969,25 @@ function withOptionalOptions(base, args, optionMap) {
   }
   output.push('--json');
   return output;
+}
+
+function validateExactRequiredStrings(args, allowedKeys, requiredKeys) {
+  const allowed = new Set(allowedKeys);
+  for (const key of Object.keys(args ?? {})) {
+    if (!allowed.has(key)) {
+      return {
+        ok: false,
+        message: `Unsupported MCP argument for this tool: ${key}`
+      };
+    }
+  }
+  for (const key of requiredKeys) {
+    if (typeof args?.[key] !== 'string' || args[key].trim() === '') {
+      return {
+        ok: false,
+        message: `Missing required MCP argument: ${key}`
+      };
+    }
+  }
+  return { ok: true };
 }

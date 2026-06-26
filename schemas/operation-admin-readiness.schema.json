@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/operation-admin-readiness.schema.json",
+  "title": "TraceCue Operation Admin Readiness",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "admin_readiness_version",
+    "generated_at",
+    "product_identity",
+    "scope_selection",
+    "operation_selection",
+    "policy_source",
+    "admin_policy",
+    "requirements",
+    "selected_operations",
+    "readiness",
+    "approval_boundary",
+    "summary",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "admin_readiness_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "product_identity": { "type": "object" },
+    "scope_selection": { "type": "string" },
+    "operation_selection": { "type": "string" },
+    "policy_source": { "type": "object" },
+    "admin_policy": { "type": "object" },
+    "requirements": { "type": "object" },
+    "selected_operations": { "type": "array" },
+    "readiness": { "type": "array" },
+    "approval_boundary": { "type": "object" },
+    "summary": { "type": "object" },
+    "boundary": { "type": "object" },
+    "notes": { "type": "array" }
+  },
+  "additionalProperties": true
+}

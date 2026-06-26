@@ -113,6 +113,34 @@
       "role": "manifest"
     },
     {
+      "path": "src/release-readiness.js",
+      "role": "manifest"
+    },
+    {
+      "path": "src/artifact-root-policy.js",
+      "role": "manifest"
+    },
+    {
+      "path": "src/artifact-root-migration.js",
+      "role": "manifest"
+    },
+    {
+      "path": "src/legacy-alias-audit.js",
+      "role": "manifest"
+    },
+    {
+      "path": "src/legacy-alias-removal-readiness.js",
+      "role": "manifest"
+    },
+    {
+      "path": "src/constrained-shell-readiness.js",
+      "role": "manifest"
+    },
+    {
+      "path": "src/final-hardening-readiness.js",
+      "role": "manifest"
+    },
+    {
       "path": "src/observe.js",
       "role": "manifest"
     },
@@ -214,6 +242,34 @@
     },
     {
       "path": "schemas/visual-review-result.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/release-readiness.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/artifact-root-policy.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/artifact-root-migration.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/legacy-alias-audit.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/legacy-alias-removal-readiness.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/constrained-shell-readiness.schema.json",
+      "role": "manifest"
+    },
+    {
+      "path": "schemas/final-hardening-readiness.schema.json",
       "role": "manifest"
     }
   ],
@@ -422,6 +478,449 @@
       "writes_artifacts": false,
       "legacy_alias_removal_authorized": false,
       "artifact_root_migration_authorized": false
+    }
+  },
+  "phase_57": {
+    "status": "complete",
+    "feature": "Physical checkout rename completion",
+    "files": [
+      "src/identity-audit.js",
+      "tools/check_rename_readiness.mjs",
+      "docs/workflow/IDENTITY_MIGRATION.md"
+    ],
+    "boundaries": {
+      "local_filesystem_checkout_renamed": true,
+      "package_identity_changed": false,
+      "artifact_root_migration_authorized": false,
+      "legacy_alias_removal_authorized": false,
+      "npm_publication_authorized": false
+    }
+  },
+  "phase_58": {
+    "status": "complete",
+    "feature": "Remote repository rename completion",
+    "files": [
+      "src/product-identity.js",
+      "src/identity-audit.js",
+      "tools/check_rename_readiness.mjs",
+      ".codex-plugin/plugin.json"
+    ],
+    "boundaries": {
+      "remote_repository_identity_synchronized": true,
+      "package_identity_changed": false,
+      "artifact_root_migration_authorized": false,
+      "legacy_alias_removal_authorized": false,
+      "npm_publication_authorized": false
+    }
+  },
+  "phase_59": {
+    "status": "complete",
+    "feature": "Local language settings foundation",
+    "files": [
+      "src/language-settings.js",
+      "src/locale-policy.js",
+      "schemas/language-settings.schema.json",
+      "ops/DASHBOARD_SETTINGS.json"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "settings_mutated_by_read_commands": false,
+      "translation_execution_performed": false,
+      "provider_call_performed": false,
+      "parent_repository_contacted": false,
+      "consumer_repository_contacted": false,
+      "mcp_write_execute_exposed": false
+    }
+  },
+  "phase_60": {
+    "status": "complete",
+    "feature": "Read-only operation registry and roadmap risk taxonomy foundation",
+    "files": [
+      "src/operation-registry.js",
+      "schemas/operation-registry.schema.json",
+      "src/mcp-capabilities.js",
+      "src/mcp-execution-gates.js"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "writes_artifacts": false,
+      "deletes_files": false,
+      "provider_call_performed": false,
+      "api_call_performed": false,
+      "capture_performed": false,
+      "translation_execution_performed": false,
+      "npm_publish_performed": false,
+      "artifact_root_migration_performed": false,
+      "legacy_alias_removed": false,
+      "shell_used": false,
+      "mcp_permissions_changed": false,
+      "mcp_write_execute_exposed": false,
+      "gate_effect": "none"
+    }
+  },
+  "phase_60_1": {
+    "status": "complete",
+    "feature": "Read-only operation roadmap boundary contracts",
+    "files": [
+      "src/operation-roadmap.js",
+      "schemas/operation-roadmap.schema.json",
+      "src/cli.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "writes_artifacts": false,
+      "deletes_files": false,
+      "provider_call_performed": false,
+      "capture_performed": false,
+      "translation_execution_performed": false,
+      "npm_publish_performed": false,
+      "artifact_root_migration_performed": false,
+      "legacy_alias_removed": false,
+      "shell_used": false,
+      "draft_roadmap_promoted_to_product_plan": false,
+      "live_execution_performed": false,
+      "execution_tokens_issued": false,
+      "ci_remote_triggered": false,
+      "mcp_write_execute_exposed": false
+    }
+  },
+  "phase_61_64": {
+    "status": "complete",
+    "feature": "Read-only operation contract foundation",
+    "files": [
+      "src/operation-contracts.js",
+      "schemas/operation-contracts.schema.json",
+      "src/cli.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "writes_artifacts": false,
+      "deletes_files": false,
+      "provider_call_performed": false,
+      "capture_performed": false,
+      "translation_execution_performed": false,
+      "package_publication_performed": false,
+      "artifact_root_migration_performed": false,
+      "legacy_alias_removed": false,
+      "shell_used": false,
+      "token_issuance_enabled": false,
+      "execution_tokens_issued": false,
+      "receipt_writer_enabled": false,
+      "execution_harness_enabled": false,
+      "live_execution_performed": false,
+      "mcp_write_execute_exposed": false
+    }
+  },
+  "phase_65_68": {
+    "status": "complete",
+    "feature": "Read-only operation policy and readiness foundation",
+    "files": [
+      "ops/OPERATION_POLICY.json",
+      "src/operation-policy.js",
+      "schemas/operation-policy.schema.json",
+      "src/cli.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "policy_config_mutated": false,
+      "writes_artifacts": false,
+      "deletes_files": false,
+      "provider_call_performed": false,
+      "capture_performed": false,
+      "translation_execution_performed": false,
+      "package_publication_performed": false,
+      "artifact_root_migration_performed": false,
+      "legacy_alias_removed": false,
+      "shell_used": false,
+      "token_issuance_enabled": false,
+      "execution_tokens_issued": false,
+      "receipt_writer_enabled": false,
+      "execution_harness_enabled": false,
+      "mcp_admin_execution_enabled": false,
+      "live_execution_performed": false,
+      "mcp_write_execute_exposed": false
+    }
+  },
+  "phase_69_70": {
+    "status": "complete",
+    "feature": "Read-only MCP admin token-flow, harness, and agent execution bridge readiness foundation",
+    "files": [
+      "src/operation-admin-readiness.js",
+      "schemas/operation-admin-readiness.schema.json",
+      "src/cli.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "writes_artifacts": false,
+      "deletes_files": false,
+      "provider_call_performed": false,
+      "capture_performed": false,
+      "translation_execution_performed": false,
+      "package_publication_performed": false,
+      "artifact_root_migration_performed": false,
+      "legacy_alias_removed": false,
+      "shell_used": false,
+      "mcp_admin_token_flow_enabled": false,
+      "token_issuance_enabled": false,
+      "execution_tokens_issued": false,
+      "token_storage_enabled": false,
+      "mcp_admin_harness_enabled": false,
+      "mcp_admin_agent_execution_bridge_enabled": true,
+      "mcp_admin_execute_calls_enabled": true,
+      "execution_harness_enabled": false,
+      "live_execution_performed": false,
+      "mcp_write_execute_exposed": true
+    }
+  },
+  "phase_71_73": {
+    "status": "complete",
+    "feature": "Read-only provider MCP planning, disclosure, and credential guard readiness",
+    "files": [
+      "src/operation-provider-readiness.js",
+      "schemas/operation-provider-readiness.schema.json",
+      "src/cli.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "writes_artifacts": false,
+      "deletes_files": false,
+      "provider_mcp_execution_enabled": false,
+      "provider_call_performed": false,
+      "api_call_performed": false,
+      "external_evidence_transfer_authorized": false,
+      "external_evidence_transfer_performed": false,
+      "credential_values_read": false,
+      "credential_values_recorded": false,
+      "raw_provider_response_stored": false,
+      "capture_performed": false,
+      "translation_execution_performed": false,
+      "package_publication_performed": false,
+      "artifact_root_migration_performed": false,
+      "legacy_alias_removed": false,
+      "shell_used": false,
+      "live_execution_performed": false,
+      "mcp_write_execute_exposed": false
+    }
+  },
+  "phase_74_78": {
+    "status": "complete",
+    "feature": "Provider MCP execution bridge and status/list readiness hardening",
+      "files": [
+      "src/agent-execution.js",
+      "src/operation-provider-readiness.js",
+      "src/operation-registry.js",
+      "src/mcp-capabilities.js",
+      "src/mcp-profiles.js",
+      "schemas/operation-provider-readiness.schema.json",
+      "schemas/mcp-tool.schema.json"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "writes_artifacts": false,
+      "deletes_files": false,
+      "provider_mcp_execution_enabled": true,
+      "safe_mcp_execution_enabled": false,
+      "full_mcp_execution_enabled": false,
+      "admin_mcp_execution_enabled": true,
+      "provider_mcp_status_list_available": true,
+      "provider_mcp_status_list_read_only": true,
+      "provider_call_performed": false,
+      "api_call_performed": false,
+      "local_runner_execution_performed": false,
+      "external_evidence_transfer_authorized": true,
+      "external_evidence_transfer_performed": false,
+      "credential_values_read": false,
+      "credential_values_recorded": false,
+      "raw_provider_response_stored": false,
+      "capture_performed": false,
+      "translation_execution_performed": false,
+      "package_publication_performed": false,
+      "artifact_root_migration_performed": false,
+      "legacy_alias_removed": false,
+      "shell_used": false,
+      "live_execution_performed": false,
+      "mcp_write_execute_exposed": true
+    }
+  },
+  "phase_79_84": {
+    "status": "complete",
+    "feature": "Cleanup MCP planning and receipt hardening",
+    "files": [
+      "src/resource-artifacts.js",
+      "src/operation-registry.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "artifact_root_scoped": true,
+      "candidate_locks_required": true,
+      "plan_hash_supported": true,
+      "directory_deletion_allowed": false,
+      "mcp_cleanup_execute_exposed": false,
+      "shell_used": false
+    }
+  },
+  "phase_85_95": {
+    "status": "complete",
+    "feature": "Capture readiness and no-capture execution boundary",
+    "files": [
+      "src/capture-readiness.js",
+      "schemas/capture-readiness.schema.json",
+      "schemas/capture-artifact.schema.json",
+      "schemas/capture-receipt.schema.json"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "capture_performed": false,
+      "raw_pixels_read": false,
+      "artifacts_written": false,
+      "mcp_capture_execution_exposed": false
+    }
+  },
+  "phase_96_119": {
+    "status": "complete",
+    "feature": "Provider-free localization and translation readiness",
+    "files": [
+      "src/localization-resources.js",
+      "src/language-settings.js",
+      "src/locale-policy.js",
+      "schemas/localization-resources.schema.json",
+      "schemas/translation-readiness.schema.json",
+      "schemas/translation-dry-run.schema.json"
+    ],
+    "boundaries": {
+      "provider_call_performed": false,
+      "credential_values_read": false,
+      "translation_execution_performed": false,
+      "artifacts_written": false,
+      "raw_evidence_translated": false
+    }
+  },
+  "phase_120_125": {
+    "status": "complete",
+    "feature": "Local release readiness and npm publication boundary",
+    "files": [
+      "src/release-readiness.js",
+      "schemas/release-readiness.schema.json",
+      "src/operation-registry.js",
+      "src/mcp-capabilities.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "npm_publish_performed": false,
+      "registry_upload_performed": false,
+      "credential_values_read": false,
+      "package_identity_changed": false,
+      "license_changed": false,
+      "remote_ci_triggered": false,
+      "mcp_write_execute_exposed": false
+    }
+  },
+  "phase_126_133": {
+    "status": "complete",
+    "feature": "Artifact-root policy, compatibility, and migration readiness",
+    "files": [
+      "ops/ARTIFACT_ROOT_POLICY.json",
+      "src/artifact-root-policy.js",
+      "src/artifact-root-migration.js",
+      "schemas/artifact-root-policy.schema.json",
+      "schemas/artifact-root-migration.schema.json"
+    ],
+    "boundaries": {
+      "legacy_compatibility_preserved": true,
+      "real_artifact_migration_performed": false,
+      "artifact_root_compatibility_removed": false,
+      "cleanup_outside_artifact_root_allowed": false,
+      "mcp_write_execute_exposed": false
+    }
+  },
+  "phase_134_138": {
+    "status": "complete",
+    "feature": "Legacy alias audit and compatibility readiness",
+    "files": [
+      "src/legacy-alias-audit.js",
+      "schemas/legacy-alias-audit.schema.json",
+      "src/operation-registry.js",
+      "src/mcp-capabilities.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "read_only": true,
+      "legacy_aliases_retained": true,
+      "package_bins_removed": false,
+      "mcp_aliases_removed": false,
+      "plugin_aliases_removed": false,
+      "artifact_root_compatibility_removed": false
+    }
+  },
+  "phase_139": {
+    "status": "complete",
+    "feature": "Legacy alias removal readiness and fail-closed gate",
+    "files": [
+      "src/legacy-alias-removal-readiness.js",
+      "schemas/legacy-alias-removal-readiness.schema.json",
+      "src/parser.js",
+      "src/cli.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "removal_authorized": false,
+      "legacy_alias_removed": false,
+      "package_bins_removed": false,
+      "mcp_aliases_removed": false,
+      "plugin_aliases_removed": false,
+      "product_docs_promoted": false,
+      "mcp_write_execute_exposed": false
+    }
+  },
+  "phase_140_148": {
+    "status": "complete",
+    "feature": "Constrained shell readiness and fail-closed execution boundary",
+    "files": [
+      "src/constrained-shell-readiness.js",
+      "schemas/constrained-shell-readiness.schema.json",
+      "src/parser.js",
+      "src/cli.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "command_executed": false,
+      "shell_used": false,
+      "child_process_used": false,
+      "environment_values_read": false,
+      "credential_values_read": false,
+      "files_mutated": false,
+      "network_contact": false,
+      "mcp_execution_exposed": false,
+      "mcp_write_execute_exposed": false
+    }
+  },
+  "phase_149_155": {
+    "status": "complete",
+    "feature": "Final hardening readiness report",
+    "files": [
+      "src/final-hardening-readiness.js",
+      "schemas/final-hardening-readiness.schema.json",
+      "src/parser.js",
+      "src/cli.js",
+      "src/mcp-profiles.js"
+    ],
+    "boundaries": {
+      "browser_smoke_executed": false,
+      "mcp_smoke_executed": false,
+      "remote_ci_triggered": false,
+      "git_mutated": false,
+      "npm_publish_performed": false,
+      "provider_call_performed": false,
+      "artifact_root_migration_performed": false,
+      "legacy_alias_removed": false,
+      "shell_used": false,
+      "product_docs_promoted": false
     }
   }
 }

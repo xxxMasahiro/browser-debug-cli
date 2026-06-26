@@ -27,6 +27,7 @@ const context = {
   cwd: process.cwd(),
   env: process.env,
   mcpProfile: parsed.profile,
+  invokedBinName: PRODUCT_IDENTITY.mcpBinName,
   nodeVersion: process.versions.node,
   stdin: process.stdin,
   stdout: process.stdout,

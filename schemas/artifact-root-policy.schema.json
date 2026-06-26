@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/artifact-root-policy.schema.json",
+  "title": "TraceCue Artifact Root Policy",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "policy_version",
+    "generated_at",
+    "product_identity",
+    "policy_source",
+    "mode",
+    "current_behavior",
+    "roots",
+    "migration",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "policy_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "product_identity": { "type": "object" },
+    "policy_source": { "type": "object" },
+    "mode": { "type": "string" },
+    "current_behavior": { "type": "object" },
+    "roots": { "type": "array" },
+    "migration": { "type": "object" },
+    "warnings": { "type": "array" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

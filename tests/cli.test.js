@@ -13,6 +13,7 @@ import { runImageReview } from '../src/image-review.js';
 import { buildIdentityAudit, runIdentityAudit, normalizeRepositoryUrl } from '../src/identity-audit.js';
 import { runCaptureHandoff, captureHandoffBoundary } from '../src/capture-handoff.js';
 import { buildCapturePlan, capturePlanBoundary } from '../src/capture-plan.js';
+import { buildCaptureReadiness, captureReadinessBoundary } from '../src/capture-readiness.js';
 import {
   runVisualReviewResultPreparation,
   visualReviewResultPreparationBoundary
@@ -29,7 +30,77 @@ import {
   runVisualReviewAggregation,
   visualReviewAggregationBoundary
 } from '../src/visual-review-aggregation.js';
-import { handleMcpRequest } from '../src/mcp.js';
+import {
+  TRACE_CUE_LOCALE_CODES,
+  getTraceCueIntlLocale,
+  getTraceCueLocaleDirection,
+  normalizeTraceCueLocale
+} from '../src/locale-policy.js';
+import {
+  buildLanguageSettingsPolicyContract,
+  normalizeLanguageSettings,
+  runLanguageSettings,
+  languageSettingsBoundary
+} from '../src/language-settings.js';
+import {
+  buildLocalizationResources,
+  buildReportTemplates,
+  buildTranslationDryRun,
+  buildTranslationReadiness,
+  translationBoundary
+} from '../src/localization-resources.js';
+import {
+  buildArtifactRootStatus,
+  artifactRootBoundary
+} from '../src/artifact-root-policy.js';
+import {
+  buildArtifactRootMigrationPlan
+} from '../src/artifact-root-migration.js';
+import {
+  buildLegacyAliasAudit,
+  legacyAliasWarningsForInvocation
+} from '../src/legacy-alias-audit.js';
+import {
+  buildLegacyAliasRemovalReadiness,
+  legacyAliasRemovalReadinessBoundary
+} from '../src/legacy-alias-removal-readiness.js';
+import {
+  buildReleaseReadiness,
+  releaseReadinessBoundary
+} from '../src/release-readiness.js';
+import {
+  buildConstrainedShellReadiness,
+  constrainedShellBoundary
+} from '../src/constrained-shell-readiness.js';
+import {
+  buildFinalHardeningReadiness,
+  finalHardeningBoundary
+} from '../src/final-hardening-readiness.js';
+import {
+  buildOperationAdminReadinessReport,
+  operationAdminReadinessBoundary
+} from '../src/operation-admin-readiness.js';
+import {
+  buildOperationContractsReport,
+  operationContractsBoundary
+} from '../src/operation-contracts.js';
+import {
+  buildOperationPolicyReport,
+  operationPolicyBoundary
+} from '../src/operation-policy.js';
+import {
+  buildOperationProviderReadinessReport,
+  operationProviderReadinessBoundary
+} from '../src/operation-provider-readiness.js';
+import {
+  buildOperationRegistryReport,
+  operationRegistryBoundary
+} from '../src/operation-registry.js';
+import {
+  buildOperationRoadmapReport,
+  operationRoadmapBoundary
+} from '../src/operation-roadmap.js';
+import { MCP_TOOL_TAGS, getMcpToolsByTag, handleMcpRequest } from '../src/mcp.js';
 import { runObserve } from '../src/observe.js';
 import { parseCliArgs } from '../src/parser.js';
 import { PRODUCT_IDENTITY, filesystemSafeName } from '../src/product-identity.js';
@@ -81,6 +152,193 @@ test('doctor returns the JSON envelope without launching a browser', async () =>
   assert.equal(body.warnings[0].code, 'PLAYWRIGHT_NOT_INSTALLED');
 });
 
+test('language settings keep dashboard UI and artifact output language independent', async () => {
+  assert.deepEqual(TRACE_CUE_LOCALE_CODES, ['ja', 'en', 'ko', 'zh-CN', 'zh-TW', 'es', 'pt-BR', 'fr', 'de', 'id', 'vi', 'th', 'hi', 'ar']);
+  assert.equal(new Set(TRACE_CUE_LOCALE_CODES).size, 14);
+  assert.equal(normalizeTraceCueLocale('zh-Hant'), 'zh-TW');
+  assert.equal(normalizeTraceCueLocale('pt'), 'pt-BR');
+  assert.equal(getTraceCueLocaleDirection('ar'), 'rtl');
+  assert.equal(getTraceCueIntlLocale('ar'), 'ar-SA');
+
+  const policy = buildLanguageSettingsPolicyContract();
+  assert.equal(policy.locale_authority.supported_locale_count, 14);
+  assert.equal(policy.defaults.ui_locale, 'en');
+  assert.equal(policy.boundary.provider_dispatch_enabled, false);
+  assert.equal(policy.boundary.mcp_write_execute_exposed, false);
+
+  const normalized = normalizeLanguageSettings({
+    ui_locale: 'ja-JP',
+    profiles: {
+      reports: {
+        language: {
+          source_language: 'auto',
+          output_language_mode: 'explicit',
+          output_language: 'ar',
+          translation_mode: 'provider-derived'
+        }
+      }
+    }
+  });
+  assert.equal(normalized.dashboard_ui.locale, 'ja');
+  assert.equal(normalized.source.language, 'auto');
+  assert.equal(normalized.artifact_output.language_mode, 'explicit');
+  assert.equal(normalized.artifact_output.language, 'ar');
+  assert.equal(normalized.artifact_output.text_direction, 'rtl');
+  assert.equal(normalized.artifact_output.translation_mode, 'none');
+  assert.equal(normalized.artifact_output.translation_execution_enabled, false);
+  assert.equal(normalized.safety.provider_dispatch_allowed_by_settings, false);
+  assert.equal(normalized.diagnostics.some((diagnostic) => diagnostic.code === 'translation-mode-not-implemented'), true);
+
+  const uiDerived = normalizeLanguageSettings({
+    ui_locale: 'ko',
+    profiles: {
+      reports: {
+        language: {
+          source_language: 'auto',
+          output_language_mode: 'ui'
+        }
+      }
+    }
+  });
+  assert.equal(uiDerived.dashboard_ui.locale, 'ko');
+  assert.equal(uiDerived.artifact_output.language, 'ko');
+  assert.equal(uiDerived.source.status, 'auto');
+
+  const sourceDerived = normalizeLanguageSettings({
+    ui_locale: 'ja',
+    profiles: {
+      reports: {
+        language: {
+          source_language: 'en',
+          output_language_mode: 'source'
+        }
+      }
+    }
+  });
+  assert.equal(sourceDerived.dashboard_ui.locale, 'ja');
+  assert.equal(sourceDerived.artifact_output.language, 'en');
+
+  const parsed = parseCliArgs(['settings', 'language', '--json']);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'settings language');
+
+  const result = await executeCli(['settings', 'language', '--json'], { now: fixedNow });
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'settings language');
+  assert.equal(body.status, 'ok');
+  assert.equal(body.data.language_settings.dashboard_ui.locale, 'en');
+  assert.equal(body.data.language_settings.artifact_output.translation_execution_enabled, false);
+  assert.equal(body.data.boundary.read_only, true);
+  assert.deepEqual(body.artifacts, []);
+
+  const policyResult = await executeCli(['settings', 'language', 'policy', '--json'], { now: fixedNow });
+  assert.equal(policyResult.exitCode, 0);
+  assert.equal(JSON.parse(policyResult.stdout).data.language_settings_policy.locale_authority.supported_locale_count, 14);
+
+  const direct = await runLanguageSettings({}, { now: fixedNow });
+  assert.equal(direct.data.language_settings.dashboard_ui.locale, 'en');
+  assert.equal(languageSettingsBoundary().gate_effect, 'none');
+});
+
+test('localization resources and translation readiness stay provider-free', async () => {
+  const resources = buildLocalizationResources({ locale: 'ar' }, { now: fixedNow });
+  assert.equal(resources.locale_selection, 'ar');
+  assert.equal(resources.selected_resource.text_direction, 'rtl');
+  assert.equal(resources.selected_resource.status, 'stub-falls-back-to-baseline');
+  assert.equal(resources.rtl_layout_guard.logical_css_required, true);
+  assert.equal(resources.raw_evidence_policy.translated, false);
+  assert.equal(resources.boundary.provider_call_performed, false);
+
+  const templates = buildReportTemplates({ locale: 'ja' }, { now: fixedNow });
+  assert.equal(templates.locale_selection, 'ja');
+  assert.equal(templates.rendering_contract.raw_evidence_interpolation_translatable, false);
+  assert.equal(templates.selected_templates.templates.every((item) => item.raw_evidence === false), true);
+
+  const readiness = await buildTranslationReadiness({ locale: 'fr' }, { now: fixedNow });
+  assert.equal(readiness.locale_selection, 'fr');
+  assert.equal(readiness.provider_policy.dry_run_available, true);
+  assert.equal(readiness.provider_policy.live_provider_execution_available, false);
+  assert.equal(readiness.disclosure_plan.raw_evidence_translated, false);
+  assert.equal(readiness.boundary.provider_call_performed, false);
+
+  const dryRun = await buildTranslationDryRun({ locale: 'de', provider: 'fake' }, { now: fixedNow });
+  assert.equal(dryRun.status, 'dry_run_only');
+  assert.equal(dryRun.items.some((item) => item.output_text.startsWith('[de]')), true);
+  assert.equal(dryRun.items.every((item) => item.raw_evidence === false), true);
+  assert.equal(dryRun.boundary.translation_execution_performed, false);
+  assert.equal(translationBoundary({ dryRun: true }).fake_translation_generated, true);
+
+  const parsedResources = parseCliArgs(['settings', 'locale', 'resources', '--locale', 'ar', '--json']);
+  assert.equal(parsedResources.ok, true);
+  assert.equal(parsedResources.command, 'settings locale resources');
+
+  const resourcesResult = await executeCli(['settings', 'locale', 'resources', '--locale', 'ar', '--json'], { now: fixedNow });
+  assert.equal(resourcesResult.exitCode, 0);
+  const resourcesBody = JSON.parse(resourcesResult.stdout);
+  assert.equal(resourcesBody.data.localization_resources.selected_resource.text_direction, 'rtl');
+  assert.equal(resourcesBody.data.boundary.raw_evidence_translated, false);
+
+  const templatesResult = await executeCli(['settings', 'report', 'templates', '--locale', 'ja', '--json'], { now: fixedNow });
+  assert.equal(templatesResult.exitCode, 0);
+  const templatesBody = JSON.parse(templatesResult.stdout);
+  assert.equal(templatesBody.data.report_templates.rendering_contract.canonical_enum_translation_allowed, false);
+
+  const resourceExecute = await executeCli(['settings', 'locale', 'resources', '--execute', '--json'], { now: fixedNow });
+  assert.equal(resourceExecute.exitCode, 2);
+  assert.equal(JSON.parse(resourceExecute.stdout).errors[0].code, 'UNSUPPORTED_LOCALIZATION_OPTION');
+
+  const readinessResult = await executeCli(['translation', 'readiness', '--locale', 'fr', '--json'], { now: fixedNow });
+  assert.equal(readinessResult.exitCode, 0);
+  const readinessBody = JSON.parse(readinessResult.stdout);
+  assert.equal(readinessBody.data.translation_readiness.provider_policy.live_provider_execution_available, false);
+  assert.equal(readinessBody.data.boundary.provider_call_performed, false);
+
+  const dryRunResult = await executeCli(['translation', 'dry-run', '--locale', 'de', '--provider', 'fake', '--json'], { now: fixedNow });
+  assert.equal(dryRunResult.exitCode, 0);
+  const dryRunBody = JSON.parse(dryRunResult.stdout);
+  assert.equal(dryRunBody.data.translation_dry_run.status, 'dry_run_only');
+  assert.equal(dryRunBody.data.translation_dry_run.raw_evidence_policy.translated, false);
+
+  const unsupportedInput = await executeCli(['translation', 'dry-run', '--image', 'screen.png', '--json'], { now: fixedNow });
+  assert.equal(unsupportedInput.exitCode, 2);
+  assert.equal(JSON.parse(unsupportedInput.stdout).errors[0].code, 'UNSUPPORTED_TRANSLATION_OPTION');
+
+  const apiProvider = await executeCli(['translation', 'dry-run', '--provider', 'api', '--json'], { now: fixedNow });
+  assert.equal(apiProvider.exitCode, 1);
+  assert.equal(JSON.parse(apiProvider.stdout).errors[0].code, 'TRANSLATION_PROVIDER_NOT_AVAILABLE');
+
+  const runUnavailable = await executeCli(['translation', 'run', '--provider', 'api', '--execute', '--json'], { now: fixedNow });
+  assert.equal(runUnavailable.exitCode, 1);
+  const runUnavailableBody = JSON.parse(runUnavailable.stdout);
+  assert.equal(runUnavailableBody.errors[0].code, 'TRANSLATION_EXECUTION_NOT_AVAILABLE');
+  assert.equal(runUnavailableBody.data.boundary.translation_execution_performed, false);
+
+  const mcpReadiness = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 15,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_translation_readiness',
+      arguments: { locale: 'fr' }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpReadiness.result.structuredContent.command, 'translation readiness');
+  assert.equal(mcpReadiness.result.structuredContent.data.translation_readiness.locale_selection, 'fr');
+
+  const mcpResourcesWithExecute = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 16,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_localization_resources',
+      arguments: { locale: 'ja', execute: true }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpResourcesWithExecute.error.code, -32602);
+  assert.match(mcpResourcesWithExecute.error.message, /Unsupported MCP argument/);
+});
+
 test('identity audit reports current and future rename readiness without mutating Git', async () => {
   const parsed = parseCliArgs(['identity', 'audit', '--json']);
   assert.equal(parsed.ok, true);
@@ -111,6 +369,8 @@ test('identity audit reports current and future rename readiness without mutatin
   );
   assert.equal(body.data.identity_audit.compatibility.legacy_alias_removal_authorized, false);
   assert.equal(body.data.identity_audit.compatibility.artifact_root_migration_authorized, false);
+  assert.equal(body.data.identity_audit.compatibility.legacy_alias_audit.removal_candidate_ready, false);
+  assert.equal(body.data.identity_audit.compatibility.legacy_alias_audit.retained_count >= 1, true);
   assert.equal(body.data.boundary.git_mutated, false);
   assert.equal(body.data.boundary.remote_contact, false);
   assert.equal(body.data.boundary.artifacts_written, false);
@@ -150,6 +410,319 @@ test('identity audit reports current and future rename readiness without mutatin
   });
   assert.equal(completedAudit.repository.remote_rename_pending, false);
   assert.equal(completedAudit.readiness.status, 'identity_rename_complete');
+});
+
+test('release, artifact-root, and legacy alias readiness stay local and non-publishing', async () => {
+  const releaseParsed = parseCliArgs(['release', 'readiness', '--json']);
+  assert.equal(releaseParsed.ok, true);
+  assert.equal(releaseParsed.command, 'release readiness');
+
+  const releaseResult = await executeCli(['release', 'readiness', '--json'], {
+    cwd: process.cwd(),
+    now: fixedNow
+  });
+  assert.equal(releaseResult.exitCode, 0);
+  const releaseBody = JSON.parse(releaseResult.stdout);
+  assert.equal(releaseBody.command, 'release readiness');
+  assert.equal(releaseBody.data.release_readiness.package_metadata.private, true);
+  assert.equal(releaseBody.data.release_readiness.package_metadata.license, 'UNLICENSED');
+  assert.equal(releaseBody.data.release_readiness.publication_boundary.npm_publish_performed, false);
+  assert.equal(releaseBody.data.release_readiness.publication_boundary.npm_publish_dry_run_performed, false);
+  assert.equal(releaseBody.data.release_readiness.publication_boundary.npm_auth_checked, false);
+  assert.equal(releaseBody.data.boundary.network_contact, false);
+  assert.equal(releaseBody.data.boundary.product_docs_promoted, false);
+  assert.deepEqual(releaseBody.artifacts, []);
+
+  const releaseDirect = await buildReleaseReadiness({}, { cwd: process.cwd(), now: fixedNow });
+  assert.equal(releaseDirect.decisions.publish_dry_run.status, 'approval_required_not_run');
+  assert.equal(releaseReadinessBoundary().npm_publish_performed, false);
+
+  const artifactStatusParsed = parseCliArgs(['artifact-root', 'status', '--json']);
+  assert.equal(artifactStatusParsed.ok, true);
+  assert.equal(artifactStatusParsed.command, 'artifact-root status');
+
+  const artifactStatus = await executeCli(['artifact-root', 'status', '--json'], {
+    cwd: process.cwd(),
+    now: fixedNow
+  });
+  assert.equal(artifactStatus.exitCode, 0);
+  const artifactStatusBody = JSON.parse(artifactStatus.stdout);
+  assert.equal(artifactStatusBody.data.artifact_root_status.current_behavior.default_artifact_root_preserved, true);
+  assert.equal(artifactStatusBody.data.artifact_root_status.current_behavior.dual_write_active, false);
+  assert.deepEqual(artifactStatusBody.data.artifact_root_status.current_behavior.read_roots, [
+    PRODUCT_IDENTITY.defaultArtifactRoot,
+    PRODUCT_IDENTITY.futureArtifactRoot
+  ]);
+  assert.equal(artifactStatusBody.data.artifact_root_status.migration.real_workspace_execution_enabled, false);
+  assert.equal(artifactStatusBody.data.boundary.real_workspace_migration_executed, false);
+  assert.equal(artifactRootBoundary().legacy_files_deleted, false);
+
+  const artifactDirect = await buildArtifactRootStatus({}, { cwd: process.cwd(), now: fixedNow });
+  assert.equal(artifactDirect.policy_source.loaded, true);
+
+  const migrationPlan = await executeCli(['artifact-root', 'migration', 'plan', '--json'], {
+    cwd: process.cwd(),
+    now: fixedNow
+  });
+  assert.equal(migrationPlan.exitCode, 0);
+  const migrationPlanBody = JSON.parse(migrationPlan.stdout);
+  assert.match(migrationPlanBody.data.artifact_root_migration.plan_hash, /^[a-f0-9]{64}$/);
+  assert.equal(migrationPlanBody.data.artifact_root_migration.execution_boundary.real_workspace_execution_enabled, false);
+  assert.equal(migrationPlanBody.data.boundary.migration_executed, false);
+
+  const missingFixture = parseCliArgs(['artifact-root', 'migration', 'execute', '--execute', '--json']);
+  assert.equal(missingFixture.ok, false);
+  assert.equal(missingFixture.error.code, 'MISSING_REQUIRED_OPTION');
+
+  const fixtureRoot = await mkdtemp(path.join(tmpdir(), 'trace-cue-artifact-root-migration-'));
+  await mkdir(path.join(fixtureRoot, PRODUCT_IDENTITY.defaultArtifactRoot, 'reports'), { recursive: true });
+  await writeFile(path.join(fixtureRoot, PRODUCT_IDENTITY.defaultArtifactRoot, 'reports', 'sample.json'), '{"ok":true}\n', 'utf8');
+  const fixturePlan = await buildArtifactRootMigrationPlan({ 'fixture-root': fixtureRoot }, {
+    cwd: fixtureRoot,
+    now: fixedNow,
+    fixtureOnly: true
+  });
+  assert.equal(fixturePlan.candidate_count, 1);
+  assert.equal(fixturePlan.copy_count, 1);
+
+  const fixtureExecute = await executeCli([
+    'artifact-root',
+    'migration',
+    'execute',
+    '--execute',
+    '--fixture-root',
+    fixtureRoot,
+    '--plan-hash',
+    fixturePlan.plan_hash,
+    '--json'
+  ], {
+    cwd: process.cwd(),
+    now: fixedNow
+  });
+  assert.equal(fixtureExecute.exitCode, 0);
+  const fixtureExecuteBody = JSON.parse(fixtureExecute.stdout);
+  assert.equal(fixtureExecuteBody.data.artifact_root_migration.execution.fixture_only, true);
+  assert.equal(fixtureExecuteBody.data.artifact_root_migration.execution.copied_count, 1);
+  assert.equal(fixtureExecuteBody.data.artifact_root_migration.execution.deletes_legacy_files, false);
+  assert.equal(fixtureExecuteBody.data.boundary.real_workspace_migration_executed, false);
+  await access(path.join(fixtureRoot, PRODUCT_IDENTITY.defaultArtifactRoot, 'reports', 'sample.json'));
+  await access(path.join(fixtureRoot, PRODUCT_IDENTITY.futureArtifactRoot, 'reports', 'sample.json'));
+
+  const aliasParsed = parseCliArgs(['identity', 'aliases', '--json']);
+  assert.equal(aliasParsed.ok, true);
+  assert.equal(aliasParsed.command, 'identity aliases');
+
+  const aliasResult = await executeCli(['identity', 'aliases', '--json'], {
+    cwd: process.cwd(),
+    now: fixedNow,
+    invokedBinName: PRODUCT_IDENTITY.legacyCliBins[0].name
+  });
+  assert.equal(aliasResult.exitCode, 0);
+  const aliasBody = JSON.parse(aliasResult.stdout);
+  assert.equal(aliasBody.data.legacy_alias_audit.summary.removal_authorized, false);
+  assert.equal(aliasBody.data.legacy_alias_audit.summary.removal_candidate_ready, false);
+  assert.equal(aliasBody.data.legacy_alias_audit.invocation.legacy_invocation, true);
+  assert.equal(aliasBody.warnings.some((warning) => warning.code === 'LEGACY_CLI_BIN_USED'), true);
+  assert.equal(aliasBody.data.boundary.legacy_alias_removed, false);
+
+  const aliasDirect = await buildLegacyAliasAudit({}, {
+    cwd: process.cwd(),
+    now: fixedNow
+  });
+  assert.equal(aliasDirect.summary.retained_count, aliasDirect.summary.surface_count);
+  assert.equal(legacyAliasWarningsForInvocation(PRODUCT_IDENTITY.cliBinName).length, 0);
+  assert.equal(legacyAliasWarningsForInvocation(PRODUCT_IDENTITY.legacyCliBins[0].name).length, 1);
+
+  const mcpRelease = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 20,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_release_readiness',
+      arguments: {}
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpRelease.result.structuredContent.command, 'release readiness');
+  assert.equal(mcpRelease.result.structuredContent.data.boundary.npm_publish_performed, false);
+
+  const mcpArtifact = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 21,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_artifact_root_status',
+      arguments: { execute: true }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpArtifact.error.code, -32602);
+  assert.match(mcpArtifact.error.message, /Unsupported MCP argument/);
+
+  const mcpAliases = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 22,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_legacy_alias_audit',
+      arguments: {}
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpAliases.result.structuredContent.command, 'identity aliases');
+  assert.equal(mcpAliases.result.structuredContent.data.boundary.legacy_alias_removed, false);
+});
+
+test('legacy alias removal, shell, and final hardening readiness stay fail-closed and local-only', async () => {
+  const removalParsed = parseCliArgs(['identity', 'aliases', 'removal-readiness', '--json']);
+  assert.equal(removalParsed.ok, true);
+  assert.equal(removalParsed.command, 'identity aliases removal-readiness');
+
+  const removalReadiness = await executeCli(['identity', 'aliases', 'removal-readiness', '--json'], {
+    cwd: process.cwd(),
+    now: fixedNow
+  });
+  assert.equal(removalReadiness.exitCode, 0);
+  const removalBody = JSON.parse(removalReadiness.stdout);
+  assert.equal(removalBody.data.legacy_alias_removal_readiness.status, 'blocked_approval_required');
+  assert.equal(removalBody.data.legacy_alias_removal_readiness.readiness.removal_authorized, false);
+  assert.equal(removalBody.data.legacy_alias_removal_readiness.readiness.package_bins_removed, false);
+  assert.equal(removalBody.data.legacy_alias_removal_readiness.compatibility.legacy_aliases_must_remain, true);
+  assert.equal(removalBody.data.boundary.legacy_alias_removed, false);
+  assert.equal(removalBody.data.boundary.product_docs_promoted, false);
+  assert.deepEqual(removalBody.artifacts, []);
+
+  const directRemoval = await buildLegacyAliasRemovalReadiness({}, {
+    cwd: process.cwd(),
+    now: fixedNow
+  });
+  assert.equal(directRemoval.blockers.every((blocker) => blocker.active), true);
+  assert.equal(legacyAliasRemovalReadinessBoundary().mcp_execution_exposed, false);
+
+  const removalExecute = await executeCli(['identity', 'aliases', 'remove', '--execute', '--json'], { now: fixedNow });
+  assert.equal(removalExecute.exitCode, 1);
+  const removalExecuteBody = JSON.parse(removalExecute.stdout);
+  assert.equal(removalExecuteBody.errors[0].code, 'LEGACY_ALIAS_REMOVAL_NOT_AVAILABLE');
+  assert.equal(removalExecuteBody.data.boundary.legacy_alias_removed, false);
+
+  const shellParsed = parseCliArgs(['shell', 'readiness', '--json']);
+  assert.equal(shellParsed.ok, true);
+  assert.equal(shellParsed.command, 'shell readiness');
+
+  const shellReadiness = await executeCli(['shell', 'readiness', '--json'], { now: fixedNow });
+  assert.equal(shellReadiness.exitCode, 0);
+  const shellBody = JSON.parse(shellReadiness.stdout);
+  assert.equal(shellBody.data.constrained_shell_readiness.status, 'plan_only');
+  assert.equal(shellBody.artifacts.length, 0);
+  assert.equal(shellBody.data.constrained_shell_readiness.threat_model.free_form_shell_allowed, false);
+  assert.equal(shellBody.data.constrained_shell_readiness.command_schema.allowlist_required, true);
+  assert.equal(shellBody.data.boundary.command_executed, false);
+  assert.equal(shellBody.data.boundary.shell_used, false);
+  assert.equal(shellBody.data.boundary.mcp_execution_exposed, false);
+  assert.equal(shellBody.data.boundary.mcp_write_execute_exposed, false);
+
+  const shellPlan = await executeCli(['shell', 'plan', '--json'], { now: fixedNow });
+  assert.equal(shellPlan.exitCode, 0);
+  assert.equal(JSON.parse(shellPlan.stdout).data.constrained_shell_plan.mode, 'plan');
+
+  const shellExecuteOption = parseCliArgs(['shell', 'readiness', '--execute', '--json']);
+  assert.equal(shellExecuteOption.ok, false);
+  assert.equal(shellExecuteOption.error.code, 'CONFLICTING_OPTIONS');
+
+  const shellCommandOption = parseCliArgs(['shell', 'readiness', '--command', 'echo hi', '--json']);
+  assert.equal(shellCommandOption.ok, false);
+  assert.equal(shellCommandOption.error.code, 'UNKNOWN_OPTION');
+
+  const shellPlanPositional = parseCliArgs(['shell', 'plan', 'echo', '--json']);
+  assert.equal(shellPlanPositional.ok, false);
+  assert.equal(shellPlanPositional.error.code, 'UNEXPECTED_ARGUMENT');
+
+  const shellRunMissingExecute = parseCliArgs(['shell', 'run', '--json']);
+  assert.equal(shellRunMissingExecute.ok, false);
+  assert.equal(shellRunMissingExecute.error.code, 'MISSING_REQUIRED_OPTION');
+
+  const directShell = buildConstrainedShellReadiness({}, { now: fixedNow });
+  assert.equal(directShell.mcp_readiness.execution_tool_exposed, false);
+  assert.equal(constrainedShellBoundary().child_process_used, false);
+
+  const shellExecute = await executeCli(['shell', 'run', '--execute', '--json'], { now: fixedNow });
+  assert.equal(shellExecute.exitCode, 1);
+  const shellExecuteBody = JSON.parse(shellExecute.stdout);
+  assert.equal(shellExecuteBody.errors[0].code, 'CONSTRAINED_SHELL_EXECUTION_NOT_AVAILABLE');
+  assert.equal(shellExecuteBody.data.boundary.command_executed, false);
+  assert.equal(shellExecuteBody.data.boundary.shell_used, false);
+  assert.equal(shellExecuteBody.data.boundary.mcp_execution_exposed, false);
+
+  const sentinel = 'shell-secret-sentinel';
+  const shellSentinel = await executeCli(['shell', 'readiness', '--json'], {
+    now: fixedNow,
+    env: { TRACE_CUE_TEST_SECRET: sentinel },
+    fetch: () => {
+      throw new Error('shell readiness must not call fetch');
+    }
+  });
+  assert.equal(shellSentinel.exitCode, 0);
+  assert.equal(shellSentinel.stdout.includes(sentinel), false);
+
+  const finalReadiness = await executeCli(['final', 'readiness', '--json'], { now: fixedNow });
+  assert.equal(finalReadiness.exitCode, 0);
+  const finalBody = JSON.parse(finalReadiness.stdout);
+  assert.equal(finalBody.data.final_hardening_readiness.phase_range.start, 149);
+  assert.equal(finalBody.data.final_hardening_readiness.phase_range.end, 155);
+  assert.equal(finalBody.data.final_hardening_readiness.smoke_rebaseline.browser_smoke_executed_by_report, false);
+  assert.equal(finalBody.data.final_hardening_readiness.local_gate_plan.every((check) => check.executed_by_report === false), true);
+  assert.equal(finalBody.data.boundary.browser_launched, false);
+  assert.equal(finalBody.data.boundary.remote_ci_triggered, false);
+  assert.equal(finalBody.data.boundary.npm_publish_performed, false);
+  assert.equal(finalBody.data.boundary.shell_used, false);
+  assert.equal(buildFinalHardeningReadiness({}, { now: fixedNow }).release_boundary.legacy_alias_removed, false);
+  assert.equal(finalHardeningBoundary().mcp_execution_exposed, false);
+
+  const mcpRemovalReadiness = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 23,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_legacy_alias_removal_readiness',
+      arguments: {}
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpRemovalReadiness.result.structuredContent.command, 'identity aliases removal-readiness');
+  assert.equal(mcpRemovalReadiness.result.structuredContent.data.boundary.legacy_alias_removed, false);
+
+  const mcpShell = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 24,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_shell_readiness',
+      arguments: {}
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpShell.result.structuredContent.command, 'shell readiness');
+  assert.equal(mcpShell.result.structuredContent.data.boundary.shell_used, false);
+  assert.equal(mcpShell.result.structuredContent.data.boundary.writes_artifacts, false);
+  assert.equal(mcpShell.result.structuredContent.data.boundary.deletes_files, false);
+
+  const mcpFinal = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 25,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_final_readiness',
+      arguments: {}
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpFinal.result.structuredContent.command, 'final readiness');
+  assert.equal(mcpFinal.result.structuredContent.data.boundary.remote_ci_triggered, false);
+
+  const mcpShellExecute = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 26,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_shell_readiness',
+      arguments: { execute: true }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpShellExecute.error.code, -32602);
 });
 
 test('resource status reports local memory boundaries without launching a browser', async () => {
@@ -209,6 +782,10 @@ test('resource artifacts plan and explicit cleanup stay scoped to the artifact r
   assert.equal(plannedBody.data.boundary.browser_launched, false);
   assert.equal(plannedBody.data.boundary.cache_deleted, false);
   assert.equal(plannedBody.data.cleanup_proposal.candidate_count >= 1, true);
+  assert.match(plannedBody.data.cleanup_proposal.plan_hash, /^[a-f0-9]{64}$/);
+  assert.equal(plannedBody.data.cleanup_proposal.policy.candidate_lock_algorithm, 'sha256:path-size-mtime-content');
+  assert.equal(plannedBody.data.cleanup_proposal.policy.directories_deleted, false);
+  assert.match(plannedBody.data.cleanup_proposal.candidates[0].lock.sha256, /^[a-f0-9]{64}$/);
 
   const dryRun = await executeCli(['resource', 'artifacts', 'cleanup', '--max-bytes', '5', '--dry-run', '--json'], {
     cwd,
@@ -218,6 +795,25 @@ test('resource artifacts plan and explicit cleanup stay scoped to the artifact r
   const dryRunBody = JSON.parse(dryRun.stdout);
   assert.equal(dryRunBody.data.cleanup.dry_run, true);
   assert.equal(dryRunBody.data.boundary.cache_deleted, false);
+  await access(path.join(cwd, '.browser-debug', 'screenshots', 'large-a.png'));
+
+  const mismatched = await executeCli([
+    'resource',
+    'artifacts',
+    'cleanup',
+    '--max-bytes',
+    '5',
+    '--plan-hash',
+    '0'.repeat(64),
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow
+  });
+  assert.equal(mismatched.exitCode, 1);
+  const mismatchedBody = JSON.parse(mismatched.stdout);
+  assert.equal(mismatchedBody.errors[0].code, 'ARTIFACT_CLEANUP_PLAN_HASH_MISMATCH');
   await access(path.join(cwd, '.browser-debug', 'screenshots', 'large-a.png'));
 
   const cleaned = await executeCli(['resource', 'artifacts', 'cleanup', '--max-bytes', '5', '--execute', '--json'], {
@@ -230,12 +826,27 @@ test('resource artifacts plan and explicit cleanup stay scoped to the artifact r
   assert.equal(cleanedBody.data.cleanup.execute, true);
   assert.equal(cleanedBody.data.cleanup.files_deleted >= 1, true);
   assert.equal(cleanedBody.data.boundary.cache_deleted, true);
+  assert.equal(cleanedBody.data.boundary.directories_deleted, false);
+  assert.equal(cleanedBody.data.boundary.candidate_locks_enforced, true);
   assert.equal(cleanedBody.artifacts[0].type, 'artifact_cleanup_receipt');
   const receipt = JSON.parse(
     await readFile(path.join(cwd, '.browser-debug', 'receipts', 'artifact-cleanup-fixed.json'), 'utf8')
   );
   assert.equal(receipt.execute, true);
+  assert.match(receipt.plan_hash, /^[a-f0-9]{64}$/);
+  assert.equal(receipt.candidate_lock_algorithm, 'sha256:path-size-mtime-content');
   assert.equal(receipt.boundary.deletion_scope, 'artifact_root_only');
+
+  const outside = await mkdtemp(path.join(tmpdir(), 'browser-debug-artifact-outside-'));
+  const symlinkCwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-artifact-symlink-'));
+  await symlink(outside, path.join(symlinkCwd, '.browser-debug'));
+  const symlinkPlan = await executeCli(['resource', 'artifacts', 'plan', '--json'], {
+    cwd: symlinkCwd,
+    now: fixedNow
+  });
+  assert.equal(symlinkPlan.exitCode, 1);
+  const symlinkBody = JSON.parse(symlinkPlan.stdout);
+  assert.equal(symlinkBody.errors[0].code, 'ARTIFACT_USAGE_FAILED');
 });
 
 test('review resource guard can stop critical browser work before launch', async () => {
@@ -1070,11 +1681,14 @@ test('visual review dashboard aggregates local visual review status without writ
   assert.equal(body.data.visual_review_dashboard.summary.execution_count, 1);
   assert.equal(body.data.visual_review_dashboard.summary.result_count, 1);
   assert.equal(body.data.visual_review_dashboard.summary.provider_call_performed, true);
+  assert.equal(body.data.visual_review_dashboard.language_settings.dashboard_ui.locale, 'en');
+  assert.equal(body.data.visual_review_dashboard.language_settings.artifact_output.translation_execution_enabled, false);
   assert.equal(body.data.visual_review_dashboard.boundary.read_only, true);
   assert.equal(body.data.visual_review_dashboard.boundary.writes_artifacts, false);
   assert.equal(body.data.visual_review_dashboard.boundary.provider_call_performed, false);
   assert.equal(body.data.visual_review_dashboard.boundary.raw_pixels_read, false);
   assert.equal(body.data.visual_review_dashboard.control_center_handoff.mcp_tool, 'browser_debug_visual_review_dashboard');
+  assert.equal(body.data.visual_review_dashboard.control_center_handoff.language_settings_command, 'trace-cue settings language --json');
   assert.equal(body.data.visual_review_dashboard.gate_effect, 'none');
   assert.deepEqual(body.artifacts, []);
   assert.equal(JSON.stringify(body.data).includes(png.toString('base64')), false);
@@ -1096,6 +1710,7 @@ test('visual review dashboard aggregates local visual review status without writ
   }, { cwd, mcpProfile: 'safe', now: fixedNow });
   assert.equal(mcpDashboard.result.structuredContent.command, 'visual review dashboard');
   assert.equal(mcpDashboard.result.structuredContent.data.visual_review_dashboard.summary.execution_count, 1);
+  assert.equal(mcpDashboard.result.structuredContent.data.visual_review_dashboard.language_settings.dashboard_ui.locale, 'en');
   assert.equal(mcpDashboard.result.structuredContent.data.boundary.read_only, true);
 });
 
@@ -1382,6 +1997,9 @@ test('schema commands expose machine-readable contracts', async () => {
     Object.keys(reviewSchemaBody.data.schema.properties).sort(),
     Object.keys(reviewSchemaFile.properties).sort()
   );
+  assert.equal(reviewSchemaBody.data.schema.$id, reviewSchemaFile.$id);
+  assert.equal(reviewSchemaBody.data.schema.title, reviewSchemaFile.title);
+  assert.deepEqual((reviewSchemaBody.data.schema.required ?? []).sort(), (reviewSchemaFile.required ?? []).sort());
 
   const targetManifestSchemaFile = JSON.parse(await readFile(new URL('../schemas/target-manifest.schema.json', import.meta.url), 'utf8'));
   const targetManifestSchema = await executeCli(['schema', 'get', '--name', 'target_manifest', '--json'], { now: fixedNow });
@@ -1390,17 +2008,41 @@ test('schema commands expose machine-readable contracts', async () => {
     Object.keys(targetManifestSchemaBody.data.schema.properties).sort(),
     Object.keys(targetManifestSchemaFile.properties).sort()
   );
+  assert.equal(targetManifestSchemaBody.data.schema.$id, targetManifestSchemaFile.$id);
+  assert.equal(targetManifestSchemaBody.data.schema.title, targetManifestSchemaFile.title);
+  assert.deepEqual((targetManifestSchemaBody.data.schema.required ?? []).sort(), (targetManifestSchemaFile.required ?? []).sort());
 
   const agentSchemaPairs = [
     ['capture_handoff', '../schemas/capture-handoff.schema.json'],
     ['capture_plan', '../schemas/capture-plan.schema.json'],
+    ['capture_readiness', '../schemas/capture-readiness.schema.json'],
+    ['capture_artifact', '../schemas/capture-artifact.schema.json'],
+    ['capture_receipt', '../schemas/capture-receipt.schema.json'],
     ['identity_audit', '../schemas/identity-audit.schema.json'],
+    ['localization_resources', '../schemas/localization-resources.schema.json'],
+    ['report_templates', '../schemas/report-templates.schema.json'],
+    ['translation_readiness', '../schemas/translation-readiness.schema.json'],
+    ['translation_dry_run', '../schemas/translation-dry-run.schema.json'],
+    ['release_readiness', '../schemas/release-readiness.schema.json'],
+    ['artifact_root_policy', '../schemas/artifact-root-policy.schema.json'],
+    ['artifact_root_migration', '../schemas/artifact-root-migration.schema.json'],
+    ['legacy_alias_audit', '../schemas/legacy-alias-audit.schema.json'],
+    ['legacy_alias_removal_readiness', '../schemas/legacy-alias-removal-readiness.schema.json'],
+    ['constrained_shell_readiness', '../schemas/constrained-shell-readiness.schema.json'],
+    ['final_hardening_readiness', '../schemas/final-hardening-readiness.schema.json'],
     ['desktop_review_provider_preparation_plan', '../schemas/desktop-review-provider-preparation-plan.schema.json'],
     ['image_review', '../schemas/image-review.schema.json'],
     ['mcp_execution_gates', '../schemas/mcp-execution-gates.schema.json'],
     ['visual_review_provider_policy', '../schemas/visual-review-provider-policy.schema.json'],
     ['visual_review_result_preparation', '../schemas/visual-review-result-preparation.schema.json'],
     ['visual_review_dashboard', '../schemas/visual-review-dashboard.schema.json'],
+    ['language_settings', '../schemas/language-settings.schema.json'],
+    ['operation_registry', '../schemas/operation-registry.schema.json'],
+    ['operation_roadmap', '../schemas/operation-roadmap.schema.json'],
+    ['operation_contracts', '../schemas/operation-contracts.schema.json'],
+    ['operation_policy', '../schemas/operation-policy.schema.json'],
+    ['operation_admin_readiness', '../schemas/operation-admin-readiness.schema.json'],
+    ['operation_provider_readiness', '../schemas/operation-provider-readiness.schema.json'],
     ['visual_review_execution', '../schemas/visual-review-execution.schema.json'],
     ['visual_review_result', '../schemas/visual-review-result.schema.json'],
     ['visual_review_aggregation', '../schemas/visual-review-aggregation.schema.json'],
@@ -1422,6 +2064,9 @@ test('schema commands expose machine-readable contracts', async () => {
       Object.keys(schemaBody.data.schema.properties).sort(),
       Object.keys(schemaFile.properties).sort()
     );
+    assert.equal(schemaBody.data.schema.$id, schemaFile.$id);
+    assert.equal(schemaBody.data.schema.title, schemaFile.title);
+    assert.deepEqual((schemaBody.data.schema.required ?? []).sort(), (schemaFile.required ?? []).sort());
   }
 });
 
@@ -2236,6 +2881,302 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   assert.equal(apiResult.agent_advisory.api_call_performed_by_cli, true);
   assert.equal(apiResult.agent_advisory_findings.length, 1);
 
+  const mcpSafeRunBlocked = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 37,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_run',
+      arguments: {}
+    }
+  }, { cwd, mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpSafeRunBlocked.error.code, -32602);
+  assert.match(mcpSafeRunBlocked.error.message, /not available for MCP profile safe/);
+
+  const mcpAdminPlanCredentialArg = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 38,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_plan',
+      arguments: {
+        package: '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+        surface: 'local-subscription-agent',
+        provider: 'fake-agent',
+        model: 'fake-model',
+        idempotencyKey: 'mcp-credential-arg-plan',
+        credential: 'must-not-be-accepted'
+      }
+    }
+  }, { cwd, mcpProfile: 'admin', now: fixedNow });
+  assert.equal(mcpAdminPlanCredentialArg.error.code, -32602);
+  assert.match(mcpAdminPlanCredentialArg.error.message, /Unsupported MCP argument/);
+
+  const outsideAgentPackageRoot = await mkdtemp(path.join(tmpdir(), 'trace-cue-agent-execution-outside-'));
+  await writeFile(path.join(outsideAgentPackageRoot, 'packet.json'), JSON.stringify({ id: 'outside-package' }), 'utf8');
+  await symlink(path.join(outsideAgentPackageRoot, 'packet.json'), path.join(cwd, 'linked-agent-packet.json'));
+  const mcpSymlinkPackageBlocked = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 39,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_plan',
+      arguments: {
+        package: 'linked-agent-packet.json',
+        surface: 'local-subscription-agent',
+        provider: 'fake-agent',
+        model: 'fake-model',
+        idempotencyKey: 'mcp-symlink-package-plan'
+      }
+    }
+  }, { cwd, mcpProfile: 'admin', now: fixedNow });
+  assert.equal(mcpSymlinkPackageBlocked.result.isError, true);
+  assert.equal(mcpSymlinkPackageBlocked.result.structuredContent.errors[0].code, 'AGENT_EXECUTION_REALPATH_OUTSIDE_WORKSPACE');
+
+  const mcpFakePlan = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 40,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_plan',
+      arguments: {
+        package: '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+        surface: 'local-subscription-agent',
+        provider: 'fake-agent',
+        model: 'fake-model',
+        idempotencyKey: 'mcp-fake-plan'
+      }
+    }
+  }, { cwd, mcpProfile: 'admin', now: fixedNow });
+  assert.equal(mcpFakePlan.result.structuredContent.command, 'agent execution plan');
+  assert.equal(mcpFakePlan.result.structuredContent.data.agent_execution.status, 'planned');
+  assert.equal(mcpFakePlan.result.structuredContent.data.agent_execution.mcp_execution_exposed, true);
+  assert.equal(mcpFakePlan.result.structuredContent.data.agent_execution.idempotency_key_hash.length, 64);
+  assert.equal(JSON.stringify(mcpFakePlan.result.structuredContent).includes('mcp-fake-plan'), false);
+  const mcpFakeExecutionPath = mcpFakePlan.result.structuredContent.data.agent_execution.execution_path;
+
+  const mcpFakeRunMissingExecute = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 41,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_run',
+      arguments: {
+        execution: mcpFakeExecutionPath,
+        package: '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+        surface: 'local-subscription-agent',
+        provider: 'fake-agent',
+        model: 'fake-model',
+        execute: false,
+        idempotencyKey: 'mcp-fake-run-missing-execute'
+      }
+    }
+  }, { cwd, mcpProfile: 'admin', now: fixedNow });
+  assert.equal(mcpFakeRunMissingExecute.error.code, -32602);
+  assert.match(mcpFakeRunMissingExecute.error.message, /requires execute: true/);
+
+  const mcpFakeRun = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 42,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_run',
+      arguments: {
+        execution: mcpFakeExecutionPath,
+        package: '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+        surface: 'local-subscription-agent',
+        provider: 'fake-agent',
+        model: 'fake-model',
+        execute: true,
+        idempotencyKey: 'mcp-fake-run'
+      }
+    }
+  }, { cwd, mcpProfile: 'admin', now: fixedNow });
+  assert.equal(mcpFakeRun.result.structuredContent.command, 'agent execution run');
+  assert.equal(mcpFakeRun.result.structuredContent.data.agent_execution.status, 'completed');
+  assert.equal(mcpFakeRun.result.structuredContent.data.agent_execution.mcp_execution_exposed, true);
+  const mcpFakeResultPath = mcpFakeRun.result.structuredContent.data.agent_execution.normalized_agent_result_path;
+  const mcpFakeResult = JSON.parse(await readFile(path.join(cwd, mcpFakeResultPath), 'utf8'));
+  assert.equal(mcpFakeResult.boundary.mcp_execution_exposed, true);
+  assert.equal(mcpFakeResult.agent_advisory.mcp_execution_exposed, true);
+
+  const mcpLocalPlan = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 43,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_plan',
+      arguments: {
+        package: '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+        surface: 'local-subscription-agent',
+        provider: 'local-runner',
+        model: 'local-agent',
+        idempotencyKey: 'mcp-local-plan'
+      }
+    }
+  }, { cwd, mcpProfile: 'admin', now: fixedNow });
+  const mcpLocalExecutionPath = mcpLocalPlan.result.structuredContent.data.agent_execution.execution_path;
+  const mcpLocalRun = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 44,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_run',
+      arguments: {
+        execution: mcpLocalExecutionPath,
+        package: '.browser-debug/agent-packages/agent-package-fixed/packet.json',
+        surface: 'local-subscription-agent',
+        provider: 'local-runner',
+        model: 'local-agent',
+        execute: true,
+        idempotencyKey: 'mcp-local-run'
+      }
+    }
+  }, {
+    cwd,
+    mcpProfile: 'admin',
+    now: fixedNow,
+    agentExecutionLocalRunner: async () => ({
+      agent_advisory_findings: [{
+        id: 'mcp-local-runner-finding',
+        category: 'implementation_diagnosis',
+        severity: 'low',
+        message: 'MCP local runner advisory.',
+        recommendation: 'Review the MCP local runner advisory item.'
+      }]
+    })
+  });
+  assert.equal(mcpLocalRun.result.structuredContent.data.agent_execution.status, 'completed');
+  assert.equal(mcpLocalRun.result.structuredContent.data.agent_execution.boundary.shell_used, false);
+  assert.equal(mcpLocalRun.result.structuredContent.data.agent_execution.boundary.free_form_shell_input_accepted, false);
+  assert.equal(mcpLocalRun.result.structuredContent.data.agent_execution.mcp_execution_exposed, true);
+
+  const mcpApiPlanMissing = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 45,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_plan',
+      arguments: {
+        package: '.browser-debug/agent-packages/agent-package-api/packet.json',
+        surface: 'generic-api-provider',
+        provider: 'generic-api-provider',
+        model: 'generic-model',
+        idempotencyKey: 'mcp-api-missing-plan'
+      }
+    }
+  }, { cwd, mcpProfile: 'admin', now: fixedNow });
+  const mcpApiMissingExecutionPath = mcpApiPlanMissing.result.structuredContent.data.agent_execution.execution_path;
+  let mcpMissingFetchCalled = false;
+  const mcpApiRunMissingConfig = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 46,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_run',
+      arguments: {
+        execution: mcpApiMissingExecutionPath,
+        package: '.browser-debug/agent-packages/agent-package-api/packet.json',
+        surface: 'generic-api-provider',
+        provider: 'generic-api-provider',
+        model: 'generic-model',
+        execute: true,
+        idempotencyKey: 'mcp-api-missing-run'
+      }
+    }
+  }, {
+    cwd,
+    mcpProfile: 'admin',
+    now: fixedNow,
+    env: {},
+    fetch: async () => {
+      mcpMissingFetchCalled = true;
+      throw new Error('missing-config must not call fetch');
+    }
+  });
+  assert.equal(mcpApiRunMissingConfig.result.isError, true);
+  assert.equal(mcpApiRunMissingConfig.result.structuredContent.errors[0].code, 'AGENT_EXECUTION_API_CONFIGURATION_MISSING');
+  assert.equal(mcpMissingFetchCalled, false);
+
+  const mcpApiPlan = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 47,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_plan',
+      arguments: {
+        package: '.browser-debug/agent-packages/agent-package-api/packet.json',
+        surface: 'generic-api-provider',
+        provider: 'generic-api-provider',
+        model: 'generic-model',
+        idempotencyKey: 'mcp-api-plan'
+      }
+    }
+  }, { cwd, mcpProfile: 'admin', now: fixedNow });
+  const mcpApiExecutionPath = mcpApiPlan.result.structuredContent.data.agent_execution.execution_path;
+  const mcpApiCalls = [];
+  const mcpCredentialSentinel = 'credential-value-for-mcp-test';
+  const mcpApiRun = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 48,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_agent_execution_run',
+      arguments: {
+        execution: mcpApiExecutionPath,
+        package: '.browser-debug/agent-packages/agent-package-api/packet.json',
+        surface: 'generic-api-provider',
+        provider: 'generic-api-provider',
+        model: 'generic-model',
+        execute: true,
+        idempotencyKey: 'mcp-api-run'
+      }
+    }
+  }, {
+    cwd,
+    mcpProfile: 'admin',
+    now: fixedNow,
+    env: {
+      [API_PROVIDER_ENDPOINT_ENV]: 'https://provider.example.test/mcp-agent-advisory',
+      [API_PROVIDER_CREDENTIAL_ENV]: mcpCredentialSentinel
+    },
+    fetch: async (url, init) => {
+      mcpApiCalls.push({ url, init, body: JSON.parse(init.body) });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          agent_advisory_findings: [{
+            id: 'mcp-api-finding',
+            category: 'visual_design',
+            severity: 'low',
+            message: 'MCP API provider advisory.',
+            recommendation: 'Review the MCP API advisory item.'
+          }]
+        })
+      };
+    }
+  });
+  assert.equal(mcpApiRun.result.structuredContent.data.agent_execution.status, 'completed');
+  assert.equal(mcpApiRun.result.structuredContent.data.agent_execution.api_call_performed, true);
+  assert.equal(mcpApiRun.result.structuredContent.data.agent_execution.external_evidence_transfer, true);
+  assert.equal(mcpApiRun.result.structuredContent.data.agent_execution.credential_values_recorded, false);
+  assert.equal(mcpApiRun.result.structuredContent.data.agent_execution.raw_provider_response_stored, false);
+  assert.equal(mcpApiRun.result.structuredContent.data.agent_execution.mcp_execution_exposed, true);
+  assert.equal(mcpApiCalls.length, 1);
+  assert.equal(mcpApiCalls[0].body.disclosure_policy.raw_artifact_content_included, false);
+  assert.equal(mcpApiCalls[0].body.disclosure_policy.trace_content_included, false);
+  assert.equal(mcpApiCalls[0].body.disclosure_policy.screenshot_binary_included, false);
+  assert.equal(mcpApiCalls[0].body.disclosure_policy.source_data_values_included, false);
+  assert.equal(mcpApiCalls[0].body.disclosure_policy.prompt_content_included, true);
+  assert.match(mcpApiCalls[0].init.headers.authorization, /^Bearer /);
+  assert.doesNotMatch(JSON.stringify(mcpApiRun.result.structuredContent), new RegExp(mcpCredentialSentinel));
+  const mcpApiResultPath = mcpApiRun.result.structuredContent.data.agent_execution.normalized_agent_result_path;
+  const mcpApiResultText = await readFile(path.join(cwd, mcpApiResultPath), 'utf8');
+  assert.doesNotMatch(mcpApiResultText, new RegExp(mcpCredentialSentinel));
+  const mcpApiReceiptText = await readFile(path.join(cwd, '.browser-debug', 'receipts', `${mcpApiRun.result.structuredContent.data.agent_execution.id}-run.json`), 'utf8');
+  assert.doesNotMatch(mcpApiReceiptText, new RegExp(mcpCredentialSentinel));
+
   const completedExecutionIndex = await executeCli([
     'agent',
     'execution',
@@ -2247,11 +3188,12 @@ test('agent package, ingest, and report stay local and advisory-only', async () 
   });
   assert.equal(completedExecutionIndex.exitCode, 0);
   const completedExecutionIndexBody = JSON.parse(completedExecutionIndex.stdout);
-  assert.equal(completedExecutionIndexBody.data.summary.completed, 3);
-  assert.equal(completedExecutionIndexBody.data.summary.blocked, 1);
-  assert.equal(completedExecutionIndexBody.data.summary.advisory_results, 3);
+  assert.equal(completedExecutionIndexBody.data.summary.completed, 6);
+  assert.equal(completedExecutionIndexBody.data.summary.blocked, 2);
+  assert.equal(completedExecutionIndexBody.data.summary.advisory_results, 6);
   assert.equal(completedExecutionIndexBody.data.summary.credential_values_recorded, false);
   assert.equal(completedExecutionIndexBody.data.summary.raw_provider_response_stored, false);
+  assert.equal(completedExecutionIndexBody.data.summary.mcp_execution_exposed, true);
 
   await writeFile(
     path.join(cwd, '.browser-debug', 'agent-results', 'agent-result-other.json'),
@@ -3020,6 +3962,51 @@ test('visual review plan prepares desktop review provider planning from capture 
 });
 
 test('capture plan reports screen and window capture boundaries without capturing pixels', async () => {
+  const readinessParsed = parseCliArgs(['capture', 'readiness', '--source', 'screen', '--json']);
+  assert.equal(readinessParsed.ok, true);
+  assert.equal(readinessParsed.command, 'capture readiness');
+  assert.equal(readinessParsed.options.source, 'screen');
+
+  const readiness = await executeCli(['capture', 'readiness', '--source', 'screen', '--json'], { now: fixedNow });
+  assert.equal(readiness.exitCode, 0);
+  const readinessBody = JSON.parse(readiness.stdout);
+  assert.equal(readinessBody.command, 'capture readiness');
+  assert.equal(readinessBody.data.capture_readiness.source_selection, 'screen');
+  assert.equal(readinessBody.data.capture_readiness.probe.method, 'static_process_platform_only');
+  assert.equal(readinessBody.data.capture_readiness.probe.os_capture_api_used, false);
+  assert.equal(readinessBody.data.capture_readiness.probe.window_enumeration_performed, false);
+  assert.equal(readinessBody.data.capture_readiness.probe.process_enumeration_performed, false);
+  assert.equal(readinessBody.data.capture_readiness.summary.cli_execute_available, false);
+  assert.equal(readinessBody.data.capture_readiness.summary.mcp_execute_available, false);
+  assert.equal(readinessBody.data.capture_readiness.privacy_policy.raw_pixels_allowed_in_json, false);
+  assert.equal(readinessBody.data.capture_readiness.artifact_contract.capture_artifact_schema, 'capture_artifact');
+  assert.equal(readinessBody.data.capture_readiness.artifact_contract.capture_receipt_schema, 'capture_receipt');
+  assert.equal(readinessBody.data.boundary.readiness_only, true);
+  assert.equal(readinessBody.data.boundary.raw_pixels_read, false);
+  assert.equal(readinessBody.data.boundary.native_capture_dependency_loaded, false);
+  assert.equal(readinessBody.data.boundary.static_platform_probe_only, true);
+  assert.deepEqual(readinessBody.artifacts, []);
+
+  const status = await executeCli(['capture', 'status', '--source', 'desktop-app', '--json'], { now: fixedNow });
+  assert.equal(status.exitCode, 0);
+  const statusBody = JSON.parse(status.stdout);
+  assert.equal(statusBody.command, 'capture status');
+  assert.equal(statusBody.data.capture_readiness.source_selection, 'desktop-app');
+  assert.equal(statusBody.data.capture_readiness.capabilities[0].source_kind, 'desktop_app_capture');
+
+  const directReadiness = buildCaptureReadiness({ source: 'window' }, { now: fixedNow, platform: 'linux', arch: 'x64' });
+  assert.equal(directReadiness.ok, true);
+  assert.equal(directReadiness.report.capabilities[0].platform_support_status, 'possible_with_approved_adapter');
+  assert.equal(captureReadinessBoundary().os_capture_api_used, false);
+
+  const readinessExecute = await executeCli(['capture', 'readiness', '--execute', '--json'], { now: fixedNow });
+  assert.equal(readinessExecute.exitCode, 2);
+  assert.equal(JSON.parse(readinessExecute.stdout).errors[0].code, 'CONFLICTING_OPTIONS');
+
+  const readinessProvider = await executeCli(['capture', 'readiness', '--provider', 'generic-api', '--json'], { now: fixedNow });
+  assert.equal(readinessProvider.exitCode, 2);
+  assert.equal(JSON.parse(readinessProvider.stdout).errors[0].code, 'UNSUPPORTED_CAPTURE_READINESS_OPTION');
+
   const parsed = parseCliArgs(['capture', 'plan', '--source', 'window', '--json']);
   assert.equal(parsed.ok, true);
   assert.equal(parsed.command, 'capture plan');
@@ -3036,6 +4023,7 @@ test('capture plan reports screen and window capture boundaries without capturin
   assert.equal(body.data.capture_plan.summary.raw_pixels_in_json, false);
   assert.equal(body.data.capture_plan.summary.native_capture_dependency_loaded, false);
   assert.equal(body.data.capture_plan.summary.mcp_execution_exposed, false);
+  assert.equal(body.data.capture_plan.summary.owner_review_required_before_capture, true);
   assert.equal(body.data.capture_plan.sources.length, 1);
   assert.equal(body.data.capture_plan.sources[0].source_kind, 'window_capture');
   assert.equal(body.data.capture_plan.sources[0].mcp_capture_available, false);
@@ -3064,6 +4052,21 @@ test('capture plan reports screen and window capture boundaries without capturin
   assert.equal(provider.exitCode, 2);
   assert.equal(JSON.parse(provider.stdout).errors[0].code, 'UNSUPPORTED_CAPTURE_PLAN_OPTION');
 
+  const runMissingExecute = await executeCli(['capture', 'run', '--source', 'screen', '--json'], { now: fixedNow });
+  assert.equal(runMissingExecute.exitCode, 2);
+  assert.equal(JSON.parse(runMissingExecute.stdout).errors[0].code, 'MISSING_REQUIRED_OPTION');
+
+  const runUnavailable = await executeCli(['capture', 'run', '--source', 'screen', '--execute', '--json'], { now: fixedNow });
+  assert.equal(runUnavailable.exitCode, 1);
+  const runUnavailableBody = JSON.parse(runUnavailable.stdout);
+  assert.equal(runUnavailableBody.command, 'capture run');
+  assert.equal(runUnavailableBody.errors[0].code, 'CAPTURE_EXECUTION_NOT_AVAILABLE');
+  assert.equal(runUnavailableBody.data.capture_execution.execute_requested, true);
+  assert.equal(runUnavailableBody.data.capture_execution.approval_required, true);
+  assert.equal(runUnavailableBody.data.boundary.capture_performed, false);
+  assert.equal(runUnavailableBody.data.boundary.os_capture_api_used, false);
+  assert.deepEqual(runUnavailableBody.artifacts, []);
+
   const mcpPlan = await handleMcpRequest({
     jsonrpc: '2.0',
     id: 48,
@@ -3076,6 +4079,32 @@ test('capture plan reports screen and window capture boundaries without capturin
   assert.equal(mcpPlan.result.structuredContent.command, 'capture plan');
   assert.equal(mcpPlan.result.structuredContent.data.capture_plan.source_selection, 'screen');
   assert.equal(mcpPlan.result.structuredContent.data.boundary.mcp_execution_exposed, false);
+
+  const mcpReadiness = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 481,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_capture_readiness',
+      arguments: { source: 'window' }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpReadiness.result.structuredContent.command, 'capture readiness');
+  assert.equal(mcpReadiness.result.structuredContent.data.capture_readiness.source_selection, 'window');
+  assert.equal(mcpReadiness.result.structuredContent.data.capture_readiness.summary.mcp_execute_available, false);
+  assert.equal(mcpReadiness.result.structuredContent.data.boundary.os_capture_api_used, false);
+
+  const mcpPlanWithExecute = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 482,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_capture_plan',
+      arguments: { source: 'screen', execute: true }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpPlanWithExecute.error.code, -32602);
+  assert.match(mcpPlanWithExecute.error.message, /Unsupported MCP argument/);
 });
 
 test('MCP execution gates report required approval boundaries without exposing execution', async () => {
@@ -3129,6 +4158,477 @@ test('MCP execution gates report required approval boundaries without exposing e
   assert.equal(mcpGate.result.structuredContent.data.boundary.mcp_write_execute_exposed, false);
 });
 
+test('operation registry reports roadmap risks without enabling execution', async () => {
+  const parsed = parseCliArgs(['operation', 'registry', '--group', 'localization', '--risk', 'translation', '--json']);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'operation registry');
+  assert.equal(parsed.options.group, 'localization');
+  assert.equal(parsed.options.risk, 'translation');
+
+  const apiReport = buildOperationRegistryReport({ operation: 'npm_publish' }, { now: fixedNow });
+  assert.equal(apiReport.ok, true);
+  assert.equal(apiReport.report.operations[0].id, 'npm_publish');
+  assert.equal(apiReport.report.operations[0].risk.release_bound, true);
+  assert.equal(apiReport.report.boundary.npm_publish_performed, false);
+  assert.equal(operationRegistryBoundary().mcp_write_execute_exposed, false);
+
+  const result = await executeCli(['operation', 'registry', '--group', 'release_identity', '--json'], { now: fixedNow });
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'operation registry');
+  assert.equal(body.data.operation_registry.group_selection, 'release_identity');
+  assert.equal(body.data.operation_registry.summary.read_only_registry_only, true);
+  const releaseReadinessOperation = body.data.operation_registry.operations.find((operation) => operation.id === 'release_readiness');
+  const artifactRootStatusOperation = body.data.operation_registry.operations.find((operation) => operation.id === 'artifact_root_status');
+  const artifactRootMigrationPlanOperation = body.data.operation_registry.operations.find((operation) => operation.id === 'artifact_root_migration_plan');
+  const artifactRootMigrationExecuteOperation = body.data.operation_registry.operations.find((operation) => operation.id === 'artifact_root_migration_execute');
+  const legacyAliasAuditOperation = body.data.operation_registry.operations.find((operation) => operation.id === 'legacy_alias_audit');
+  const legacyAliasRemovalReadinessOperation = body.data.operation_registry.operations.find((operation) => operation.id === 'legacy_alias_removal_readiness');
+  const legacyAliasRemovalOperation = body.data.operation_registry.operations.find((operation) => operation.id === 'legacy_alias_removal');
+  assert.equal(releaseReadinessOperation.current_mcp_exposure.safe, true);
+  assert.equal(releaseReadinessOperation.capability_excluded, false);
+  assert.equal(body.data.operation_registry.operations.some((operation) => operation.id === 'npm_publish'), true);
+  assert.equal(artifactRootStatusOperation.current_mcp_exposure.admin, true);
+  assert.equal(artifactRootStatusOperation.capability_excluded, false);
+  assert.equal(artifactRootMigrationPlanOperation.current_status, 'read_only_available');
+  assert.equal(artifactRootMigrationExecuteOperation.current_status, 'fixture_only_cli_gate');
+  assert.equal(artifactRootMigrationExecuteOperation.current_mcp_exposure.admin, false);
+  assert.equal(legacyAliasAuditOperation.current_mcp_exposure.full, true);
+  assert.equal(legacyAliasAuditOperation.capability_excluded, false);
+  assert.equal(legacyAliasRemovalReadinessOperation.current_mcp_exposure.safe, true);
+  assert.equal(legacyAliasRemovalReadinessOperation.capability_excluded, false);
+  assert.equal(legacyAliasRemovalOperation.current_status, 'fail_closed_cli_gate');
+  assert.equal(legacyAliasRemovalOperation.current_mcp_exposure.admin, false);
+  assert.equal(body.data.operation_registry.summary.write_execute_tools_exposed, false);
+  assert.equal(body.data.boundary.deletes_files, false);
+  assert.equal(body.data.boundary.provider_call_performed, false);
+  assert.equal(body.data.boundary.mcp_write_execute_exposed, false);
+  assert.deepEqual(body.artifacts, []);
+
+  const cleanupRegistry = await executeCli(['operation', 'registry', '--group', 'cleanup_mcp', '--json'], { now: fixedNow });
+  assert.equal(cleanupRegistry.exitCode, 0);
+  const cleanupRegistryBody = JSON.parse(cleanupRegistry.stdout);
+  const cleanupPlanOperation = cleanupRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'resource_artifacts_cleanup_plan');
+  const cleanupExecuteOperation = cleanupRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'resource_artifacts_cleanup_execute');
+  assert.equal(cleanupPlanOperation.current_mcp_exposure.safe, true);
+  assert.equal(cleanupPlanOperation.current_mcp_exposure.full, true);
+  assert.equal(cleanupPlanOperation.current_mcp_exposure.admin, true);
+  assert.equal(cleanupPlanOperation.capability_excluded, false);
+  assert.equal(cleanupPlanOperation.required_gates.some((gate) => gate.id === 'plan_hash'), true);
+  assert.equal(cleanupExecuteOperation.current_mcp_exposure.admin, false);
+  assert.equal(cleanupExecuteOperation.capability_excluded, true);
+  assert.equal(cleanupRegistryBody.data.operation_registry.summary.write_execute_tools_exposed, false);
+
+  const captureRegistry = await executeCli(['operation', 'registry', '--group', 'capture', '--json'], { now: fixedNow });
+  assert.equal(captureRegistry.exitCode, 0);
+  const captureRegistryBody = JSON.parse(captureRegistry.stdout);
+  const captureReadinessOperation = captureRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'capture_readiness_probe');
+  const capturePlanOperation = captureRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'capture_plan_read_only');
+  const captureExecuteOperation = captureRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'screen_window_capture_execute');
+  assert.equal(captureReadinessOperation.current_mcp_exposure.safe, true);
+  assert.equal(captureReadinessOperation.capability_excluded, false);
+  assert.equal(capturePlanOperation.current_mcp_exposure.admin, true);
+  assert.equal(capturePlanOperation.required_gates.some((gate) => gate.id === 'mcp_read_only'), true);
+  assert.equal(captureExecuteOperation.cli_available, true);
+  assert.equal(captureExecuteOperation.current_status, 'fail_closed_cli_gate');
+  assert.equal(captureExecuteOperation.current_mcp_exposure.admin, false);
+  assert.equal(captureExecuteOperation.capability_excluded, true);
+  assert.equal(captureRegistryBody.data.operation_registry.summary.write_execute_tools_exposed, false);
+
+  const localizationRegistry = await executeCli(['operation', 'registry', '--group', 'localization', '--json'], { now: fixedNow });
+  assert.equal(localizationRegistry.exitCode, 0);
+  const localizationRegistryBody = JSON.parse(localizationRegistry.stdout);
+  const uiResourcesOperation = localizationRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'ui_i18n_resource_runtime');
+  const reportTemplatesOperation = localizationRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'report_localized_rendering');
+  const translationReadinessOperation = localizationRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'translation_readiness');
+  const translationExecuteOperation = localizationRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'translation_mcp_admin_execute');
+  assert.equal(uiResourcesOperation.current_mcp_exposure.safe, true);
+  assert.equal(reportTemplatesOperation.current_mcp_exposure.full, true);
+  assert.equal(translationReadinessOperation.current_mcp_exposure.admin, true);
+  assert.equal(translationExecuteOperation.current_status, 'fail_closed_cli_gate');
+  assert.equal(translationExecuteOperation.current_mcp_exposure.admin, false);
+  assert.equal(localizationRegistryBody.data.operation_registry.summary.write_execute_tools_exposed, false);
+
+  const shellRegistry = await executeCli(['operation', 'registry', '--group', 'constrained_shell', '--json'], { now: fixedNow });
+  assert.equal(shellRegistry.exitCode, 0);
+  const shellRegistryBody = JSON.parse(shellRegistry.stdout);
+  const shellReadinessOperation = shellRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'constrained_shell_readiness');
+  const shellExecuteOperation = shellRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'constrained_shell_execute');
+  assert.equal(shellReadinessOperation.current_mcp_exposure.safe, true);
+  assert.equal(shellReadinessOperation.capability_excluded, false);
+  assert.equal(shellExecuteOperation.current_status, 'fail_closed_cli_gate');
+  assert.equal(shellExecuteOperation.current_mcp_exposure.admin, false);
+  assert.equal(shellExecuteOperation.capability_excluded, true);
+  assert.equal(shellRegistryBody.data.operation_registry.summary.write_execute_tools_exposed, false);
+
+  const finalRegistry = await executeCli(['operation', 'registry', '--group', 'final_hardening', '--json'], { now: fixedNow });
+  assert.equal(finalRegistry.exitCode, 0);
+  const finalRegistryBody = JSON.parse(finalRegistry.stdout);
+  const finalReadinessOperation = finalRegistryBody.data.operation_registry.operations.find((operation) => operation.id === 'final_hardening_readiness');
+  assert.equal(finalReadinessOperation.current_mcp_exposure.full, true);
+  assert.equal(finalReadinessOperation.capability_excluded, false);
+  assert.equal(finalRegistryBody.data.operation_registry.summary.write_execute_tools_exposed, false);
+
+  const translationGate = await executeCli(['mcp', 'execution', 'gates', '--operation', 'translation_mcp_admin_execute', '--json'], { now: fixedNow });
+  assert.equal(translationGate.exitCode, 0);
+  const translationGateBody = JSON.parse(translationGate.stdout);
+  assert.equal(translationGateBody.data.execution_gates.operations[0].group, 'localization');
+  assert.equal(translationGateBody.data.execution_gates.operations[0].required_gates.some((gate) => gate.id === 'raw_evidence_non_translation'), true);
+  assert.equal(translationGateBody.data.execution_gates.registry.source, 'operation_registry');
+
+  const mcpRegistry = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 47,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_operation_registry',
+      arguments: { group: 'constrained_shell' }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpRegistry.result.structuredContent.command, 'operation registry');
+  assert.equal(mcpRegistry.result.structuredContent.data.operation_registry.group_selection, 'constrained_shell');
+  assert.equal(mcpRegistry.result.structuredContent.data.boundary.shell_used, false);
+
+  const invalid = await executeCli(['operation', 'registry', '--risk', 'wide-open', '--json'], { now: fixedNow });
+  assert.equal(invalid.exitCode, 1);
+  assert.equal(JSON.parse(invalid.stdout).errors[0].code, 'INVALID_OPERATION_REGISTRY_RISK');
+});
+
+test('operation roadmap reports phase A/B/C contracts without promoting draft execution', async () => {
+  const parsed = parseCliArgs(['operation', 'roadmap', '--phase', '125', '--json']);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'operation roadmap');
+  assert.equal(parsed.options.phase, '125');
+
+  const apiReport = buildOperationRoadmapReport({ phase: '125' }, { now: fixedNow });
+  assert.equal(apiReport.ok, true);
+  assert.equal(apiReport.report.phases.length, 1);
+  assert.equal(apiReport.report.phases[0].phase, 125);
+  assert.equal(apiReport.report.phases[0].proposal.step, 'A');
+  assert.equal(apiReport.report.phases[0].implementation_plan.step, 'B');
+  assert.equal(apiReport.report.phases[0].implementation.step, 'C');
+  assert.equal(apiReport.report.phases[0].implementation.approval_required_before_live_execution, true);
+  assert.equal(apiReport.report.phases[0].implementation.live_execution_performed, false);
+  assert.equal(apiReport.report.boundary.draft_roadmap_promoted_to_product_plan, false);
+  assert.equal(operationRoadmapBoundary().mcp_write_execute_exposed, false);
+
+  const result = await executeCli(['operation', 'roadmap', '--group', 'release_identity', '--json'], { now: fixedNow });
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'operation roadmap');
+  assert.equal(body.data.operation_roadmap.group_selection, 'release_identity');
+  assert.equal(body.data.operation_roadmap.summary.phase_count, 20);
+  assert.equal(body.data.operation_roadmap.summary.local_boundary_implemented_count, 20);
+  assert.equal(body.data.operation_roadmap.summary.live_execution_performed, false);
+  assert.equal(body.data.operation_roadmap.phases.some((phase) => phase.phase === 125), true);
+  assert.equal(body.data.operation_roadmap.phases.find((phase) => phase.phase === 125).implementation.status, 'implemented_as_fail_closed_approval_gate');
+  assert.equal(body.data.operation_roadmap.phases.find((phase) => phase.phase === 139).slice, 'Legacy Alias Removal Boundary');
+  assert.match(body.data.operation_roadmap.phases.find((phase) => phase.phase === 139).purpose, /readiness and fail-closed/);
+  assert.equal(body.data.boundary.live_execution_performed, false);
+  assert.equal(body.data.boundary.execution_tokens_issued, false);
+  assert.equal(body.data.boundary.ci_remote_triggered, false);
+  assert.deepEqual(body.artifacts, []);
+
+  const safePhase = await executeCli(['operation', 'roadmap', '--phase', '66', '--json'], { now: fixedNow });
+  assert.equal(safePhase.exitCode, 0);
+  const safePhaseBody = JSON.parse(safePhase.stdout);
+  assert.equal(safePhaseBody.data.operation_roadmap.phases[0].implementation.approval_required_before_live_execution, false);
+  assert.equal(safePhaseBody.data.operation_roadmap.phases[0].implementation.status, 'implemented_as_read_only_or_dry_run_contract');
+
+  const invalid = await executeCli(['operation', 'roadmap', '--phase', '200', '--json'], { now: fixedNow });
+  assert.equal(invalid.exitCode, 1);
+  assert.equal(JSON.parse(invalid.stdout).errors[0].code, 'INVALID_OPERATION_ROADMAP_PHASE');
+
+  const execute = await executeCli(['operation', 'roadmap', '--phase', '125', '--execute', '--json'], { now: fixedNow });
+  assert.equal(execute.exitCode, 1);
+  assert.equal(JSON.parse(execute.stdout).errors[0].code, 'CONFLICTING_OPTIONS');
+
+  const mcpRoadmap = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 49,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_operation_roadmap',
+      arguments: { phase: '94' }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpRoadmap.result.structuredContent.command, 'operation roadmap');
+  assert.equal(mcpRoadmap.result.structuredContent.data.operation_roadmap.phase_selection, 94);
+  assert.equal(mcpRoadmap.result.structuredContent.data.operation_roadmap.phases[0].implementation.approval_required_before_live_execution, true);
+  assert.equal(mcpRoadmap.result.structuredContent.data.boundary.capture_performed, false);
+});
+
+test('operation contracts report shared Phase 61-64 contracts without issuing tokens', async () => {
+  const parsed = parseCliArgs(['operation', 'contracts', '--scope', 'token_contract', '--operation', 'agent_execution_run', '--json']);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'operation contracts');
+  assert.equal(parsed.options.scope, 'token_contract');
+  assert.equal(parsed.options.operation, 'agent_execution_run');
+
+  const apiReport = buildOperationContractsReport({ scope: 'receipt_contract', operation: 'translation_mcp_admin_execute' }, { now: fixedNow });
+  assert.equal(apiReport.ok, true);
+  assert.equal(apiReport.report.scope_selection, 'receipt_contract');
+  assert.equal(apiReport.report.operation_selection, 'translation_mcp_admin_execute');
+  assert.deepEqual(apiReport.report.phase_range.implemented_contract_phases, [61, 62, 63, 64]);
+  assert.equal(apiReport.report.contracts[0].id, 'receipt_contract');
+  assert.equal(apiReport.report.contracts[0].boundary.receipt_writer_enabled, false);
+  assert.equal(apiReport.report.boundary.execute_token_contract_recorded, true);
+  assert.equal(apiReport.report.boundary.execution_tokens_issued, false);
+  assert.equal(apiReport.report.boundary.receipt_writer_enabled, false);
+  assert.equal(operationContractsBoundary().mcp_write_execute_exposed, false);
+
+  const result = await executeCli(['operation', 'contracts', '--scope', 'all', '--operation', 'resource_artifacts_cleanup_execute', '--json'], { now: fixedNow });
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'operation contracts');
+  assert.equal(body.data.operation_contracts.summary.contract_count, 4);
+  assert.equal(body.data.operation_contracts.summary.token_issuance_enabled, false);
+  assert.equal(body.data.operation_contracts.selected_operations[0].id, 'resource_artifacts_cleanup_execute');
+  assert.equal(body.data.operation_contracts.selected_operations[0].required_gates.some((gate) => gate.id === 'candidate_lock'), true);
+  assert.equal(body.data.boundary.contracts_report_only, true);
+  assert.equal(body.data.boundary.live_execution_performed, false);
+  assert.equal(body.data.boundary.artifacts_written, false);
+  assert.deepEqual(body.artifacts, []);
+
+  const invalid = await executeCli(['operation', 'contracts', '--scope', 'unsafe', '--json'], { now: fixedNow });
+  assert.equal(invalid.exitCode, 1);
+  assert.equal(JSON.parse(invalid.stdout).errors[0].code, 'INVALID_OPERATION_CONTRACTS_SCOPE');
+
+  const execute = await executeCli(['operation', 'contracts', '--scope', 'token_contract', '--execute', '--json'], { now: fixedNow });
+  assert.equal(execute.exitCode, 1);
+  assert.equal(JSON.parse(execute.stdout).errors[0].code, 'CONFLICTING_OPTIONS');
+
+  const mcpContracts = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 50,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_operation_contracts',
+      arguments: { scope: 'gate_schema', operation: 'agent_execution_run' }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpContracts.result.structuredContent.command, 'operation contracts');
+  assert.equal(mcpContracts.result.structuredContent.data.operation_contracts.scope_selection, 'gate_schema');
+  assert.equal(mcpContracts.result.structuredContent.data.operation_contracts.contracts[0].id, 'gate_schema');
+  assert.equal(mcpContracts.result.structuredContent.data.boundary.execution_harness_enabled, false);
+});
+
+test('operation policy reports Phase 65-68 readiness without token or harness execution', async () => {
+  const parsed = parseCliArgs(['operation', 'policy', '--scope', 'harness_readiness', '--operation', 'agent_execution_run', '--json']);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'operation policy');
+  assert.equal(parsed.options.scope, 'harness_readiness');
+  assert.equal(parsed.options.operation, 'agent_execution_run');
+
+  const apiReport = buildOperationPolicyReport({ scope: 'mcp_readiness', operation: 'translation_mcp_admin_execute' }, { now: fixedNow });
+  assert.equal(apiReport.ok, true);
+  assert.equal(apiReport.report.scope_selection, 'mcp_readiness');
+  assert.equal(apiReport.report.policy_source.loaded, true);
+  assert.equal(apiReport.report.admin_policy.write_execute_tools_exposed, true);
+  assert.equal(apiReport.report.readiness[0].id, 'mcp_readiness');
+  assert.equal(apiReport.report.readiness[0].boundary.admin_mcp_execution_enabled, true);
+  assert.equal(apiReport.report.boundary.phase_policy_recorded.includes(68), true);
+  assert.equal(apiReport.report.boundary.execution_harness_enabled, false);
+  assert.equal(operationPolicyBoundary().mcp_write_execute_exposed, true);
+
+  const result = await executeCli(['operation', 'policy', '--scope', 'all', '--operation', 'resource_artifacts_cleanup_execute', '--json'], { now: fixedNow });
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'operation policy');
+  assert.equal(body.data.operation_policy.summary.readiness_count, 4);
+  assert.equal(body.data.operation_policy.summary.execution_harness_enabled, false);
+  assert.equal(body.data.operation_policy.admin_policy.live_execution_enabled, false);
+  assert.equal(body.data.operation_policy.selected_operations[0].id, 'resource_artifacts_cleanup_execute');
+  assert.equal(body.data.boundary.policy_report_only, true);
+  assert.equal(body.data.boundary.admin_policy_config_written, false);
+  assert.equal(body.data.boundary.mcp_admin_execution_enabled, true);
+  assert.deepEqual(body.artifacts, []);
+
+  const invalid = await executeCli(['operation', 'policy', '--scope', 'unsafe', '--json'], { now: fixedNow });
+  assert.equal(invalid.exitCode, 1);
+  assert.equal(JSON.parse(invalid.stdout).errors[0].code, 'INVALID_OPERATION_POLICY_SCOPE');
+
+  const execute = await executeCli(['operation', 'policy', '--scope', 'harness_readiness', '--execute', '--json'], { now: fixedNow });
+  assert.equal(execute.exitCode, 1);
+  assert.equal(JSON.parse(execute.stdout).errors[0].code, 'CONFLICTING_OPTIONS');
+
+  const mcpPolicy = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 51,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_operation_policy',
+      arguments: { scope: 'admin_policy', operation: 'agent_execution_run' }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpPolicy.result.structuredContent.command, 'operation policy');
+  assert.equal(mcpPolicy.result.structuredContent.data.operation_policy.scope_selection, 'admin_policy');
+  assert.equal(mcpPolicy.result.structuredContent.data.operation_policy.admin_policy.token_issuance_enabled, false);
+  assert.equal(mcpPolicy.result.structuredContent.data.boundary.mcp_write_execute_exposed, true);
+});
+
+test('operation admin-readiness reports Phase 69-70 readiness without token issuance or generic harness execution', async () => {
+  const parsed = parseCliArgs(['operation', 'admin-readiness', '--scope', 'mcp_admin_token_flow', '--operation', 'agent_execution_run', '--json']);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'operation admin-readiness');
+  assert.equal(parsed.options.scope, 'mcp_admin_token_flow');
+  assert.equal(parsed.options.operation, 'agent_execution_run');
+
+  const apiReport = buildOperationAdminReadinessReport(
+    { scope: 'mcp_admin_harness_bridge', operation: 'translation_mcp_admin_execute' },
+    { now: fixedNow }
+  );
+  assert.equal(apiReport.ok, true);
+  assert.equal(apiReport.report.scope_selection, 'mcp_admin_harness_bridge');
+  assert.equal(apiReport.report.readiness[0].id, 'mcp_admin_harness_bridge');
+  assert.equal(apiReport.report.readiness[0].boundary.mcp_admin_harness_enabled, false);
+  assert.equal(apiReport.report.approval_boundary.approval_required_for_live_execution, true);
+  assert.deepEqual(apiReport.report.boundary.phase_admin_readiness_recorded, [69, 70]);
+  assert.equal(apiReport.report.boundary.mcp_admin_token_flow_enabled, false);
+  assert.equal(apiReport.report.boundary.execution_tokens_issued, false);
+  assert.equal(apiReport.report.boundary.mcp_admin_harness_enabled, false);
+  assert.equal(operationAdminReadinessBoundary().mcp_write_execute_exposed, true);
+
+  const result = await executeCli(['operation', 'admin-readiness', '--scope', 'all', '--operation', 'resource_artifacts_cleanup_execute', '--json'], { now: fixedNow });
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'operation admin-readiness');
+  assert.equal(body.data.operation_admin_readiness.summary.readiness_count, 2);
+  assert.equal(body.data.operation_admin_readiness.summary.mcp_admin_token_flow_enabled, false);
+  assert.equal(body.data.operation_admin_readiness.summary.mcp_admin_harness_enabled, false);
+  assert.equal(body.data.operation_admin_readiness.selected_operations[0].id, 'resource_artifacts_cleanup_execute');
+  assert.equal(body.data.boundary.admin_readiness_report_only, true);
+  assert.equal(body.data.boundary.token_issuance_enabled, false);
+  assert.equal(body.data.boundary.mcp_admin_execute_calls_enabled, true);
+  assert.deepEqual(body.artifacts, []);
+
+  const invalid = await executeCli(['operation', 'admin-readiness', '--scope', 'unsafe', '--json'], { now: fixedNow });
+  assert.equal(invalid.exitCode, 1);
+  assert.equal(JSON.parse(invalid.stdout).errors[0].code, 'INVALID_OPERATION_ADMIN_READINESS_SCOPE');
+
+  const execute = await executeCli(['operation', 'admin-readiness', '--scope', 'mcp_admin_token_flow', '--execute', '--json'], { now: fixedNow });
+  assert.equal(execute.exitCode, 1);
+  assert.equal(JSON.parse(execute.stdout).errors[0].code, 'CONFLICTING_OPTIONS');
+
+  const mcpAdminReadiness = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 52,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_operation_admin_readiness',
+      arguments: { scope: 'mcp_admin_token_flow', operation: 'agent_execution_run' }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpAdminReadiness.result.structuredContent.command, 'operation admin-readiness');
+  assert.equal(mcpAdminReadiness.result.structuredContent.data.operation_admin_readiness.scope_selection, 'mcp_admin_token_flow');
+  assert.equal(mcpAdminReadiness.result.structuredContent.data.operation_admin_readiness.readiness[0].boundary.token_issuance_enabled, false);
+  assert.equal(mcpAdminReadiness.result.structuredContent.data.boundary.mcp_write_execute_exposed, true);
+});
+
+test('operation provider-readiness reports provider planning, admin execution, and status/list readiness without provider calls', async () => {
+  const parsed = parseCliArgs(['operation', 'provider-readiness', '--scope', 'env_credential_guard', '--operation', 'agent_execution_run', '--json']);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.command, 'operation provider-readiness');
+  assert.equal(parsed.options.scope, 'env_credential_guard');
+  assert.equal(parsed.options.operation, 'agent_execution_run');
+
+  const apiReport = buildOperationProviderReadinessReport(
+    { scope: 'disclosure_contract', operation: 'provider_api_execution' },
+    { now: fixedNow }
+  );
+  assert.equal(apiReport.ok, true);
+  assert.equal(apiReport.report.scope_selection, 'disclosure_contract');
+  assert.equal(apiReport.report.operation_selection, 'provider_mcp_api_execute');
+  assert.equal(apiReport.report.readiness[0].id, 'disclosure_contract');
+  assert.equal(apiReport.report.disclosure_contract.external_evidence_transfer_authorized, true);
+  assert.equal(apiReport.report.provider_catalog.some((provider) => provider.id === 'generic-api-provider'), true);
+  assert.equal(apiReport.report.provider_catalog.every((provider) => provider.provider_call_performed === false), true);
+  assert.equal(apiReport.report.status_list_contract.status_tool_available, true);
+  assert.equal(apiReport.report.status_list_contract.list_tool_available, true);
+  assert.equal(apiReport.report.status_list_contract.tools.every((tool) => tool.effects.providerCall === false), true);
+  assert.equal(apiReport.report.status_list_contract.tools.every((tool) => tool.effects.writesArtifacts === false), true);
+  assert.equal(apiReport.report.credential_guard.endpoint_env_name, API_PROVIDER_ENDPOINT_ENV);
+  assert.equal(apiReport.report.credential_guard.credential_env_name, API_PROVIDER_CREDENTIAL_ENV);
+  assert.equal(apiReport.report.boundary.credential_values_read, false);
+  assert.equal(apiReport.report.boundary.provider_call_performed, false);
+  assert.equal(operationProviderReadinessBoundary().mcp_write_execute_exposed, true);
+  assert.equal(operationProviderReadinessBoundary().provider_mcp_status_list_available, true);
+
+  const statusListTools = getMcpToolsByTag('safe', MCP_TOOL_TAGS.PROVIDER_STATUS_LIST_READ);
+  assert.equal(statusListTools.some((tool) => tool.tags.includes(MCP_TOOL_TAGS.AGENT_EXECUTION_STATUS_READ)), true);
+  assert.equal(statusListTools.some((tool) => tool.tags.includes(MCP_TOOL_TAGS.AGENT_EXECUTION_LIST_READ)), true);
+  assert.equal(statusListTools.every((tool) => tool.effects.providerCall === false), true);
+  assert.equal(statusListTools.every((tool) => tool.effects.writesArtifacts === false), true);
+
+  const result = await executeCli(['operation', 'provider-readiness', '--scope', 'all', '--operation', 'agent_execution_run', '--json'], { now: fixedNow });
+  assert.equal(result.exitCode, 0);
+  const body = JSON.parse(result.stdout);
+  assert.equal(body.command, 'operation provider-readiness');
+  assert.equal(body.data.operation_provider_readiness.summary.readiness_count, 7);
+  assert.equal(body.data.operation_provider_readiness.summary.implemented_phase_max, 78);
+  assert.equal(body.data.operation_provider_readiness.summary.provider_mcp_status_list_available, true);
+  assert.equal(body.data.operation_provider_readiness.summary.status_list_tool_count >= 2, true);
+  assert.equal(body.data.operation_provider_readiness.summary.provider_mcp_execution_enabled, true);
+  assert.equal(body.data.operation_provider_readiness.summary.provider_mcp_fake_execution_enabled, true);
+  assert.equal(body.data.operation_provider_readiness.summary.provider_mcp_local_runner_execution_enabled, true);
+  assert.equal(body.data.operation_provider_readiness.summary.provider_mcp_api_execution_enabled, true);
+  assert.equal(body.data.operation_provider_readiness.summary.credential_values_recorded, false);
+  assert.equal(body.data.operation_provider_readiness.provider_catalog.length >= 3, true);
+  assert.equal(body.data.operation_provider_readiness.status_list_contract.read_only, true);
+  assert.equal(body.data.boundary.provider_readiness_report_only, true);
+  assert.equal(body.data.boundary.provider_mcp_status_list_read_only, true);
+  assert.equal(body.data.boundary.provider_mcp_execution_enabled, true);
+  assert.equal(body.data.boundary.safe_mcp_provider_execution_enabled, false);
+  assert.equal(body.data.boundary.full_mcp_provider_execution_enabled, false);
+  assert.equal(body.data.boundary.admin_mcp_provider_execution_enabled, true);
+  assert.equal(body.data.boundary.external_evidence_transfer_performed, false);
+  assert.deepEqual(body.artifacts, []);
+
+  const invalid = await executeCli(['operation', 'provider-readiness', '--scope', 'unsafe', '--json'], { now: fixedNow });
+  assert.equal(invalid.exitCode, 1);
+  assert.equal(JSON.parse(invalid.stdout).errors[0].code, 'INVALID_OPERATION_PROVIDER_READINESS_SCOPE');
+
+  const execute = await executeCli(['operation', 'provider-readiness', '--scope', 'provider_mcp_plan', '--execute', '--json'], { now: fixedNow });
+  assert.equal(execute.exitCode, 1);
+  assert.equal(JSON.parse(execute.stdout).errors[0].code, 'CONFLICTING_OPTIONS');
+
+  const providerOption = await executeCli(['operation', 'provider-readiness', '--provider', 'generic-api-provider', '--json'], { now: fixedNow });
+  assert.equal(providerOption.exitCode, 1);
+  assert.equal(JSON.parse(providerOption.stdout).errors[0].code, 'UNSUPPORTED_OPERATION_PROVIDER_READINESS_OPTION');
+
+  const sentinelCredential = 'credential-sentinel-value';
+  const sentinelEndpoint = 'https://provider.invalid/sentinel';
+  const sentinel = await executeCli(['operation', 'provider-readiness', '--scope', 'env_credential_guard', '--json'], {
+    now: fixedNow,
+    env: {
+      [API_PROVIDER_ENDPOINT_ENV]: sentinelEndpoint,
+      [API_PROVIDER_CREDENTIAL_ENV]: sentinelCredential
+    },
+    fetch: () => {
+      throw new Error('provider readiness must not call fetch');
+    }
+  });
+  assert.equal(sentinel.exitCode, 0);
+  assert.equal(sentinel.stdout.includes(sentinelCredential), false);
+  assert.equal(sentinel.stdout.includes(sentinelEndpoint), false);
+
+  const mcpProviderReadiness = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 53,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_operation_provider_readiness',
+      arguments: { scope: 'provider_mcp_status_list', operation: 'agent_execution_run' }
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(mcpProviderReadiness.result.structuredContent.command, 'operation provider-readiness');
+  assert.equal(mcpProviderReadiness.result.structuredContent.data.operation_provider_readiness.scope_selection, 'provider_mcp_status_list');
+  assert.equal(mcpProviderReadiness.result.structuredContent.data.operation_provider_readiness.readiness[0].id, 'provider_mcp_status_list');
+  assert.equal(mcpProviderReadiness.result.structuredContent.data.operation_provider_readiness.status_list_contract.provider_mcp_execution_enabled, true);
+  assert.equal(mcpProviderReadiness.result.structuredContent.data.operation_provider_readiness.credential_guard.credential_values_read, false);
+  assert.equal(mcpProviderReadiness.result.structuredContent.data.boundary.provider_call_performed, false);
+});
+
 test('MCP adapter exposes a local allowlisted tool surface', async () => {
   const initialized = await handleMcpRequest({ jsonrpc: '2.0', id: 0, method: 'initialize' });
   assert.equal(initialized.result.serverInfo.name, PRODUCT_IDENTITY.mcpServerName);
@@ -3136,6 +4636,7 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(initialized.result.metadata.identity.package_name, PRODUCT_IDENTITY.packageName);
   assert.equal(initialized.result.metadata.identity.package_version, PRODUCT_IDENTITY.packageVersion);
   assert.equal(initialized.result.metadata.identity.mcp_bin_name, PRODUCT_IDENTITY.mcpBinName);
+  assert.equal(initialized.result.metadata.compatibility.legacy_alias_policy.removal_authorized, false);
   assert.equal(initialized.result.metadata.profile.name, 'full');
 
   const listed = await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
@@ -3150,11 +4651,27 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_agent_workflow_status'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_agent_execution_status'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_visual_review_dashboard'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_capture_readiness'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_language_settings'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_localization_resources'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_report_templates'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_translation_readiness'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_release_readiness'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_artifact_root_status'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_legacy_alias_audit'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_legacy_alias_removal_readiness'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_shell_readiness'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_final_readiness'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_mcp_execution_gates'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_mcp_capabilities'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_registry'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_roadmap'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_contracts'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_policy'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_admin_readiness'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_provider_readiness'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review_target'), true);
-  assert.equal(listed.result.tools.some((tool) => /agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_aggregate|desktop_review_provider|capture_handoff/i.test(tool.name)), false);
-  assert.equal(listed.result.tools.some((tool) => /shell|cleanup/i.test(tool.name)), false);
+  assert.equal(listed.result.tools.some((tool) => /agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_aggregate|desktop_review_provider|capture_handoff|shell_run|shell_execute/i.test(tool.name)), false);
   assert.equal(listed.result.tools.every((tool) => tool.effects.shellUsed === false), true);
 
   const safeListed = await handleMcpRequest({ jsonrpc: '2.0', id: 11, method: 'tools/list' }, { mcpProfile: 'safe' });
@@ -3168,23 +4685,57 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(safeToolNames.includes('browser_debug_agent_workflow_index'), true);
   assert.equal(safeToolNames.includes('browser_debug_agent_execution_list'), true);
   assert.equal(safeToolNames.includes('browser_debug_visual_review_dashboard'), true);
+  assert.equal(safeToolNames.includes('browser_debug_capture_readiness'), true);
+  assert.equal(safeToolNames.includes('browser_debug_language_settings'), true);
+  assert.equal(safeToolNames.includes('browser_debug_localization_resources'), true);
+  assert.equal(safeToolNames.includes('browser_debug_report_templates'), true);
+  assert.equal(safeToolNames.includes('browser_debug_translation_readiness'), true);
+  assert.equal(safeToolNames.includes('browser_debug_release_readiness'), true);
+  assert.equal(safeToolNames.includes('browser_debug_artifact_root_status'), true);
+  assert.equal(safeToolNames.includes('browser_debug_legacy_alias_audit'), true);
+  assert.equal(safeToolNames.includes('browser_debug_legacy_alias_removal_readiness'), true);
+  assert.equal(safeToolNames.includes('browser_debug_shell_readiness'), true);
+  assert.equal(safeToolNames.includes('browser_debug_final_readiness'), true);
   assert.equal(safeToolNames.includes('browser_debug_mcp_execution_gates'), true);
   assert.equal(safeToolNames.includes('browser_debug_mcp_capabilities'), true);
+  assert.equal(safeToolNames.includes('browser_debug_operation_registry'), true);
+  assert.equal(safeToolNames.includes('browser_debug_operation_roadmap'), true);
+  assert.equal(safeToolNames.includes('browser_debug_operation_contracts'), true);
+  assert.equal(safeToolNames.includes('browser_debug_operation_policy'), true);
+  assert.equal(safeToolNames.includes('browser_debug_operation_admin_readiness'), true);
+  assert.equal(safeToolNames.includes('browser_debug_operation_provider_readiness'), true);
   assert.equal(safeToolNames.includes('browser_debug_review'), false);
   assert.equal(safeToolNames.includes('browser_debug_observe'), false);
   assert.equal(safeToolNames.includes('browser_debug_target_init'), false);
   assert.equal(safeToolNames.includes('browser_debug_review_target'), false);
-  assert.equal(safeToolNames.some((name) => /agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_run|visual_review_aggregate|desktop_review_provider|capture_handoff/i.test(name)), false);
+  assert.equal(safeToolNames.some((name) => /agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_run|visual_review_aggregate|desktop_review_provider|capture_handoff|shell_run|shell_execute/i.test(name)), false);
   assert.equal(safeListed.result.tools.every((tool) => tool.effects.browserLaunched === false), true);
   assert.equal(safeListed.result.tools.every((tool) => tool.effects.deletesFiles === false), true);
   assert.equal(safeListed.result.tools.every((tool) => tool.effects.providerCall === false), true);
 
+  const languageTool = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 14,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_language_settings',
+      arguments: {}
+    }
+  }, { mcpProfile: 'safe', now: fixedNow });
+  assert.equal(languageTool.result.structuredContent.command, 'settings language');
+  assert.equal(languageTool.result.structuredContent.data.language_settings.dashboard_ui.locale, 'en');
+  assert.equal(languageTool.result.structuredContent.data.boundary.mcp_write_execute_exposed, false);
+
   const adminListed = await handleMcpRequest({ jsonrpc: '2.0', id: 12, method: 'tools/list' }, { mcpProfile: 'admin' });
   assert.equal(adminListed.result.profile.name, 'admin');
-  assert.deepEqual(
-    adminListed.result.tools.map((tool) => tool.name),
-    listed.result.tools.map((tool) => tool.name)
-  );
+  const adminToolNames = adminListed.result.tools.map((tool) => tool.name);
+  assert.equal(adminToolNames.includes('browser_debug_agent_execution_plan'), true);
+  assert.equal(adminToolNames.includes('browser_debug_agent_execution_run'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_agent_execution_plan'), false);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_agent_execution_run'), false);
+  assert.equal(adminListed.result.tools.find((tool) => tool.name === 'browser_debug_agent_execution_run').effects.providerCall, true);
+  assert.equal(adminListed.result.tools.find((tool) => tool.name === 'browser_debug_agent_execution_run').effects.writesArtifacts, true);
+  assert.equal(adminListed.result.tools.every((tool) => tool.effects.deletesFiles === false), true);
 
   const invalidProfile = await handleMcpRequest({ jsonrpc: '2.0', id: 13, method: 'tools/list' }, { mcpProfile: 'wide-open' });
   assert.equal(invalidProfile.error.code, -32602);
@@ -3265,19 +4816,23 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(mcpCapabilitiesBody.data.capabilities.scope, 'excluded');
   assert.equal(mcpCapabilitiesBody.data.capabilities.profiles.length, 0);
   assert.equal(mcpCapabilitiesBody.data.capabilities.transports.length, 0);
-  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.currently_equivalent_to_full, true);
-  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.write_execute_tools_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.currently_equivalent_to_full, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.write_execute_tools_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.cleanup_plan_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.cleanup_execution_exposed, false);
-  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agent_execution_run_exposed, false);
-  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.provider_api_execution_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agent_execution_plan_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agent_execution_run_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.provider_api_execution_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.shell_tools_exposed, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.cleanup_execution, false);
-  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agent_execution_run, false);
-  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.provider_api_execution, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.cleanup_plan, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agent_execution_plan, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agent_execution_run, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.provider_api_execution, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.arbitrary_shell, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.http_full_or_admin, false);
   assert.deepEqual(mcpCapabilitiesBody.data.capabilities.excluded_operations.map((operation) => operation.mcp_admin), excludedOperationIds.map(() => false));
-  assert.ok(excludedOperationIds.includes('agent_execution_run'));
+  assert.equal(excludedOperationIds.includes('agent_execution_run'), false);
   assert.ok(excludedOperationIds.includes('visual_provider_execution'));
   assert.ok(excludedOperationIds.includes('visual_review_run'));
   assert.ok(excludedOperationIds.includes('visual_review_result_preparation'));
@@ -3285,13 +4840,51 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.visual_review_run_exposed, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.visual_review_result_preparation_exposed, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.visual_review_aggregation_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.capture_readiness_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.capture_plan_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.capture_execution_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.localization_resources_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.report_templates_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.translation_readiness_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.translation_execution_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.release_readiness_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.npm_publication_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.artifact_root_status_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.artifact_root_migration_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.legacy_alias_audit_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.legacy_alias_removal_readiness_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.legacy_alias_removal_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.shell_readiness_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.final_readiness_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.visual_review_run, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.visual_review_result_preparation, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.visual_review_aggregation, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.capture_readiness, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.capture_plan, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.capture_execution, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.localization_resources, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.report_templates, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.translation_readiness, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.translation_execution, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.release_readiness, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.npm_publication, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.artifact_root_status, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.artifact_root_migration, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.legacy_alias_audit, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.legacy_alias_removal_readiness, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.legacy_alias_removal, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.shell_readiness, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.final_readiness, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.constrained_shell_execution, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.raw_image_transfer, false);
   assert.ok(excludedOperationIds.includes('resource_artifacts_cleanup_execute'));
-  assert.ok(excludedOperationIds.includes('provider_api_execution'));
+  assert.equal(excludedOperationIds.includes('provider_api_execution'), false);
+  assert.ok(excludedOperationIds.includes('translation_mcp_admin_execute'));
+  assert.ok(excludedOperationIds.includes('npm_publish'));
+  assert.ok(excludedOperationIds.includes('artifact_root_migration_execute'));
+  assert.ok(excludedOperationIds.includes('legacy_alias_removal'));
   assert.ok(excludedOperationIds.includes('arbitrary_shell'));
+  assert.ok(excludedOperationIds.includes('constrained_shell_mcp_execute'));
   assert.ok(excludedOperationIds.includes('http_full_admin_socket_remote'));
 
   const safeProfileCapabilities = await executeCli(['mcp', 'capabilities', '--profile', 'safe', '--scope', 'profiles', '--json'], { now: fixedNow });
@@ -3451,6 +5044,19 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   }, { cwd: artifactCwd, now: fixedNow });
   assert.equal(artifactPlan.result.structuredContent.command, 'resource artifacts plan');
   assert.equal(artifactPlan.result.structuredContent.data.boundary.cache_deleted, false);
+  assert.match(artifactPlan.result.structuredContent.data.cleanup_proposal.plan_hash, /^[a-f0-9]{64}$/);
+
+  const artifactPlanWithExecute = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 61,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_resource_artifacts_plan',
+      arguments: { maxBytes: '1mib', execute: true }
+    }
+  }, { cwd: artifactCwd, now: fixedNow });
+  assert.equal(artifactPlanWithExecute.error.code, -32602);
+  assert.match(artifactPlanWithExecute.error.message, /Unsupported MCP argument/);
 
   const capabilityPolicy = await handleMcpRequest({
     jsonrpc: '2.0',
@@ -3463,8 +5069,8 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   }, { mcpProfile: 'safe', now: fixedNow });
   assert.equal(capabilityPolicy.result.structuredContent.command, 'mcp capabilities');
   assert.equal(capabilityPolicy.result.structuredContent.status, 'ok');
-  assert.equal(capabilityPolicy.result.structuredContent.data.capabilities.admin_policy.write_execute_tools_exposed, false);
-  assert.equal(capabilityPolicy.result.structuredContent.data.capabilities.excluded_operations.some((operation) => operation.id === 'agent_execution_run'), true);
+  assert.equal(capabilityPolicy.result.structuredContent.data.capabilities.admin_policy.write_execute_tools_exposed, true);
+  assert.equal(capabilityPolicy.result.structuredContent.data.capabilities.excluded_operations.some((operation) => operation.id === 'agent_execution_run'), false);
   assert.equal(capabilityPolicy.result.structuredContent.data.capabilities.excluded_operations.every((operation) => operation.mcp_admin === false), true);
 
   const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-mcp-target-'));

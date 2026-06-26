@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/operation-registry.schema.json",
+  "title": "TraceCue Operation Registry",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "registry_version",
+    "generated_at",
+    "product_identity",
+    "operation_selection",
+    "group_selection",
+    "risk_selection",
+    "summary",
+    "groups",
+    "risk_taxonomy",
+    "operations",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "registry_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "product_identity": { "type": "object" },
+    "operation_selection": { "type": "string" },
+    "group_selection": { "type": "string" },
+    "risk_selection": { "type": "string" },
+    "summary": { "type": "object" },
+    "groups": { "type": "array" },
+    "risk_taxonomy": { "type": "array" },
+    "operations": { "type": "array" },
+    "boundary": { "type": "object" },
+    "next_steps": { "type": "array" }
+  },
+  "additionalProperties": true
+}

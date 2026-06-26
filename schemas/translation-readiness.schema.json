@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/translation-readiness.schema.json",
+  "title": "TraceCue Translation Readiness",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "readiness_version",
+    "generated_at",
+    "locale_selection",
+    "provider_policy",
+    "disclosure_plan",
+    "dry_run_preview",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "readiness_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "locale_selection": { "type": "string" },
+    "settings": { "type": ["object", "null"] },
+    "provider_policy": { "type": "object" },
+    "disclosure_plan": { "type": "object" },
+    "dry_run_preview": { "type": "array" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

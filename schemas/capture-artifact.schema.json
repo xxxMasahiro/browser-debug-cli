@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/capture-artifact.schema.json",
+  "title": "TraceCue Capture Artifact",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "created_at",
+    "source_kind",
+    "selected_surface",
+    "artifact",
+    "media",
+    "privacy",
+    "receipt",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "id": { "type": "string" },
+    "created_at": { "type": "string" },
+    "source_kind": {
+      "enum": [
+        "screen_capture",
+        "window_capture",
+        "desktop_app_capture"
+      ]
+    },
+    "selected_surface": { "type": "object" },
+    "artifact": { "type": "object" },
+    "media": { "type": "object" },
+    "privacy": { "type": "object" },
+    "receipt": { "type": "object" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

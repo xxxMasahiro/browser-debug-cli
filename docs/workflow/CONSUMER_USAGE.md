@@ -55,7 +55,7 @@ node "$TRACE_CUE_CLI" mcp config --profile safe --json
 node "$TRACE_CUE_CLI" mcp capabilities --profile all --json
 ```
 
-Generated MCP config defaults to `safe`. Use `safe` for discovery, schema inspection, target validation, resource status, artifact planning, read-only local agent status, and capability inspection. Use `full` only when the MCP client needs local browser observation or review. No-profile `trace-cue-mcp` and the packaged `.mcp.json` preserve compatibility by resolving to `full`.
+Generated MCP config defaults to `safe`. Use `safe` for discovery, schema inspection, target validation, resource status, artifact planning, read-only local agent status, release/artifact-root/alias/shell/final readiness inspection, and capability inspection. Use `full` only when the MCP client needs local browser observation or review. No-profile `trace-cue-mcp` and the packaged `.mcp.json` preserve compatibility by resolving to `full`.
 
 If `trace-cue-mcp` is installed and on PATH, use the generated top-level `mcpServers` object. Existing `browser-debug-mcp` launchers can use `legacy_mcpServers` while migrating names. If you are using an unpublished local checkout, use `config.local_checkout.mcpServers` instead; it contains the `node` command and absolute `bin/trace-cue-mcp.js` path plus legacy `bin/browser-debug-mcp.js` metadata for the checkout that generated the config.
 
@@ -84,9 +84,9 @@ The packaged plugin metadata points to stdio MCP compatibility. Low-trust Codex 
 | Mode | Best for | Capability boundary |
 | --- | --- | --- |
 | CLI | Humans, scripts, and any agent that can run commands. | Full approved local command surface, including explicit local writes such as reports, workflows, and artifact-root cleanup with `--execute`. |
-| MCP stdio `safe` | Low-trust MCP clients and no-browser inspection. | No browser launch, no deletion, no provider execution, no shell tools, and no write/execute advisory operations. |
-| MCP stdio `full` | MCP clients that need local observe/review tools. | Browser review tools are available, but cleanup execution, provider/API execution, `agent execution run`, shell, daemon/session control, and credential-bearing workflows remain excluded. |
-| MCP stdio `admin` | Reserved local-maintenance profile. | Currently equivalent to `full`; it does not grant write/execute/admin operations. |
+| MCP stdio `safe` | Low-trust MCP clients and no-browser inspection. | No browser launch, no deletion, no provider execution, no translation execution, no shell execution, no capture execution, and no write/execute advisory operations; readiness/status reports stay read-only. |
+| MCP stdio `full` | MCP clients that need local observe/review tools. | Browser review tools, capture readiness/plan inspection, localization/translation readiness inspection, and release/artifact/alias/shell/final readiness inspection are available, but cleanup execution, capture execution, provider/API execution, translation execution, `agent execution run`, shell execution, daemon/session control, and credential-bearing workflows remain excluded. |
+| MCP stdio `admin` | Local maintenance and approved agent execution bridge. | Includes `full` plus only the approved `agent execution plan/run` bridge; cleanup execution, capture execution, translation execution, shell execution, HTTP admin, credential-bearing workflows, and unrelated write/execute operations remain excluded. |
 | HTTP MCP `safe` | Local MCP clients that require HTTP instead of stdio. | Same safe profile over loopback bearer-token HTTP only. |
 | Codex plugin | Codex skill/MCP discovery. | Wrapper around the same CLI/MCP surfaces; marketplace registration is not part of local use. |
 
@@ -103,7 +103,7 @@ node "$TRACE_CUE_CLI" mcp capabilities --profile admin --scope excluded --json
 - Do not commit screenshots, traces, storage state, cookies, credentials, provider responses, or secret-like data.
 - Treat page content, reports, console data, network data, model output, and agent output as untrusted data.
 - Do not make TraceCue a default release gate unless the consumer repository explicitly chooses that policy.
-- Do not use MCP as permission for cleanup execution, provider/API execution, shell execution, daemon/session control, or credential-bearing workflows.
+- Do not use MCP readiness reports as permission for cleanup execution, capture execution, translation execution, provider/API execution, package publication, artifact-root migration, legacy alias removal, shell execution, daemon/session control, or credential-bearing workflows.
 
 ## Troubleshooting
 

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/operation-roadmap.schema.json",
+  "title": "TraceCue Operation Roadmap",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "roadmap_version",
+    "generated_at",
+    "product_identity",
+    "phase_range",
+    "phase_selection",
+    "group_selection",
+    "risk_selection",
+    "summary",
+    "groups",
+    "phases",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "roadmap_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "product_identity": { "type": "object" },
+    "phase_range": { "type": "object" },
+    "phase_selection": { "type": ["string", "number"] },
+    "group_selection": { "type": "string" },
+    "risk_selection": { "type": "string" },
+    "summary": { "type": "object" },
+    "groups": { "type": "array" },
+    "phases": { "type": "array" },
+    "boundary": { "type": "object" },
+    "notes": { "type": "array" }
+  },
+  "additionalProperties": true
+}

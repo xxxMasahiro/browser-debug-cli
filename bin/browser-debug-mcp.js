@@ -27,6 +27,7 @@ const context = {
   cwd: process.cwd(),
   env: process.env,
   mcpProfile: parsed.profile,
+  invokedBinName: PRODUCT_IDENTITY.legacyMcpBins[0]?.name ?? 'browser-debug-mcp',
   nodeVersion: process.versions.node,
   stdin: process.stdin,
   stdout: process.stdout,

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/translation-dry-run.schema.json",
+  "title": "TraceCue Translation Dry Run",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "dry_run_version",
+    "generated_at",
+    "locale_selection",
+    "provider",
+    "status",
+    "items",
+    "raw_evidence_policy",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "dry_run_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "locale_selection": { "type": "string" },
+    "provider": { "type": "string" },
+    "status": { "type": "string" },
+    "items": { "type": "array" },
+    "raw_evidence_policy": { "type": "object" },
+    "boundary": { "type": "object" },
+    "note": { "type": "string" }
+  },
+  "additionalProperties": true
+}

@@ -28,6 +28,8 @@ export const PRODUCT_IDENTITY = Object.freeze({
   repositoryUrl: 'https://github.com/xxxMasahiro/trace-cue',
   futureRepositoryUrl: 'https://github.com/xxxMasahiro/trace-cue',
   legacyRepositoryUrls: Object.freeze(['https://github.com/xxxMasahiro/browser-debug-cli']),
+  mcpToolPrefix: 'browser_debug',
+  legacyMcpToolPrefixes: Object.freeze(['browser_debug']),
   npmCacheDirectoryName: 'trace-cue-npm-cache',
   packSmokeDirectoryName: 'trace-cue-pack-smoke',
   packSmokeKeepEnv: 'TRACE_CUE_KEEP_PACK_INSTALL_SMOKE',
@@ -35,6 +37,15 @@ export const PRODUCT_IDENTITY = Object.freeze({
   defaultArtifactRoot: '.browser-debug',
   futureArtifactRoot: '.trace-cue',
   legacyArtifactRoots: Object.freeze(['.browser-debug'])
+});
+
+export const LEGACY_ALIAS_POLICY = Object.freeze({
+  status: 'compatibility_retained',
+  warning_status: 'advisory_warning_available',
+  removal_authorized: false,
+  removal_phase: 139,
+  compatibility_window: 'retained_until_explicit_removal_release_candidate_approval',
+  migration_guide_status: 'workflow_guidance_available'
 });
 
 export function packageTarballFilename(identity = PRODUCT_IDENTITY) {
@@ -78,10 +89,92 @@ export function productIdentitySummary(identity = PRODUCT_IDENTITY) {
     repository_url: identity.repositoryUrl,
     future_repository_url: identity.futureRepositoryUrl,
     legacy_repository_urls: identity.legacyRepositoryUrls,
+    mcp_tool_prefix: identity.mcpToolPrefix,
+    legacy_mcp_tool_prefixes: identity.legacyMcpToolPrefixes,
     default_artifact_root: identity.defaultArtifactRoot,
     future_artifact_root: identity.futureArtifactRoot,
     legacy_artifact_roots: identity.legacyArtifactRoots
   };
+}
+
+export function legacyAliasSurfaces(identity = PRODUCT_IDENTITY) {
+  return Object.freeze([
+    ...identity.legacyCliBins.map((entry) => legacySurface({
+      id: `cli_bin:${entry.name}`,
+      kind: 'cli_bin',
+      legacy: entry.name,
+      canonical: identity.cliBinName,
+      path: entry.path,
+      canonicalPath: identity.cliBinPath,
+      warningEligible: true
+    })),
+    ...identity.legacyMcpBins.map((entry) => legacySurface({
+      id: `mcp_bin:${entry.name}`,
+      kind: 'mcp_bin',
+      legacy: entry.name,
+      canonical: identity.mcpBinName,
+      path: entry.path,
+      canonicalPath: identity.mcpBinPath,
+      warningEligible: true
+    })),
+    ...identity.legacyMcpServerNames.map((name) => legacySurface({
+      id: `mcp_server:${name}`,
+      kind: 'mcp_server',
+      legacy: name,
+      canonical: identity.mcpServerName,
+      warningEligible: false
+    })),
+    ...identity.legacyPluginNames.map((name) => legacySurface({
+      id: `plugin:${name}`,
+      kind: 'plugin',
+      legacy: name,
+      canonical: identity.pluginName,
+      warningEligible: false
+    })),
+    ...identity.legacyPluginSkillPaths.map((skillPath) => legacySurface({
+      id: `plugin_skill:${skillPath}`,
+      kind: 'plugin_skill',
+      legacy: skillPath,
+      canonical: identity.pluginSkillPath,
+      warningEligible: false
+    })),
+    ...identity.legacyPackageNames.map((name) => legacySurface({
+      id: `package:${name}`,
+      kind: 'package_name',
+      legacy: name,
+      canonical: identity.packageName,
+      warningEligible: false
+    })),
+    ...identity.legacyRepositoryUrls.map((url) => legacySurface({
+      id: `repository_url:${url}`,
+      kind: 'repository_url',
+      legacy: url,
+      canonical: identity.repositoryUrl,
+      warningEligible: false
+    })),
+    ...identity.legacyArtifactRoots.map((root) => legacySurface({
+      id: `artifact_root:${root}`,
+      kind: 'artifact_root',
+      legacy: root,
+      canonical: identity.futureArtifactRoot,
+      warningEligible: false,
+      retainedAsDefault: root === identity.defaultArtifactRoot
+    })),
+    ...identity.legacyMcpToolPrefixes.map((prefix) => legacySurface({
+      id: `mcp_tool_prefix:${prefix}`,
+      kind: 'mcp_tool_prefix',
+      legacy: prefix,
+      canonical: identity.mcpToolPrefix,
+      warningEligible: false,
+      retainedAsDefault: prefix === identity.mcpToolPrefix
+    }))
+  ]);
+}
+
+export function legacyAliasReplacementMap(identity = PRODUCT_IDENTITY) {
+  return Object.freeze(Object.fromEntries(
+    legacyAliasSurfaces(identity).map((surface) => [surface.legacy, surface.canonical])
+  ));
 }
 
 export function filesystemSafeName(value) {
@@ -99,4 +192,29 @@ function tarballPackageName(packageName) {
 
 function packageNamePathParts(packageName) {
   return packageName.split('/').filter(Boolean);
+}
+
+function legacySurface({
+  id,
+  kind,
+  legacy,
+  canonical,
+  path: legacyPath,
+  canonicalPath,
+  warningEligible,
+  retainedAsDefault = false
+}) {
+  return Object.freeze({
+    id,
+    kind,
+    legacy,
+    canonical,
+    legacy_path: legacyPath ?? null,
+    canonical_path: canonicalPath ?? null,
+    status: 'retained',
+    warning_eligible: warningEligible,
+    retained_as_default: retainedAsDefault,
+    removal_authorized: false,
+    compatibility_window: LEGACY_ALIAS_POLICY.compatibility_window
+  });
 }

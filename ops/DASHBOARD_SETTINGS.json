@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "dashboard-settings",
+  "source_language": "en",
+  "display_locale": "en",
+  "ui_locale": "en",
+  "ui_direction": "ltr",
+  "intl_locale": "en-US",
+  "selected_at": null,
+  "profiles": {
+    "schema_version": "1.0.0",
+    "reports": {
+      "language": {
+        "schema_version": "1.0.0",
+        "source_language": "auto",
+        "source_language_status": "auto",
+        "output_language_mode": "source",
+        "output_language": null,
+        "output_language_status": "source-language-unresolved",
+        "explicit_output_language": null,
+        "intl_locale": null,
+        "text_direction": "ltr",
+        "translation_mode": "none",
+        "translation_execution_enabled": false,
+        "provider_dispatch_enabled": false,
+        "external_sending_enabled": false,
+        "body_included": false,
+        "diagnostics": []
+      }
+    },
+    "safety": {
+      "provider_execution_allowed_by_settings": false,
+      "external_send_allowed_by_settings": false,
+      "mcp_write_execute_allowed_by_settings": false,
+      "shell_execution_allowed_by_settings": false,
+      "browser_execution_allowed_by_settings": false,
+      "translation_execution_allowed_by_settings": false
+    }
+  },
+  "persistence": {
+    "schema_version": "1.0.0",
+    "active_store": "repository-settings",
+    "storage": "ops/DASHBOARD_SETTINGS.json",
+    "repository_persistence_available": true,
+    "repository_read_available": true,
+    "repository_write_available": false,
+    "settings_write_authority_expanded": false,
+    "shell_execution_enabled": false,
+    "provider_dispatch_enabled": false,
+    "external_sending_enabled": false,
+    "destructive_execution_enabled": false
+  },
+  "external_send_allowed": false,
+  "arbitrary_command_entry_allowed": false
+}

@@ -9,11 +9,15 @@ const VALUE_OPTIONS = new Set([
   'daemon',
   'endpoint',
   'execution',
+  'fixture-root',
+  'group',
   'host',
   'idle-timeout',
   'image',
   'input',
+  'idempotency-key',
   'limit',
+  'locale',
   'mask',
   'max-routes',
   'max-bytes',
@@ -24,6 +28,8 @@ const VALUE_OPTIONS = new Set([
   'older-than',
   'operation',
   'package',
+  'phase',
+  'plan-hash',
   'port',
   'preparation',
   'profile',
@@ -31,6 +37,7 @@ const VALUE_OPTIONS = new Set([
   'region',
   'resource-guard',
   'review-index',
+  'risk',
   'scope',
   'source',
   'session',
@@ -97,8 +104,20 @@ export function parseCliArgs(argv) {
       return parseVisual(args, globals);
     case 'identity':
       return parseIdentity(args, globals);
+    case 'artifact-root':
+      return parseArtifactRoot(args, globals);
+    case 'release':
+      return parseRelease(args, globals);
+    case 'shell':
+      return parseShell(args, globals);
+    case 'final':
+      return parseFinal(args, globals);
     case 'capture':
       return parseCapture(args, globals);
+    case 'settings':
+      return parseSettings(args, globals);
+    case 'translation':
+      return parseTranslation(args, globals);
     case 'target':
       return parseTarget(args, globals);
     case 'session':
@@ -115,6 +134,8 @@ export function parseCliArgs(argv) {
       return parseSchema(args, globals);
     case 'mcp':
       return parseMcp(args, globals);
+    case 'operation':
+      return parseOperation(args, globals);
     case 'help':
       return { ok: true, command: 'help', json: globals.json, options: {} };
     default:
@@ -382,34 +403,64 @@ function parseCapture(args, globals) {
     return { ok: true, command: 'help', json: globals.json, options: { topic: 'capture' } };
   }
   const subcommand = args[0];
-  if (subcommand !== 'plan' && subcommand !== 'handoff') {
+  if (subcommand !== 'plan' && subcommand !== 'handoff' && subcommand !== 'readiness' && subcommand !== 'status' && subcommand !== 'run') {
     return parseError('capture', globals.json, {
       code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
       message: subcommand ? `Unknown capture subcommand: ${subcommand}` : 'capture requires a subcommand.',
-      details: { subcommands: ['plan', 'handoff'] }
+      details: { subcommands: ['readiness', 'status', 'plan', 'run', 'handoff'] }
     });
   }
-  if (subcommand === 'plan') {
-    const parsed = parseOptionalOptions('capture plan', args.slice(1), globals);
+  if (subcommand === 'plan' || subcommand === 'readiness' || subcommand === 'status') {
+    const command = `capture ${subcommand}`;
+    const parsed = parseOptionalOptions(command, args.slice(1), globals);
     if (!parsed.ok) {
       return parsed;
     }
     if (parsed.options.execute) {
-      return parseError('capture plan', globals.json, {
+      return parseError(command, globals.json, {
         code: 'CONFLICTING_OPTIONS',
-        message: 'capture plan is read-only and does not accept --execute.',
+        message: `${command} is read-only and does not accept --execute.`,
         details: { option: 'execute' }
       });
     }
     const disallowedOptions = ['provider', 'model', 'image', 'url', 'screenshot', 'trace'];
     for (const option of disallowedOptions) {
       if (parsed.options[option] !== undefined) {
-        return parseError('capture plan', globals.json, {
-          code: 'UNSUPPORTED_CAPTURE_PLAN_OPTION',
-          message: `capture plan does not accept --${option} because it is planning-only.`,
+        return parseError(command, globals.json, {
+          code: subcommand === 'plan' ? 'UNSUPPORTED_CAPTURE_PLAN_OPTION' : 'UNSUPPORTED_CAPTURE_READINESS_OPTION',
+          message: `${command} does not accept --${option} because it is no-capture read-only output.`,
           details: { option }
         });
       }
+    }
+    return parsed;
+  }
+  if (subcommand === 'run') {
+    const parsed = parseOptionalOptions('capture run', args.slice(1), globals);
+    if (!parsed.ok) {
+      return parsed;
+    }
+    const unsupportedOptions = Object.keys(parsed.options).filter((option) => !['source', 'execute'].includes(option));
+    if (unsupportedOptions.length > 0) {
+      return parseError('capture run', globals.json, {
+        code: 'UNSUPPORTED_CAPTURE_RUN_OPTION',
+        message: `capture run is approval-bound and does not accept --${unsupportedOptions[0]} in this phase.`,
+        details: { option: unsupportedOptions[0] }
+      });
+    }
+    if (!parsed.options.source) {
+      return parseError('capture run', globals.json, {
+        code: 'MISSING_REQUIRED_OPTION',
+        message: 'capture run requires --source <screen|window|desktop-app>.',
+        details: { option: 'source' }
+      });
+    }
+    if (!parsed.options.execute) {
+      return parseError('capture run', globals.json, {
+        code: 'MISSING_REQUIRED_OPTION',
+        message: 'capture run is approval-bound and requires --execute to acknowledge execution intent before it can fail closed.',
+        details: { option: 'execute' }
+      });
     }
     return parsed;
   }
@@ -440,6 +491,112 @@ function parseCapture(args, globals) {
       code: 'INVALID_CAPTURE_HANDOFF_SOURCE',
       message: 'capture handoff requires a concrete source: screen, window, or desktop-app.',
       details: { source: parsed.options.source }
+    });
+  }
+  return parsed;
+}
+
+function parseSettings(args, globals) {
+  if (globals.help) {
+    const subcommand = args[0];
+    const nested = args[1];
+    return {
+      ok: true,
+      command: 'help',
+      json: globals.json,
+      options: { topic: subcommand === 'language' && nested ? `settings language ${nested}` : 'settings' }
+    };
+  }
+  const subcommand = args[0];
+  if (subcommand === 'show') {
+    return parseNoArgCommand('settings show', args.slice(1), globals);
+  }
+  if (subcommand === 'language') {
+    if (args[1] === 'policy') {
+      return parseNoArgCommand('settings language policy', args.slice(2), globals);
+    }
+    return parseNoArgCommand('settings language', args.slice(1), globals);
+  }
+  if (subcommand === 'locale' && args[1] === 'resources') {
+    return parseReadOnlyLocalizationOptions('settings locale resources', args.slice(2), globals);
+  }
+  if (subcommand === 'report' && args[1] === 'templates') {
+    return parseReadOnlyLocalizationOptions('settings report templates', args.slice(2), globals);
+  }
+  return parseError('settings', globals.json, {
+    code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+    message: subcommand ? `Unknown settings subcommand: ${subcommand}` : 'settings requires a subcommand.',
+    details: { subcommands: ['show', 'language', 'language policy', 'locale resources', 'report templates'] }
+  });
+}
+
+function parseReadOnlyLocalizationOptions(command, args, globals) {
+  const parsed = parseOptionalOptions(command, args, globals);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  const unsupported = ['execute', 'provider', 'model', 'image', 'url', 'target', 'review-index', 'capture-handoff', 'input', 'package', 'execution', 'screenshot', 'trace']
+    .find((option) => parsed.options[option] !== undefined);
+  if (unsupported) {
+    return parseError(command, globals.json, {
+      code: 'UNSUPPORTED_LOCALIZATION_OPTION',
+      message: `${command} does not accept --${unsupported} because localization resources are read-only and provider-free.`,
+      details: { option: unsupported }
+    });
+  }
+  return parsed;
+}
+
+function parseTranslation(args, globals) {
+  if (globals.help) {
+    const subcommand = args[0];
+    return {
+      ok: true,
+      command: 'help',
+      json: globals.json,
+      options: { topic: subcommand ? `translation ${subcommand}` : 'translation' }
+    };
+  }
+  const subcommand = args[0];
+  if (subcommand !== 'readiness' && subcommand !== 'dry-run' && subcommand !== 'run') {
+    return parseError('translation', globals.json, {
+      code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+      message: subcommand ? `Unknown translation subcommand: ${subcommand}` : 'translation requires a subcommand.',
+      details: { subcommands: ['readiness', 'dry-run', 'run'] }
+    });
+  }
+  const parsed = parseOptionalOptions(`translation ${subcommand}`, args.slice(1), globals);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  const unsupported = ['image', 'url', 'target', 'review-index', 'capture-handoff', 'input', 'package', 'execution', 'screenshot', 'trace']
+    .find((option) => parsed.options[option] !== undefined);
+  if (unsupported) {
+    return parseError(`translation ${subcommand}`, globals.json, {
+      code: 'UNSUPPORTED_TRANSLATION_OPTION',
+      message: `translation ${subcommand} does not accept --${unsupported} because raw evidence and execution artifacts are outside translation scope.`,
+      details: { option: unsupported }
+    });
+  }
+  if (subcommand === 'readiness' && parsed.options.execute) {
+    return parseError('translation readiness', globals.json, {
+      code: 'CONFLICTING_OPTIONS',
+      message: 'translation readiness is read-only and does not accept --execute.',
+      details: { option: 'execute' }
+    });
+  }
+  if (subcommand === 'dry-run' && parsed.options.execute) {
+    return parseError('translation dry-run', globals.json, {
+      code: 'CONFLICTING_OPTIONS',
+      message: 'translation dry-run does not accept --execute.',
+      details: { option: 'execute' }
+    });
+  }
+  if (subcommand === 'run' && !parsed.options.execute) {
+    return parseError('translation run', globals.json, {
+      code: 'MISSING_REQUIRED_OPTION',
+      message: 'translation run is approval-bound and requires --execute to acknowledge execution intent before it can fail closed.',
+      details: { option: 'execute' }
     });
   }
   return parsed;
@@ -561,17 +718,237 @@ function parseVisual(args, globals) {
 
 function parseIdentity(args, globals) {
   if (globals.help) {
-    return { ok: true, command: 'help', json: globals.json, options: { topic: 'identity' } };
+    return { ok: true, command: 'help', json: globals.json, options: { topic: args[0] === 'aliases' && args[1] ? `identity aliases ${args[1]}` : 'identity' } };
   }
   const subcommand = args[0];
+  if (subcommand === 'audit') {
+    return parseNoArgCommand('identity audit', args.slice(1), globals);
+  }
+  if (subcommand === 'aliases') {
+    const action = args[1];
+    if (!action) {
+      return parseNoArgCommand('identity aliases', args.slice(1), globals);
+    }
+    if (action === 'removal-readiness') {
+      return parseNoArgCommand('identity aliases removal-readiness', args.slice(2), globals);
+    }
+    if (action === 'remove') {
+      const parsed = parseOptionalOptions('identity aliases remove', args.slice(2), globals);
+      if (!parsed.ok) {
+        return parsed;
+      }
+      const unsupported = Object.keys(parsed.options).find((option) => option !== 'execute');
+      if (unsupported) {
+        return parseError('identity aliases remove', globals.json, {
+          code: 'UNSUPPORTED_LEGACY_ALIAS_REMOVAL_OPTION',
+          message: `identity aliases remove does not accept --${unsupported}.`,
+          details: { option: unsupported }
+        });
+      }
+      if (!parsed.options.execute) {
+        return parseError('identity aliases remove', globals.json, {
+          code: 'MISSING_REQUIRED_OPTION',
+          message: 'identity aliases remove is approval-bound and requires --execute to acknowledge removal intent before it can fail closed.',
+          details: { option: 'execute' }
+        });
+      }
+      return parsed;
+    }
+    return parseError('identity aliases', globals.json, {
+      code: 'UNKNOWN_SUBCOMMAND',
+      message: `Unknown identity aliases subcommand: ${action}`,
+      details: { subcommands: ['removal-readiness', 'remove'] }
+    });
+  }
   if (subcommand !== 'audit') {
     return parseError('identity', globals.json, {
       code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
       message: subcommand ? `Unknown identity subcommand: ${subcommand}` : 'identity requires a subcommand.',
-      details: { subcommands: ['audit'] }
+      details: { subcommands: ['audit', 'aliases', 'aliases removal-readiness', 'aliases remove'] }
     });
   }
-  return parseNoArgCommand('identity audit', args.slice(1), globals);
+}
+
+function parseShell(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: args[0] ? `shell ${args[0]}` : 'shell' } };
+  }
+  const subcommand = args[0];
+  if (subcommand === 'readiness' || subcommand === 'plan') {
+    const command = `shell ${subcommand}`;
+    const parsed = parseOptionalOptions(command, args.slice(1), globals);
+    if (!parsed.ok) {
+      return parsed;
+    }
+    const unsupported = Object.keys(parsed.options)[0];
+    if (unsupported) {
+      return parseError(command, globals.json, {
+        code: unsupported === 'execute' ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_SHELL_READINESS_OPTION',
+        message: `${command} does not accept --${unsupported} because it is plan-only and non-executing.`,
+        details: { option: unsupported }
+      });
+    }
+    return parsed;
+  }
+  if (subcommand === 'run') {
+    const parsed = parseOptionalOptions('shell run', args.slice(1), globals);
+    if (!parsed.ok) {
+      return parsed;
+    }
+    const unsupported = Object.keys(parsed.options).find((option) => option !== 'execute');
+    if (unsupported) {
+      return parseError('shell run', globals.json, {
+        code: 'UNSUPPORTED_SHELL_RUN_OPTION',
+        message: `shell run is approval-bound and does not accept --${unsupported} in this phase.`,
+        details: { option: unsupported }
+      });
+    }
+    if (!parsed.options.execute) {
+      return parseError('shell run', globals.json, {
+        code: 'MISSING_REQUIRED_OPTION',
+        message: 'shell run is approval-bound and requires --execute to acknowledge execution intent before it can fail closed.',
+        details: { option: 'execute' }
+      });
+    }
+    return parsed;
+  }
+  return parseError('shell', globals.json, {
+    code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+    message: subcommand ? `Unknown shell subcommand: ${subcommand}` : 'shell requires a subcommand.',
+    details: { subcommands: ['readiness', 'plan', 'run'] }
+  });
+}
+
+function parseFinal(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: 'final' } };
+  }
+  const subcommand = args[0];
+  if (subcommand !== 'readiness') {
+    return parseError('final', globals.json, {
+      code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+      message: subcommand ? `Unknown final subcommand: ${subcommand}` : 'final requires a subcommand.',
+      details: { subcommands: ['readiness'] }
+    });
+  }
+  const parsed = parseOptionalOptions('final readiness', args.slice(1), globals);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  const unsupported = Object.keys(parsed.options)[0];
+  if (unsupported) {
+    return parseError('final readiness', globals.json, {
+      code: unsupported === 'execute' ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_FINAL_READINESS_OPTION',
+      message: `final readiness does not accept --${unsupported} because it reports local readiness only.`,
+      details: { option: unsupported }
+    });
+  }
+  return parsed;
+}
+
+function parseArtifactRoot(args, globals) {
+  if (globals.help) {
+    const subcommand = args[0];
+    const nested = args[1];
+    return {
+      ok: true,
+      command: 'help',
+      json: globals.json,
+      options: { topic: subcommand === 'migration' && nested ? `artifact-root migration ${nested}` : 'artifact-root' }
+    };
+  }
+  const subcommand = args[0];
+  if (subcommand === 'status') {
+    return parseArtifactRootReadOnly('artifact-root status', args.slice(1), globals);
+  }
+  if (subcommand === 'migration') {
+    const action = args[1];
+    if (action === 'plan') {
+      return parseArtifactRootReadOnly('artifact-root migration plan', args.slice(2), globals);
+    }
+    if (action === 'execute') {
+      const parsed = parseOptionalOptions('artifact-root migration execute', args.slice(2), globals);
+      if (!parsed.ok) {
+        return parsed;
+      }
+      const unsupported = Object.keys(parsed.options).find((option) => !['execute', 'fixture-root', 'plan-hash'].includes(option));
+      if (unsupported) {
+        return parseError('artifact-root migration execute', globals.json, {
+          code: 'UNSUPPORTED_ARTIFACT_ROOT_MIGRATION_OPTION',
+          message: `artifact-root migration execute does not accept --${unsupported}.`,
+          details: { option: unsupported }
+        });
+      }
+      if (!parsed.options.execute) {
+        return parseError('artifact-root migration execute', globals.json, {
+          code: 'MISSING_REQUIRED_OPTION',
+          message: 'artifact-root migration execute requires --execute.',
+          details: { option: 'execute' }
+        });
+      }
+      if (!parsed.options['fixture-root']) {
+        return parseError('artifact-root migration execute', globals.json, {
+          code: 'MISSING_REQUIRED_OPTION',
+          message: 'artifact-root migration execute is fixture-only in this phase and requires --fixture-root <path>.',
+          details: { option: 'fixture-root' }
+        });
+      }
+      return parsed;
+    }
+    return parseError('artifact-root migration', globals.json, {
+      code: action ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+      message: action ? `Unknown artifact-root migration subcommand: ${action}` : 'artifact-root migration requires a subcommand.',
+      details: { subcommands: ['plan', 'execute'] }
+    });
+  }
+  return parseError('artifact-root', globals.json, {
+    code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+    message: subcommand ? `Unknown artifact-root subcommand: ${subcommand}` : 'artifact-root requires a subcommand.',
+    details: { subcommands: ['status', 'migration plan', 'migration execute'] }
+  });
+}
+
+function parseArtifactRootReadOnly(command, args, globals) {
+  const parsed = parseOptionalOptions(command, args, globals);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  const unsupported = Object.keys(parsed.options).find((option) => !['artifact-root'].includes(option));
+  if (unsupported) {
+    return parseError(command, globals.json, {
+      code: unsupported === 'execute' ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_ARTIFACT_ROOT_OPTION',
+      message: `${command} does not accept --${unsupported} because it is read-only.`,
+      details: { option: unsupported }
+    });
+  }
+  return parsed;
+}
+
+function parseRelease(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: 'release' } };
+  }
+  const subcommand = args[0];
+  if (subcommand !== 'readiness') {
+    return parseError('release', globals.json, {
+      code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+      message: subcommand ? `Unknown release subcommand: ${subcommand}` : 'release requires a subcommand.',
+      details: { subcommands: ['readiness'] }
+    });
+  }
+  const parsed = parseOptionalOptions('release readiness', args.slice(1), globals);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  const unsupported = Object.keys(parsed.options).find((option) => ![].includes(option));
+  if (unsupported) {
+    return parseError('release readiness', globals.json, {
+      code: unsupported === 'execute' ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_RELEASE_READINESS_OPTION',
+      message: `release readiness does not accept --${unsupported} because it is local read-only output.`,
+      details: { option: unsupported }
+    });
+  }
+  return parsed;
 }
 
 function parseAgent(args, globals) {
@@ -1019,6 +1396,21 @@ function parseMcp(args, globals) {
   return parseOptionalOptions(`mcp ${subcommand}`, args.slice(1), globals);
 }
 
+function parseOperation(args, globals) {
+  if (globals.help) {
+    return { ok: true, command: 'help', json: globals.json, options: { topic: 'operation' } };
+  }
+  const subcommand = args[0];
+  if (subcommand !== 'registry' && subcommand !== 'roadmap' && subcommand !== 'contracts' && subcommand !== 'policy' && subcommand !== 'admin-readiness' && subcommand !== 'provider-readiness') {
+    return parseError('operation', globals.json, {
+      code: subcommand ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+      message: subcommand ? `Unknown operation subcommand: ${subcommand}` : 'operation requires a subcommand.',
+      details: { subcommands: ['registry', 'roadmap', 'contracts', 'policy', 'admin-readiness', 'provider-readiness'] }
+    });
+  }
+  return parseOptionalOptions(`operation ${subcommand}`, args.slice(1), globals);
+}
+
 function parseRequiredOptions(command, args, globals, requiredOptions) {
   if (globals.help) {
     return { ok: true, command: 'help', json: globals.json, options: { topic: command } };
@@ -1225,8 +1617,19 @@ function plannedCommands() {
     'visual review list',
     'visual review dashboard',
     'identity audit',
+    'capture readiness',
+    'capture status',
     'capture plan',
+    'capture run',
     'capture handoff',
+    'settings show',
+    'settings language',
+    'settings language policy',
+    'settings locale resources',
+    'settings report templates',
+    'translation readiness',
+    'translation dry-run',
+    'translation run',
     'agent package',
     'agent ingest',
     'agent report',
@@ -1243,6 +1646,12 @@ function plannedCommands() {
     'mcp serve',
     'mcp config',
     'mcp capabilities',
-    'mcp execution gates'
+    'mcp execution gates',
+    'operation registry',
+    'operation roadmap',
+    'operation contracts',
+    'operation policy',
+    'operation admin-readiness',
+    'operation provider-readiness'
   ];
 }

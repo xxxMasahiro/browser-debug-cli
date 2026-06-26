@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "mode": "legacy_compatibility",
+  "write_root_role": "default",
+  "canonical_root_role": "future",
+  "read_root_roles": [
+    "default",
+    "future",
+    "legacy"
+  ],
+  "dual_write_enabled": false,
+  "migration_execution_enabled": false,
+  "fixture_migration_execution_enabled": true,
+  "legacy_compatibility_required": true
+}

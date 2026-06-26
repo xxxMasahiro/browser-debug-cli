@@ -9,6 +9,10 @@
     "description": { "type": "string" },
     "inputSchema": { "type": "object" },
     "minimumProfile": { "type": "string", "enum": ["safe", "full", "admin"] },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
     "effects": {
       "type": "object",
       "properties": {

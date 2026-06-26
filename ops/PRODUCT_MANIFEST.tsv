@@ -20,21 +20,29 @@ product.mcp_adapter	optional	all	all	src/mcp.js	source	file_nonempty	workflow	Lo
 product.page_evidence	optional	all	all	src/page-evidence.js	source	file_nonempty	workflow	Reusable page observation and event evidence helpers.
 product.resource_status	optional	all	all	src/resource-status.js	source	file_nonempty	workflow	Local no-browser resource status preflight for memory, swap, cgroup, pressure, and process memory signals.
 product.resource_guard	optional	all	all	src/resource-guard.js	source	file_nonempty	workflow	Local additive review resource guard for preflight and route/viewport rechecks.
-product.resource_artifacts	optional	all	all	src/resource-artifacts.js	source	file_nonempty	workflow	Local artifact usage planning and explicit artifact-root cleanup receipts.
+product.resource_artifacts	optional	all	all	src/resource-artifacts.js	source	file_nonempty	workflow	Local artifact usage planning, plan hashes, candidate locks, and explicit artifact-root cleanup receipts.
 product.observe	optional	all	all	src/observe.js	source	file_nonempty	workflow	Playwright-backed one-shot observation runtime.
 product.review	optional	all	all	src/review.js	source	file_nonempty	workflow	Playwright-backed deterministic review, quality signals, target manifest, coverage, and mock metrics runtime.
 product.content_ux_advisory	optional	all	all	src/content-ux-advisory.js	source	file_nonempty	workflow	Pure local content UX advisory helper for manifest opt-in source-to-screen contracts, page handoff, manifest-authoring suggestions, review brief, rubric evaluation, and dedicated handoff output.
 product.mcp_profiles	optional	all	all	src/mcp-profiles.js	source	file_nonempty	workflow	Reusable MCP profile registry for safe, full, and admin stdio adapter tool surfaces, including read-only local agent status inspection.
-product.mcp_capabilities	optional	all	all	src/mcp-capabilities.js	source	file_nonempty	workflow	Read-only MCP capability policy report helper for profile, transport, admin, and excluded-operation inspection.
+product.mcp_capabilities	optional	all	all	src/mcp-capabilities.js	source	file_nonempty	workflow	Read-only MCP capability policy report helper for profile, transport, admin, cleanup-plan, and excluded-operation inspection.
 product.mcp_transport_policy	optional	all	all	src/mcp-transport-policy.js	source	file_nonempty	workflow	Reusable MCP transport policy for stdio compatibility and explicit safe loopback HTTP transport.
 product.mcp_client_config	optional	all	all	src/mcp-client-config.js	source	file_nonempty	workflow	Token-free MCP client configuration helper for installed-bin and local-checkout stdio and explicit safe HTTP setup metadata.
 product.mcp_http_transport	optional	all	all	src/mcp-http-transport.js	source	file_nonempty	workflow	Isolated safe-profile-only loopback HTTP MCP transport over the existing MCP core.
 product.identity	optional	all	all	src/product-identity.js	source	file_nonempty	workflow	Reusable package, CLI, MCP, plugin, and repository identity metadata for rename-readiness checks.
+product.locale_policy	optional	all	all	src/locale-policy.js	source	file_nonempty	workflow	Reusable locale authority for dashboard display and artifact output language settings.
+product.language_settings	optional	all	all	src/language-settings.js	source	file_nonempty	workflow	Local read-only language settings normalization for dashboard display locale and artifact output language metadata.
+product.localization_resources	optional	all	all	src/localization-resources.js	source	file_nonempty	workflow	Provider-free UI locale resources, report template resources, translation readiness, and dry-run contracts that preserve raw evidence.
 product.schema_registry	optional	all	all	src/schema-registry.js	source	file_nonempty	workflow	Machine-readable schema registry for CLI and adapter contracts.
 product.sessions	optional	all	all	src/sessions.js	source	file_nonempty	workflow	Local session, action, report, and spec runtime.
 product.supervisor	optional	all	all	src/supervisor.js	source	file_nonempty	workflow	Process-scoped supervised ephemeral browser runtime.
 product.target	optional	all	all	src/target.js	source	file_nonempty	workflow	Reusable target manifest generation and validation runtime.
 product.schemas	optional	all	all	schemas/review.schema.json	doc	file_nonempty	workflow	Public machine-readable schema files for review and adapter contracts.
+product.language_settings_schema	optional	all	all	schemas/language-settings.schema.json	doc	file_nonempty	workflow	Public schema for local language settings output.
+product.localization_resources_schema	optional	all	all	schemas/localization-resources.schema.json	doc	file_nonempty	workflow	Public schema for provider-free UI locale resources.
+product.report_templates_schema	optional	all	all	schemas/report-templates.schema.json	doc	file_nonempty	workflow	Public schema for provider-free report template resources.
+product.translation_readiness_schema	optional	all	all	schemas/translation-readiness.schema.json	doc	file_nonempty	workflow	Public schema for translation readiness output.
+product.translation_dry_run_schema	optional	all	all	schemas/translation-dry-run.schema.json	doc	file_nonempty	workflow	Public schema for deterministic fake translation dry-run output.
 product.agent_surface_schema	optional	all	all	schemas/agent-surface.schema.json	doc	file_nonempty	workflow	Public schema for local subscription and future API provider surfaces.
 product.agent_task_package_schema	optional	all	all	schemas/agent-task-package.schema.json	doc	file_nonempty	workflow	Public schema for local agent evidence handoff packages.
 product.agent_request_status_schema	optional	all	all	schemas/agent-request-status.schema.json	doc	file_nonempty	workflow	Public schema for local agent request status output.
@@ -46,6 +54,7 @@ product.target_template	optional	all	all	templates/review-target-manifest.json	d
 product.status_dashboard_content_ux_template	optional	all	all	templates/status-dashboard-content-ux-target-manifest.json	doc	file_nonempty	workflow	Reusable manifest example for generic status-dashboard content UX advisory, review brief, and rubric review.
 product.plugin_skill	optional	all	all	skills/trace-cue-review/SKILL.md	doc	file_nonempty	workflow	Plugin-facing usage skill for local visual review workflows.
 product.consumer_usage	optional	all	all	docs/workflow/CONSUMER_USAGE.md	doc	file_nonempty	workflow	Packaged external repository usage guide for CLI, MCP stdio, safe HTTP MCP, and Codex plugin connection modes.
+product.dashboard_settings	optional	all	all	ops/DASHBOARD_SETTINGS.json	ops	file_nonempty	workflow	Repository-local default dashboard display locale and artifact output language settings.
 product.architecture_test	optional	all	all	tests/architecture.test.js	test	file_nonempty	workflow	Architecture regression tests for reusable and generic runtime boundaries.
 product.test	required	all	all	tests/cli.test.js	test	file_nonempty	workflow	No-browser CLI parser, JSON output, and doctor tests.
 product.browser_smoke	optional	all	all	tests/browser-smoke.test.js	test	file_nonempty	workflow	Optional Playwright browser smoke tests.
@@ -67,6 +76,23 @@ product.visual_review_dashboard	optional	all	all	src/visual-review-dashboard.js	
 product.visual_review_dashboard_schema	optional	all	all	schemas/visual-review-dashboard.schema.json	doc	file_nonempty	workflow	Public schema for read-only visual review dashboard output.
 product.mcp_execution_gates	optional	all	all	src/mcp-execution-gates.js	source	file_nonempty	workflow	Read-only MCP planning and execution gate policy helper.
 product.mcp_execution_gates_schema	optional	all	all	schemas/mcp-execution-gates.schema.json	doc	file_nonempty	workflow	Public schema for MCP execution gate policy output.
+product.operation_registry	optional	all	all	src/operation-registry.js	source	file_nonempty	workflow	Shared read-only operation registry and risk taxonomy for risky operation policy reports.
+product.operation_registry_schema	optional	all	all	schemas/operation-registry.schema.json	doc	file_nonempty	workflow	Public schema for read-only operation registry output.
+product.operation_roadmap	optional	all	all	src/operation-roadmap.js	source	file_nonempty	workflow	Read-only operation roadmap governance report for phase A/B/C boundary contracts.
+product.operation_roadmap_schema	optional	all	all	schemas/operation-roadmap.schema.json	doc	file_nonempty	workflow	Public schema for read-only operation roadmap output.
+product.operation_contracts	optional	all	all	src/operation-contracts.js	source	file_nonempty	workflow	Read-only shared operation contracts for risk taxonomy, gate schema, execute-token shape, and receipt shape boundaries.
+product.operation_contracts_schema	optional	all	all	schemas/operation-contracts.schema.json	doc	file_nonempty	workflow	Public schema for read-only operation contracts output.
+product.operation_policy	optional	all	all	src/operation-policy.js	source	file_nonempty	workflow	Read-only operation policy and readiness report for admin defaults, CLI plan readiness, generic harness disabled state, MCP readiness, and approved admin-only agent execution exposure.
+product.operation_policy_schema	optional	all	all	schemas/operation-policy.schema.json	doc	file_nonempty	workflow	Public schema for read-only operation policy output.
+product.operation_policy_config	optional	all	all	ops/OPERATION_POLICY.json	ops	file_nonempty	workflow	Repository-local admin operation policy config with approved agent execution plan/run exposure and disabled generic harness/token defaults.
+product.operation_admin_readiness	optional	all	all	src/operation-admin-readiness.js	source	file_nonempty	workflow	Read-only MCP admin token-flow and generic harness readiness report that records approved admin-only agent execution exposure without issuing tokens.
+product.operation_admin_readiness_schema	optional	all	all	schemas/operation-admin-readiness.schema.json	doc	file_nonempty	workflow	Public schema for read-only operation admin readiness output.
+product.operation_provider_readiness	optional	all	all	src/operation-provider-readiness.js	source	file_nonempty	workflow	Read-only provider MCP planning, disclosure, credential-guard, admin-only fake/local/API execution exposure, and safe status/list readiness report that does not call providers, execute local runners, or read credential values from the report.
+product.operation_provider_readiness_schema	optional	all	all	schemas/operation-provider-readiness.schema.json	doc	file_nonempty	workflow	Public schema for operation provider readiness, admin execution exposure, and safe status/list output.
+product.capture_readiness	optional	all	all	src/capture-readiness.js	source	file_nonempty	workflow	Read-only screen/window/desktop app capture capability, privacy, and artifact-contract readiness helper.
+product.capture_readiness_schema	optional	all	all	schemas/capture-readiness.schema.json	doc	file_nonempty	workflow	Public schema for capture readiness output.
+product.capture_artifact_schema	optional	all	all	schemas/capture-artifact.schema.json	doc	file_nonempty	workflow	Public schema contract for future capture artifact metadata.
+product.capture_receipt_schema	optional	all	all	schemas/capture-receipt.schema.json	doc	file_nonempty	workflow	Public schema contract for future capture execution receipts.
 product.capture_plan	optional	all	all	src/capture-plan.js	source	file_nonempty	workflow	Read-only screen/window/desktop app capture planning helper.
 product.capture_plan_schema	optional	all	all	schemas/capture-plan.schema.json	doc	file_nonempty	workflow	Public schema for capture planning output.
 product.capture_handoff	optional	all	all	src/capture-handoff.js	source	file_nonempty	workflow	Workspace-confined existing image capture metadata handoff helper.
@@ -77,4 +103,19 @@ product.visual_review_aggregation	optional	all	all	src/visual-review-aggregation
 product.visual_review_aggregation_schema	optional	all	all	schemas/visual-review-aggregation.schema.json	doc	file_nonempty	workflow	Public schema for read-only visual review aggregation output.
 product.identity_audit	optional	all	all	src/identity-audit.js	source	file_nonempty	workflow	Read-only identity and rename-readiness audit helper over product metadata and local Git configuration.
 product.identity_audit_schema	optional	all	all	schemas/identity-audit.schema.json	doc	file_nonempty	workflow	Public schema for read-only identity audit output.
+product.release_readiness	optional	all	all	src/release-readiness.js	source	file_nonempty	workflow	Local no-publish release readiness helper for package metadata, provenance, 2FA, and publication boundaries.
+product.release_readiness_schema	optional	all	all	schemas/release-readiness.schema.json	doc	file_nonempty	workflow	Public schema for local no-publish release readiness output.
+product.artifact_root_policy	optional	all	all	src/artifact-root-policy.js	source	file_nonempty	workflow	Reusable artifact-root policy and compatibility helper for canonical and future artifact roots.
+product.artifact_root_policy_config	optional	all	all	ops/ARTIFACT_ROOT_POLICY.json	ops	file_nonempty	workflow	Repository-local artifact-root policy config for canonical, future, and legacy-compatible roots.
+product.artifact_root_policy_schema	optional	all	all	schemas/artifact-root-policy.schema.json	doc	file_nonempty	workflow	Public schema for artifact-root policy/status output.
+product.artifact_root_migration	optional	all	all	src/artifact-root-migration.js	source	file_nonempty	workflow	Local artifact-root migration planning and fixture-boundary helper that preserves legacy compatibility.
+product.artifact_root_migration_schema	optional	all	all	schemas/artifact-root-migration.schema.json	doc	file_nonempty	workflow	Public schema for artifact-root migration readiness output.
+product.legacy_alias_audit	optional	all	all	src/legacy-alias-audit.js	source	file_nonempty	workflow	Read-only legacy alias compatibility audit and migration-readiness helper.
+product.legacy_alias_audit_schema	optional	all	all	schemas/legacy-alias-audit.schema.json	doc	file_nonempty	workflow	Public schema for legacy alias audit output.
+product.legacy_alias_removal_readiness	optional	all	all	src/legacy-alias-removal-readiness.js	source	file_nonempty	workflow	Read-only legacy alias removal readiness and fail-closed removal gate helper.
+product.legacy_alias_removal_readiness_schema	optional	all	all	schemas/legacy-alias-removal-readiness.schema.json	doc	file_nonempty	workflow	Public schema for legacy alias removal readiness output.
+product.constrained_shell_readiness	optional	all	all	src/constrained-shell-readiness.js	source	file_nonempty	workflow	Plan-only constrained shell readiness and fail-closed execution boundary helper.
+product.constrained_shell_readiness_schema	optional	all	all	schemas/constrained-shell-readiness.schema.json	doc	file_nonempty	workflow	Public schema for constrained shell readiness output.
+product.final_hardening_readiness	optional	all	all	src/final-hardening-readiness.js	source	file_nonempty	workflow	Report-only final hardening readiness helper for local regression and gate-plan metadata.
+product.final_hardening_readiness_schema	optional	all	all	schemas/final-hardening-readiness.schema.json	doc	file_nonempty	workflow	Public schema for final hardening readiness output.
 product.rename_readiness_check	optional	all	all	tools/check_rename_readiness.mjs	custom	file_nonempty	workflow	Local rename-readiness check for identity metadata, canonical/legacy repository naming, and packaged MCP legacy compatibility.

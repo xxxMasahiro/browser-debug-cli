@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/artifact-root-migration.schema.json",
+  "title": "TraceCue Artifact Root Migration",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "migration_version",
+    "generated_at",
+    "status",
+    "product_identity",
+    "source_roots",
+    "target_root",
+    "candidate_count",
+    "plan_hash",
+    "candidates",
+    "execution_boundary",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "migration_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "status": { "type": "string" },
+    "product_identity": { "type": "object" },
+    "policy_source": { "type": "object" },
+    "mode": { "type": "string" },
+    "source_roots": { "type": "array" },
+    "target_root": { "type": "string" },
+    "fixture_only": { "type": "boolean" },
+    "candidate_count": { "type": "number" },
+    "copy_count": { "type": "number" },
+    "conflict_count": { "type": "number" },
+    "plan_hash": { "type": "string" },
+    "candidates": { "type": "array" },
+    "execution_boundary": { "type": "object" },
+    "execution": { "type": "object" },
+    "warnings": { "type": "array" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

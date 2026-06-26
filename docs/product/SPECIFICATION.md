@@ -33,12 +33,19 @@ The Phase 2a design baseline uses Node.js 20 or newer, ESM modules, and a local 
 - Visual review result preparation layer: turns existing review artifact indexes into metadata-only future visual review result contracts while reading only visual evidence metadata and keeping provider execution disabled.
 - Visual review execution layer: runs explicit CLI-only provider adapters from preparation artifacts, sends metadata/local references only, normalizes untrusted advisory output into visual review results, and keeps raw pixels, existing reviews, release gates, and MCP execution unchanged.
 - Visual review dashboard layer: aggregates local visual review preparation, execution, and result metadata for CLI, dashboards, and safe MCP clients without writing artifacts, calling providers, reading raw pixels, or changing gates.
-- MCP execution gate policy layer: reports required safety gates for future MCP write/execute expansion without changing current MCP permissions or running providers.
+- MCP execution gate policy layer: reports required safety gates and current exposure for approved admin-only agent execution plus future MCP write/execute candidates without changing MCP permissions or running providers from the report.
+- Operation registry layer: centralizes risky operation families, roadmap group mapping, risk taxonomy, MCP exposure state, approval gates, capability exclusions, and read-only boundaries so capability and gate reports no longer maintain separate operation lists by hand.
+- Operation roadmap layer: derives a read-only phase governance report from the operation registry and draft phase memory, exposing A proposal, B implementation-plan, and C local boundary implementation contracts for phases 60-155 without promoting draft entries into formal product-plan commitments or live execution permission.
+- Operation contracts layer: derives shared Phase 61-64 contracts for risk taxonomy, gate schema, execute-token shape, and receipt shape from the registry/roadmap foundation without issuing tokens, writing receipts, enabling harnesses, or expanding MCP write/execute authority.
+- Operation policy layer: reads repository-local admin policy defaults and reports Phase 65-68 CLI plan readiness, disabled generic harness state, safe MCP readiness, and approved admin-only agent execution exposure without mutating policy, issuing tokens, writing receipts from the report, or running live side effects from the report.
+- Operation admin readiness layer: derives Phase 69-70 MCP admin token-flow, generic harness bridge readiness, and approved admin-only agent execution bridge state from policy and registry metadata without issuing or storing tokens, dispatching the generic harness, or expanding MCP write/execute authority beyond agent execution plan/run.
+- Operation provider readiness layer: derives Phase 71-78 provider MCP plan, bounded disclosure, env credential guard, approved admin-only fake/local/API execution exposure, and safe MCP status/list readiness from existing provider and MCP profile metadata without reading credential values, calling providers, executing local runners, or transferring evidence from the readiness report.
 - Capture planning layer: reports required safety gates for screen, window, and desktop app capture without calling OS capture APIs, writing artifacts, reading pixels, enumerating processes, or changing MCP execution permissions.
 - Capture handoff layer: reads an existing workspace image file for metadata and labels it as screen, window, or desktop app evidence without writing artifacts, exposing MCP tools, calling providers, or embedding raw pixels in JSON.
 - Desktop review provider-preparation planning layer: reads capture handoff JSON metadata only and reports future review/preparation readiness without rereading image bytes, writing artifacts, exposing MCP tools, calling providers, transferring evidence, or mutating existing reviews.
 - Standalone image review layer: reviews workspace-confined image files without launching a browser, embedding raw pixels in JSON, calling providers, uploading evidence, or changing MCP execution exposure.
 - Identity audit layer: reads local identity metadata and local Git configuration to report canonical repository URL, legacy repository URL, checkout name, legacy alias, artifact-root migration, and rename-readiness boundaries without mutating Git, contacting remotes, launching browsers, or writing artifacts.
+- Language settings layer: reads TraceCue-local dashboard settings, separates dashboard display locale from artifact output language, normalizes the supported 14-locale contract, reports source-language and translation boundaries, and exposes read-only CLI/API/MCP inspection without contacting parent repositories, writing files, launching browsers, or calling providers.
 - Schema layer: defines stable JSON contracts for envelopes, artifacts, target manifests, findings, reports, and adapter I/O.
 - Adapter layer: keeps CLI as the source of truth and exposes the same core through MCP adapters. Stdio preserves the compatibility profile surface, while explicit HTTP transport is limited to safe-profile loopback requests.
 - Consumer usage guide: documents the external-repository connection flow for CLI, MCP stdio, safe HTTP MCP, and Codex plugin users without changing runtime permissions or requiring source inspection. It also documents target runtime readiness so missing consumer API/backend services are interpreted as target-state findings rather than Browser Debug CLI connection failures.
@@ -78,6 +85,9 @@ browser-debug visual review status --execution <visual-review-execution> --json
 browser-debug visual review list --json
 browser-debug visual review dashboard --json
 browser-debug identity audit --json
+browser-debug settings show --json
+browser-debug settings language --json
+browser-debug settings language policy --json
 browser-debug visual review plan --capture-handoff <workspace-json|-> --json
 browser-debug capture plan [--source screen|window|desktop-app|all] --json
 browser-debug capture handoff --image <workspace-image> --source screen|window|desktop-app --json
@@ -98,6 +108,12 @@ browser-debug mcp config [--client generic|codex] [--profile safe|full|admin] --
 browser-debug mcp config --transport http --profile safe --host 127.0.0.1 --port <port> [--endpoint /mcp] [--token-env BROWSER_DEBUG_MCP_HTTP_TOKEN] --json
 browser-debug mcp capabilities [--profile safe|full|admin|all] [--scope all|profiles|excluded] --json
 browser-debug mcp execution gates [--operation <id>|all] [--profile safe|full|admin|all] --json
+trace-cue operation registry [--operation <id>|all] [--group <id>|all] [--risk <id>|all] --json
+trace-cue operation roadmap [--phase <n>|all] [--group <id>|all] [--risk <id>|all] --json
+trace-cue operation contracts [--scope <id>|all] [--operation <id>|all] --json
+trace-cue operation policy [--scope <id>|all] [--operation <id>|all] --json
+trace-cue operation admin-readiness [--scope <id>|all] [--operation <id>|all] --json
+trace-cue operation provider-readiness [--scope <id>|all] [--operation <id>|all] --json
 ```
 
 The MVP implementation order is:
@@ -155,6 +171,16 @@ Implemented behavior:
 - `browser-debug mcp config --json` emits reusable stdio MCP client configuration without launching a server, writing files, or reading credentials. Generated client config defaults to the `safe` profile; the packaged `.mcp.json` remains compatibility `full`; generated `local_checkout` metadata contains the current checkout's `node` launch command and absolute MCP entrypoint for unpublished local use.
 - `browser-debug mcp config --transport http --profile safe --port <port> --json` emits token-free launch and client-connection metadata for the explicit safe HTTP MCP endpoint, including the URL, token environment variable name, authorization header placeholder, protocol version, body limit, safe-profile boundaries, and a `local_checkout.launch` alternative for unpublished local use.
 - `browser-debug mcp capabilities --json` emits a read-only MCP capability policy report with profile tool surfaces, transport support, the current admin policy, explicit excluded operations, and boundary flags. It does not launch a server, write files, read token values, store credentials, or enable write/execute operations.
+- `trace-cue operation registry --json` emits the shared read-only operation registry with roadmap groups, risk taxonomy, current MCP exposure flags, required gates, capability exclusion metadata, and boundary flags. It is the source for risky operation metadata used by `mcp capabilities` and `mcp execution gates`; registry presence does not authorize execution.
+- `trace-cue operation roadmap --json` emits read-only draft phase A/B/C boundary contracts with phase, group, risk, sequence, related registry operations, approval-bound status, and no-live-execution boundary flags. It does not promote Phase 61-155 into product-plan commitments or authorize execution.
+- `trace-cue operation contracts --json` emits the shared read-only Phase 61-64 operation contracts for risk taxonomy, plan/execute/receipt gate shapes, execute-token fields, receipt fields, selected registry operations, and no-live-execution boundary flags. It does not issue tokens, write receipts, enable a harness, or authorize execution.
+- `trace-cue operation policy --json` emits the read-only Phase 65-68 operation policy and readiness report with admin policy defaults, selected registry operation context, contract references, CLI plan readiness, disabled harness state, safe MCP readiness, and no-live-execution boundary flags. It does not change policy config, issue tokens, write receipts, enable a harness, or authorize execution.
+- `trace-cue operation admin-readiness --json` emits the read-only Phase 69-70 MCP admin readiness report with execute-token flow prerequisites, harness bridge prerequisites, selected registry operation context, admin policy requirements, approved agent execution bridge state, approval boundary flags, and no-live-execution boundary flags. It does not issue tokens, store tokens, expand MCP admin execution beyond the approved agent execution bridge, dispatch a generic harness, or authorize execution from the readiness report.
+- `trace-cue operation provider-readiness --json` emits the read-only provider readiness report with Phase 71-78 provider MCP plan readiness, disclosure contract defaults, env credential guard names, approved admin-only fake/local/API execution exposure, safe MCP status/list contract metadata, selected registry operation context, and no-provider-call boundary flags for the report itself. It accepts registry operation ids and canonicalizes capability-id aliases such as provider API execution to the registry operation id. It does not read credential values, call providers, execute local runners, or transfer evidence from the readiness report.
+- `trace-cue mcp execution gates --json` now derives operation entries from the shared operation registry while preserving read-only behavior and current MCP write/execute exclusion.
+- `trace-cue settings show --json` and `trace-cue settings language --json` read `ops/DASHBOARD_SETTINGS.json` when present and otherwise return defaults. They keep dashboard display locale and artifact output language independent, normalize locale aliases, expose text direction and `Intl` locale metadata, and report translation execution as disabled.
+- `trace-cue settings language policy --json` returns the supported 14-locale contract, separate `dashboard_display` and `artifact_output` roles, source/UI/explicit output modes, reserved translation modes, and local read-only boundary flags. It writes no files, launches no browser, calls no providers, reads no credentials, and does not contact the parent lesson repository.
+- Review and visual review dashboard outputs include bounded `language_settings` metadata. The metadata does not translate source evidence, raw page text, selectors, URLs, logs, screenshots, traces, or report bodies, and it does not change deterministic findings, `metrics.finding_count`, existing action plans, quality signals, release readiness, artifact cleanup, or gates.
 - `docs/workflow/CONSUMER_USAGE.md` is a packaged external-repository usage guide. It explains how to run the CLI from a consumer repository, how to generate MCP stdio and safe HTTP MCP setup metadata, how to treat the Codex plugin as a discovery wrapper, how to keep consumer target manifests and raw `.browser-debug/` artifacts local, and how to document target runtime/API prerequisites in the consumer repository.
 - MCP profile selection happens at server launch or trusted adapter context, not per MCP request. `tools/list` and `tools/call` fail closed for invalid profiles or out-of-profile tool names.
 - MCP `@file` structured input is workspace-confined. Absolute paths, parent traversal, symlink escapes, non-regular files, and oversized files are rejected for MCP requests. Normal CLI `@file` behavior is unchanged outside MCP-restricted contexts.
@@ -455,7 +481,7 @@ The dry-run command:
 browser-debug agent execution plan --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --json
 ```
 
-is the default no-network operation. It validates the package, resolves the surface, records the disclosure policy, records provider/model selection metadata, and writes local plan metadata plus a receipt under `.browser-debug/agent-executions/`. It sets `api_call_performed=false`, `external_evidence_transfer=false`, `automatic_upload=false`, `credential_values_recorded=false`, `credential_storage="none"`, `persistent_credential_storage=false`, `raw_response_stored=false`, `raw_provider_response_stored=false`, `existing_review_mutated=false`, `mcp_execution_exposed=false`, and `gate_effect="none"`.
+is the default no-network operation. It validates the package, resolves the surface, records the disclosure policy, records provider/model selection metadata, and writes local plan metadata plus a receipt under `.browser-debug/agent-executions/`. It sets `api_call_performed=false`, `external_evidence_transfer=false`, `automatic_upload=false`, `credential_values_recorded=false`, `credential_storage="none"`, `persistent_credential_storage=false`, `raw_response_stored=false`, `raw_provider_response_stored=false`, `existing_review_mutated=false`, and `gate_effect="none"`. When invoked through stdio MCP `admin`, it also records `mcp_execution_exposed=true` and a hashed idempotency key; direct CLI plans keep `mcp_execution_exposed=false`.
 
 The run command:
 
@@ -463,7 +489,7 @@ The run command:
 browser-debug agent execution run --execution <agent-execution> --package <agent-package> --surface <surface-id> --provider <provider-id> --model <model-id> --execute --json
 ```
 
-requires a prior dry-run execution record and an explicit `--execute` flag, and fails deterministically without either. Runtime validation rejects package, surface, provider, or model mismatches between the run request and the dry-run plan. The provider adapter registry is dedicated to agent execution and is not reachable from review, resource, daemon, cleanup, Playwright, or MCP execution paths.
+requires a prior dry-run execution record and an explicit `--execute` flag, and fails deterministically without either. Runtime validation rejects package, surface, provider, or model mismatches between the run request and the dry-run plan. The provider adapter registry is dedicated to agent execution and is not reachable from review, resource, daemon, cleanup, Playwright, visual review, or shell paths. The stdio MCP `admin` execution tools reuse this same CLI/core path instead of implementing a separate provider adapter path.
 
 Implemented providers:
 
@@ -472,6 +498,8 @@ Implemented providers:
 - `generic-api-provider`: one-shot provider API adapter. It reads endpoint and credential values only from `BROWSER_DEBUG_AGENT_API_ENDPOINT` and `BROWSER_DEBUG_AGENT_API_TOKEN`, never from CLI arguments, committed files, package artifacts, workflow files, reports, receipts, `.env` auto-loading, or persistent local storage. Tests use injected transports rather than live network calls.
 
 Execution may send only bounded package and prompt content allowed by the disclosure policy. By default, it must not transfer raw screenshots, trace contents, raw DOM, console payloads, network payloads, sourceData values, report bodies, cookies, storage state, existing browser profile data, or raw review artifacts. API execution must record that an API call occurred and which bounded evidence classes were sent, but it must not store raw provider responses. Runner/provider output is normalized into `agent_advisory_result` and remains untrusted advisory data.
+
+MCP exposure is limited to stdio `admin` tools `browser_debug_agent_execution_plan` and `browser_debug_agent_execution_run`. The run tool requires `execute: true`, package/surface/provider/model arguments, an idempotency key, and a matching prior execution plan. The MCP layer rejects unknown tool arguments so credentials, endpoint values, tokens, or environment values cannot be supplied as MCP arguments. Safe, full, and HTTP MCP profiles do not expose these execution tools.
 
 `agent execution status --execution <path> --json` reads one local execution record and reports current state, normalized advisory result path, missing credential hints, receipt paths, dashboard handoff commands, dashboard status fields, and boundary flags. `agent execution list --json` scans local execution records and returns aggregate planned/running/completed/failed/blocked counts, advisory-result counts, and boundary flags for dashboards and local automation. Status and list are read-only and must not launch browsers, call providers, upload evidence, store credentials, write review artifacts, or change deterministic gates.
 
@@ -521,14 +549,14 @@ The MCP capability policy helper:
 - Is launched through `browser-debug mcp capabilities --json`.
 - Can filter output by `--profile safe|full|admin|all` and `--scope all|profiles|excluded`.
 - Reports supported transports, launch-selected profile surfaces, the current admin policy, and excluded operations.
-- Records that `admin` is currently equivalent to `full` and that write/execute tools remain unexposed.
+- Records that `admin` is distinct from `full`, exposes only the approved stdio agent execution plan/run tools, and keeps unrelated write/execute tools excluded.
 - Does not launch a listener, mutate files, contact the network, read token values, print token values, create credentials, or broaden MCP permissions.
 
-The `safe` profile is no-browser, no-delete, no-provider, no-shell, and no-external-listener in its tool effects. It includes no-browser discovery, schema, target validation, resource status, artifact planning, read-only local agent advisory/status inspection, and MCP capability policy inspection. The `full` profile remains a stdio compatibility profile for local observe/review/target workflows. The `admin` profile remains explicit and reserved for future local maintenance but does not currently add write/execute powers.
+The `safe` profile is no-browser, no-delete, no-provider, no-shell, and no-external-listener in its tool effects. It includes no-browser discovery, schema, target validation, resource status, artifact planning, read-only local agent advisory/status inspection, and MCP capability policy inspection. The `full` profile remains a stdio compatibility profile for local observe/review/target workflows. The `admin` profile remains explicit and adds only the approved stdio agent execution plan/run bridge.
 
-MCP does not expose artifact cleanup execution, package generation, ingest, report writing, workflow creation, execution planning, `agent execution run`, provider/API execution, daemon/session control, arbitrary shell execution, browser profile reuse, storage-state persistence, OAuth, external upload, credential handling, or gate mutation. HTTP transport does not expose `full` or `admin`.
+MCP does not expose artifact cleanup execution, package generation, ingest, report writing, workflow creation, execution planning outside the approved stdio `admin` agent execution plan bridge, `agent execution run` outside the approved stdio `admin` path, provider/API execution outside the approved agent execution adapter path, daemon/session control, arbitrary shell execution, browser profile reuse, storage-state persistence, OAuth, external upload, credential handling, or gate mutation. HTTP transport does not expose `full` or `admin`.
 
-Any socket MCP transport, remote HTTP listener, HTTP `full` or `admin` profile, MCP cleanup execution, MCP agent/API execution, shell tool, credential-bearing workflow, external model integration, external upload, or existing-profile reuse requires separate approval, security documentation, and tests.
+Any socket MCP transport, remote HTTP listener, HTTP `full` or `admin` profile, MCP cleanup execution, MCP agent/API execution beyond approved stdio `admin` agent execution plan/run, shell tool, credential-bearing workflow, external model integration, external upload, or existing-profile reuse requires separate approval, security documentation, and tests.
 
 ## Browser Modes
 

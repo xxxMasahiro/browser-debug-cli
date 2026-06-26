@@ -9,6 +9,84 @@
 
 ## Phase Plan
 
+### Phase 60: Operation Registry and Roadmap Risk Taxonomy Foundation
+
+Purpose: promote the draft roadmap groups 1-8 into a safe read-only operation governance foundation before any risky execution expansion. This phase records the xhigh pre-implementation review conclusion: the product needs a shared operation registry, risk taxonomy, and gate source of truth before provider MCP execution, cleanup execution, capture execution, translation execution, npm publication, artifact-root migration, legacy alias removal, constrained shell, or final release hardening are implemented.
+
+Proposal scope: centralize risky operation metadata across operation governance, provider MCP, cleanup MCP, capture, localization/translation, release identity, constrained shell, and final hardening. Expose the registry through CLI/API/MCP-safe inspection, keep capability and execution-gate reports aligned with the registry, and prove the new surface is read-only. Non-scope: execution tokens, MCP admin execution, provider/API execution through MCP, cleanup deletion through MCP, OS capture, translation provider calls, npm publish, artifact-root migration, legacy alias removal, shell execution, remote sync, CI triggering, marketplace mutation, or any existing-feature tradeoff.
+
+Implementation order: add `src/operation-registry.js` and `schemas/operation-registry.schema.json`, derive MCP capability exclusions and MCP execution-gate operation entries from the registry, wire `operation registry --json`, expose package API helpers, add safe MCP inspection as `browser_debug_operation_registry`, synchronize product/security/verification/package manifests, fix schema parity drift discovered during xhigh review, update release/repository-index notes, then run no-browser, package, structure, document, security, release, and product checks.
+
+Recovery: this phase is additive and read-only. Existing browser review, image review, target review, visual review, language settings, resource cleanup CLI behavior, provider adapters, MCP profile permissions, safe HTTP transport, identity aliases, artifact roots, package privacy, release gates, and consumer workflows remain unchanged. Rollback is a standard Git revert of the Phase 60 slice; no artifact migration, deletion, publication, provider dispatch, capture, alias removal, shell execution, remote mutation, or CI triggering is involved.
+
+### Phase 60.1: Operation Roadmap Boundary Contracts
+
+Purpose: satisfy the requested Phase 60-155 continuation as a safe local governance implementation, not as approval to run side-effectful operations or promote the remaining draft roadmap into formal product-plan entries. This phase adds a machine-readable `operation roadmap` report that records each draft phase's A proposal, B implementation-plan, and C local boundary implementation contract.
+
+Proposal scope: expose phase, group, risk, sequence, proposal, plan, implementation status, related registry operations, and fail-closed approval status through CLI/API/MCP-safe inspection. Non-scope: execution tokens, execution harness enablement, provider/API execution through MCP, cleanup deletion through MCP, OS capture, translation provider calls, package publication, artifact-root migration, legacy alias removal, shell execution, remote CI triggering, parent-repository changes, consumer-repository changes, or treating Phase 61-155 as release commitments.
+
+Implementation order: add `src/operation-roadmap.js` and `schemas/operation-roadmap.schema.json`, wire `operation roadmap --json`, expose package API helpers, add safe MCP inspection as `browser_debug_operation_roadmap`, reject unsupported execution options, add schema/API/MCP/package/architecture tests, synchronize security/verification/manifests, then run no-browser and product checks.
+
+Recovery: this phase is additive and read-only. Existing review flows, operation registry output, language settings, visual review, resource cleanup behavior, provider adapters, MCP profile permissions, safe HTTP transport, identity aliases, artifact roots, package privacy, release gates, and consumer workflows remain unchanged. Rollback is a standard Git revert of the roadmap contract slice; no artifact migration, deletion, publication, provider dispatch, capture, alias removal, shell execution, remote mutation, or CI triggering is involved.
+
+### Phase 61-64: Operation Contract Foundation
+
+Purpose: implement Slice 1 as the shared local contract foundation for operation risk taxonomy, gate schema, execute-token shape, and receipt shape before any family-specific execution path is expanded. This phase keeps the Phase 61-155 roadmap boundary intact: only Phase 61-64 contract inspection is promoted, and later roadmap entries remain draft memory until their own approved slice.
+
+Proposal scope: add a read-only `operation contracts` report that derives selected operation context from the operation registry, records the Phase 61-64 contract set, exposes risk/gate/token/receipt contract shapes through CLI/API/MCP-safe inspection, and proves token issuance, receipt writing, harness enablement, live execution, artifact writes, and MCP write/execute exposure remain disabled. Non-scope: admin policy file changes, CLI execution harnesses, MCP admin token flows, provider/API execution through MCP, cleanup deletion through MCP, OS capture, translation provider calls, package publication, artifact-root migration, legacy alias removal, shell execution, remote sync, CI triggering, marketplace mutation, or any existing-feature tradeoff.
+
+Implementation order: add `src/operation-contracts.js` and `schemas/operation-contracts.schema.json`, wire `operation contracts --json`, expose package API helpers, add safe MCP inspection as `browser_debug_operation_contracts`, reject unsupported execution options, add schema/API/MCP/package/architecture tests, synchronize product/security/verification/package manifests, then run no-browser and product checks.
+
+Recovery: this phase is additive and read-only. Existing review flows, operation registry and roadmap output, language settings, visual review, resource cleanup behavior, provider adapters, MCP profile permissions, safe HTTP transport, identity aliases, artifact roots, package privacy, release gates, and consumer workflows remain unchanged. Rollback is a standard Git revert of the contract foundation slice; no token issuance, receipt writing, artifact migration, deletion, publication, provider dispatch, capture, alias removal, shell execution, remote mutation, or CI triggering is involved.
+
+### Phase 65-68: Operation Policy and Readiness Foundation
+
+Purpose: implement Slice 2 as the local policy/readiness foundation for admin policy defaults, CLI operation plan inspection, disabled harness readiness, and safe MCP readiness before MCP admin token flow or any operation-specific side effect exists. This phase keeps Phase 69-155 as draft memory only.
+
+Proposal scope: add repository-local admin policy config, a read-only `operation policy` report, CLI/API/MCP-safe inspection, selected registry operation context, contract references, policy/readiness schema coverage, and fail-closed unsupported execution options. Non-scope: changing policy config from the CLI, token issuance, receipt writing, enabling a harness, MCP admin token flow, provider/API execution through MCP, cleanup deletion through MCP, OS capture, translation provider calls, package publication, artifact-root migration, legacy alias removal, shell execution, remote sync, CI triggering, marketplace mutation, or any existing-feature tradeoff.
+
+Implementation order: add `ops/OPERATION_POLICY.json`, `src/operation-policy.js`, and `schemas/operation-policy.schema.json`, wire `operation policy --json`, expose package API helpers, add safe MCP inspection as `browser_debug_operation_policy`, reject unsupported execution options, add schema/API/MCP/package/architecture tests, synchronize product/security/verification/package manifests, then run no-browser and product checks.
+
+Recovery: this phase is additive and read-only. Existing review flows, operation registry/roadmap/contracts output, language settings, visual review, resource cleanup behavior, provider adapters, MCP profile permissions, safe HTTP transport, identity aliases, artifact roots, package privacy, release gates, and consumer workflows remain unchanged. Rollback is a standard Git revert of the policy/readiness slice; no token issuance, receipt writing, artifact migration, deletion, publication, provider dispatch, capture, alias removal, shell execution, remote mutation, or CI triggering is involved.
+
+### Phase 69-70: Operation Admin Readiness Foundation
+
+Purpose: implement Slice 3 as a read-only MCP admin readiness foundation for the future execute-token flow and MCP-to-harness bridge while keeping live token issuance, token storage, admin MCP execution, harness dispatch, and operation side effects approval-bound. This phase keeps Phase 71-155 as draft memory only.
+
+Proposal scope: add a read-only `operation admin-readiness` report that derives selected operation context and admin policy requirements from the prior operation policy foundation, records Phase 69-70 readiness checks, exposes MCP admin token-flow and harness bridge prerequisites through CLI/API/MCP-safe inspection, and proves token issuance, token storage, harness enablement, live execution, artifact writes, and MCP write/execute exposure remain disabled. Non-scope: issuing execute tokens, storing tokens, changing policy config, writing receipts, enabling a harness, exposing MCP admin execution tools, provider/API execution through MCP, cleanup deletion through MCP, OS capture, translation provider calls, package publication, artifact-root migration, legacy alias removal, shell execution, remote sync, CI triggering, marketplace mutation, or any existing-feature tradeoff.
+
+Implementation order: add `src/operation-admin-readiness.js` and `schemas/operation-admin-readiness.schema.json`, wire `operation admin-readiness --json`, expose package API helpers, add safe MCP inspection as `browser_debug_operation_admin_readiness`, reject unsupported execution options, add schema/API/MCP/package/architecture tests, synchronize product/security/verification/package manifests, then run no-browser and product checks.
+
+Recovery: this phase is additive and read-only. Existing review flows, operation registry/roadmap/contracts/policy output, language settings, visual review, resource cleanup behavior, provider adapters, MCP profile permissions, safe HTTP transport, identity aliases, artifact roots, package privacy, release gates, and consumer workflows remain unchanged. Rollback is a standard Git revert of the admin-readiness slice; no token issuance, token storage, harness dispatch, artifact migration, deletion, publication, provider dispatch, capture, alias removal, shell execution, remote mutation, or CI triggering is involved.
+
+### Phase 71-73: Operation Provider Readiness Foundation
+
+Purpose: implement Slice 4 as a read-only provider readiness foundation for provider MCP planning, bounded disclosure contracts, and env credential guard names before provider/API execution through MCP exists. This phase keeps Phase 74-155 as draft memory only.
+
+Proposal scope: add a read-only `operation provider-readiness` report that derives selected operation context from the prior admin-readiness foundation, records Phase 71-73 readiness checks, exposes provider catalog metadata, disclosure defaults, and credential environment variable names through CLI/API/MCP-safe inspection, and proves provider calls, credential value reads, external evidence transfer, live execution, artifact writes, and MCP write/execute exposure remain disabled. Non-scope: provider/API execution through MCP, local runner execution through MCP, issuing execute tokens, storing tokens, changing policy config, writing receipts, enabling a harness, exposing MCP admin execution tools, reading credential values, transferring evidence, raw artifact transfer, cleanup deletion through MCP, OS capture, translation provider calls, package publication, artifact-root migration, legacy alias removal, shell execution, remote sync, CI triggering, marketplace mutation, or any existing-feature tradeoff.
+
+Implementation order: add `src/operation-provider-readiness.js` and `schemas/operation-provider-readiness.schema.json`, wire `operation provider-readiness --json`, expose package API helpers, add safe MCP inspection as `browser_debug_operation_provider_readiness`, reject unsupported execution/provider options, add schema/API/MCP/package/architecture tests including credential sentinel non-disclosure, synchronize product/security/verification/package manifests, then run no-browser and product checks.
+
+Recovery: this phase is additive and read-only. Existing review flows, operation registry/roadmap/contracts/policy/admin-readiness output, language settings, visual review, resource cleanup behavior, provider adapters, MCP profile permissions, safe HTTP transport, identity aliases, artifact roots, package privacy, release gates, and consumer workflows remain unchanged. Rollback is a standard Git revert of the provider-readiness slice; no provider call, credential read, external transfer, token issuance, token storage, harness dispatch, artifact migration, deletion, publication, capture, alias removal, shell execution, remote mutation, or CI triggering is involved.
+
+### Slice 5 / Phase 74-78: Provider MCP Execution And Status/List Hardening
+
+Purpose: implement the approved Slice 5 provider MCP execution and status/list hardening path. Phase 74-76 exposes the existing Phase 29 agent execution plan/run flow through stdio MCP `admin` only for deterministic fake providers, configured local runner callbacks, and env-only generic API providers. Phase 77-78 preserves safe MCP status/list inspection and synchronizes docs, security, and verification.
+
+Proposal scope: add admin-only MCP tools for `agent execution plan` and `agent execution run --execute`, require an idempotency key and explicit `execute: true`, reject unknown MCP arguments, preserve env-only credentials, reuse plan-match validation and local receipts, add realpath confinement for package/execution/prompt reads, extend `operation provider-readiness` with fake/local/API execution readiness plus safe MCP status/list contracts, add semantic MCP tool purpose tags, canonicalize operation capability-id aliases to registry operation ids, and prove safe/full/HTTP profiles remain non-execution surfaces. Non-scope: execute tokens, token storage, generic execution harness dispatch, cleanup execution through MCP, capture execution, translation execution, package publication, artifact-root migration, legacy alias removal, shell execution, HTTP `full` or `admin`, remote listeners, parent-repository changes, consumer-repository changes, or additional MCP write/execute expansion.
+
+Implementation order: split admin MCP tools from full profile tools, add argument validation and idempotency mapping, reuse existing CLI/core execution runners, update MCP capability/gate/operation readiness reports, harden workspace realpath checks, extend CLI/API/MCP/package/architecture tests for fake/local/API execution and secret non-disclosure, synchronize product/security/verification/package manifests, then run no-browser and product checks.
+
+Recovery: this slice is additive and constrained to admin MCP agent execution. Existing review flows, cleanup behavior, capture behavior, visual review execution, translation behavior, safe/full MCP profiles, safe HTTP transport, identity aliases, artifact roots, package privacy, release gates, and consumer workflows remain unchanged. Rollback is a standard Git revert of the Slice 5 changes; no token issuance, token storage, generic harness dispatch, artifact migration, deletion, publication, capture, alias removal, shell execution, remote mutation, or CI triggering is involved.
+
+### Phase 59: Local Language Settings Foundation
+
+Purpose: add TraceCue-local language settings that separate dashboard display locale from artifact output language. This phase follows the multi-agent pre-implementation review and implementation plan for a local, read-only foundation: 14-locale support, alias normalization, source/UI/explicit output modes, translation-mode policy, CLI/API/MCP inspection, schema parity, review/dashboard metadata, and document sync without touching the parent lesson repository or consumer repositories.
+
+Implementation order: add locale policy and language settings helpers, add `ops/DASHBOARD_SETTINGS.json` and `schemas/language-settings.schema.json`, wire `settings show`, `settings language`, and `settings language policy`, expose package API helpers, add a safe read-only MCP inspection tool, attach bounded `language_settings` metadata to review and visual review dashboard outputs, update package/scaffold/security/test manifests, synchronize requirements, specification, implementation plan, security, verification, README, changelog, task tracker, handoff, and AGENTS state, then run no-browser, package, release, product, and documentation scans.
+
+Recovery: language settings are additive and read-only. Existing browser review, image review, target review, visual review, MCP profiles, identity aliases, artifact roots, agent execution, cleanup, provider behavior, release gates, and consumer workflows remain unchanged. If rollback is required, revert the Phase 59 slice; no artifact migration, repository rename, npm publication, marketplace mutation, provider execution, translation execution, or external repository mutation is involved.
+
 ### Phase 58: Remote Repository Rename Completion
 
 Purpose: complete the GitHub repository rename to `xxxMasahiro/trace-cue` after the local checkout rename is stable. This phase updates local `origin`, product identity metadata, plugin metadata, docs, and tests so the canonical repository URL is current while the legacy GitHub URL remains recorded as compatibility history.
@@ -875,7 +953,7 @@ The layer is additive. It must not change existing `agent_workflow` status meani
 - Completed: made `agent execution plan` the default, no-network operation for both subscription and API surfaces.
 - Completed: included package metadata, prompt metadata, disclosure policy, provider/surface selection, artifact transfer policy, and exact next command hints; credential requirement naming remains for the provider adapter slice.
 - Completed: wrote only local execution-plan metadata and receipts under `.browser-debug/`.
-- Completed: set boundary fields to `api_call_performed=false`, `external_evidence_transfer=false`, `automatic_upload=false`, `credential_values_recorded=false`, `raw_response_stored=false`, `raw_provider_response_stored=false`, `existing_review_mutated=false`, and `mcp_execution_exposed=false`.
+- Completed: set direct CLI dry-run boundary fields to `api_call_performed=false`, `external_evidence_transfer=false`, `automatic_upload=false`, `credential_values_recorded=false`, `raw_response_stored=false`, `raw_provider_response_stored=false`, `existing_review_mutated=false`, and `mcp_execution_exposed=false`. Phase 74-76 later records `mcp_execution_exposed=true` only for stdio admin MCP-created plans/runs.
 
 #### Phase 29e: Provider Runner Abstraction and Fake Provider
 
@@ -1100,8 +1178,8 @@ Phase 36 implements a read-only MCP capability policy report so users and agents
 
 - Completed: added `src/mcp-capabilities.js` as a pure no-side-effect report builder over the existing MCP profile, transport, and product identity contracts.
 - Completed: added `browser-debug mcp capabilities --json` with `--profile safe|full|admin|all` and `--scope all|profiles|excluded` filtering.
-- Completed: recorded explicit excluded operations for cleanup execution, package/ingest/report writing, workflow creation/report writing, execution planning, `agent execution run`, daemon/session control, provider/API execution, arbitrary shell, socket transport, remote HTTP listeners, and HTTP `full` or `admin`.
-- Completed: recorded that `admin` is currently equivalent to `full` and that write/execute tools are not exposed.
+- Completed: recorded explicit excluded operations for cleanup execution, package/ingest/report writing, workflow creation/report writing, daemon/session control, arbitrary shell, socket transport, remote HTTP listeners, and HTTP `full` or `admin`, while Phase 74-76 later exposes agent execution plan/run through stdio admin only.
+- Completed: recorded the original `admin` equivalence boundary. Phase 74-76 later makes `admin` distinct from `full` only for the approved agent execution plan/run tools.
 
 #### Phase 36b: MCP, API, and Package Reuse
 
@@ -1112,7 +1190,7 @@ Phase 36 implements a read-only MCP capability policy report so users and agents
 #### Phase 36c: Documentation and Boundaries
 
 - Completed: synchronized requirements, specification, implementation plan, security, verification, release, README, plugin skill, manifests, task tracker, handoff, AGENTS, changelog, and session memory with the read-only capability policy boundary.
-- Completed: kept cleanup execution, provider/API execution, `agent execution run`, shell tools, daemon/session control, credential handling, HTTP `full` or `admin`, socket transport, and remote listeners out of MCP.
+- Completed: kept cleanup execution, shell tools, daemon/session control, credential handling, HTTP `full` or `admin`, socket transport, remote listeners, and then-unapproved provider/API or `agent execution run` surfaces out of MCP; the later Slice 5 section records the approved stdio `admin` agent execution bridge.
 
 #### Phase 36 Verification Plan
 

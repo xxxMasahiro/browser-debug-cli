@@ -33,6 +33,8 @@
     "src/",
     "schemas/",
     "templates/",
+    "ops/OPERATION_POLICY.json",
+    "ops/ARTIFACT_ROOT_POLICY.json",
     "skills/trace-cue-review/SKILL.md",
     "README.md",
     "CHANGELOG.md",

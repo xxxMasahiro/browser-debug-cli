@@ -21,7 +21,8 @@ async function main() {
     '--dry-run',
     '--json',
     '--cache',
-    path.join(tmpdir(), PRODUCT_IDENTITY.npmCacheDirectoryName)
+    path.join(tmpdir(), PRODUCT_IDENTITY.npmCacheDirectoryName),
+    '--ignore-scripts'
   ]);
 }
 

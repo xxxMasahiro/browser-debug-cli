@@ -21,11 +21,25 @@ import { daemonStatus, startDaemon, stopDaemon } from './daemon.js';
 import { buildDesktopReviewProviderPreparationPlan } from './desktop-review-provider-preparation-plan.js';
 import { runDoctor } from './doctor.js';
 import { createEnvelope, createErrorEnvelope, stringifyEnvelope } from './envelope.js';
+import { runArtifactRootMigrationExecute, runArtifactRootMigrationPlan } from './artifact-root-migration.js';
+import { runArtifactRootStatus } from './artifact-root-policy.js';
 import { runImageReview } from './image-review.js';
 import { runIdentityAudit } from './identity-audit.js';
+import { runLegacyAliasAudit } from './legacy-alias-audit.js';
+import {
+  legacyAliasRemovalUnavailableInfo,
+  runLegacyAliasRemovalReadiness
+} from './legacy-alias-removal-readiness.js';
 import { runObserve } from './observe.js';
 import { parseCliArgs } from './parser.js';
 import { PRODUCT_IDENTITY } from './product-identity.js';
+import { runReleaseReadiness } from './release-readiness.js';
+import {
+  constrainedShellRunUnavailableInfo,
+  runConstrainedShellPlan,
+  runConstrainedShellReadiness
+} from './constrained-shell-readiness.js';
+import { runFinalHardeningReadiness } from './final-hardening-readiness.js';
 import { runResourceArtifactsCleanup, runResourceArtifactsPlan } from './resource-artifacts.js';
 import { runResourceStatus } from './resource-status.js';
 import { runReview } from './review.js';
@@ -35,7 +49,26 @@ import { runTargetInit, runTargetValidate } from './target.js';
 import { buildMcpCapabilityReport } from './mcp-capabilities.js';
 import { runCaptureHandoff } from './capture-handoff.js';
 import { buildCapturePlan } from './capture-plan.js';
+import { buildCaptureReadiness } from './capture-readiness.js';
+import {
+  runLanguageSettings,
+  runLanguageSettingsPolicy,
+  runSettingsShow
+} from './language-settings.js';
+import {
+  runLocalizationResources,
+  runReportTemplates,
+  runTranslationDryRun,
+  runTranslationReadiness,
+  translationBoundary
+} from './localization-resources.js';
 import { buildMcpExecutionGateReport } from './mcp-execution-gates.js';
+import { buildOperationAdminReadinessReport } from './operation-admin-readiness.js';
+import { buildOperationContractsReport } from './operation-contracts.js';
+import { buildOperationPolicyReport } from './operation-policy.js';
+import { buildOperationProviderReadinessReport } from './operation-provider-readiness.js';
+import { buildOperationRegistryReport } from './operation-registry.js';
+import { buildOperationRoadmapReport } from './operation-roadmap.js';
 import { runVisualReviewResultPreparation } from './visual-review-result-preparation.js';
 import {
   runVisualReviewExecutionList,
@@ -244,13 +277,99 @@ export async function executeCli(argv, context = {}) {
       return runtimeResult(parsed.command, await (context.identityAuditRunner ?? runIdentityAudit)(parsed.options, context), parsed.json, now);
     }
 
+    if (parsed.command === 'identity aliases') {
+      return runtimeResult(parsed.command, await (context.legacyAliasAuditRunner ?? runLegacyAliasAudit)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'identity aliases removal-readiness') {
+      return runtimeResult(parsed.command, await (context.legacyAliasRemovalReadinessRunner ?? runLegacyAliasRemovalReadiness)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'identity aliases remove') {
+      return runtimeResult(parsed.command, legacyAliasRemovalUnavailableInfo(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'release readiness') {
+      return runtimeResult(parsed.command, await (context.releaseReadinessRunner ?? runReleaseReadiness)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'shell readiness') {
+      return runtimeResult(parsed.command, await (context.constrainedShellReadinessRunner ?? runConstrainedShellReadiness)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'shell plan') {
+      return runtimeResult(parsed.command, await (context.constrainedShellPlanRunner ?? runConstrainedShellPlan)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'shell run') {
+      return runtimeResult(parsed.command, constrainedShellRunUnavailableInfo(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'final readiness') {
+      return runtimeResult(parsed.command, await (context.finalHardeningReadinessRunner ?? runFinalHardeningReadiness)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'artifact-root status') {
+      return runtimeResult(parsed.command, await (context.artifactRootStatusRunner ?? runArtifactRootStatus)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'artifact-root migration plan') {
+      return runtimeResult(parsed.command, await (context.artifactRootMigrationPlanRunner ?? runArtifactRootMigrationPlan)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'artifact-root migration execute') {
+      return runtimeResult(parsed.command, await (context.artifactRootMigrationExecuteRunner ?? runArtifactRootMigrationExecute)(parsed.options, context), parsed.json, now);
+    }
+
     if (parsed.command === 'capture plan') {
       const capturePlan = capturePlanInfo(parsed.options, { now });
       return runtimeResult(parsed.command, capturePlan, parsed.json, now);
     }
 
+    if (parsed.command === 'capture readiness' || parsed.command === 'capture status') {
+      const captureReadiness = captureReadinessInfo(parsed.options, { now });
+      return runtimeResult(parsed.command, captureReadiness, parsed.json, now);
+    }
+
+    if (parsed.command === 'capture run') {
+      const captureRun = captureRunUnavailableInfo(parsed.options, { now });
+      return runtimeResult(parsed.command, captureRun, parsed.json, now);
+    }
+
     if (parsed.command === 'capture handoff') {
       return runtimeResult(parsed.command, await (context.captureHandoffRunner ?? runCaptureHandoff)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'settings show') {
+      return runtimeResult(parsed.command, await (context.settingsShowRunner ?? runSettingsShow)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'settings language') {
+      return runtimeResult(parsed.command, await (context.languageSettingsRunner ?? runLanguageSettings)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'settings language policy') {
+      return runtimeResult(parsed.command, await (context.languageSettingsPolicyRunner ?? runLanguageSettingsPolicy)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'settings locale resources') {
+      return runtimeResult(parsed.command, await (context.localizationResourcesRunner ?? runLocalizationResources)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'settings report templates') {
+      return runtimeResult(parsed.command, await (context.reportTemplatesRunner ?? runReportTemplates)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'translation readiness') {
+      return runtimeResult(parsed.command, await (context.translationReadinessRunner ?? runTranslationReadiness)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'translation dry-run') {
+      return runtimeResult(parsed.command, await (context.translationDryRunRunner ?? runTranslationDryRun)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'translation run') {
+      return runtimeResult(parsed.command, translationRunUnavailableInfo(parsed.options), parsed.json, now);
     }
 
     if (parsed.command === 'agent package') {
@@ -329,6 +448,36 @@ export async function executeCli(argv, context = {}) {
     if (parsed.command === 'mcp execution gates') {
       const mcpExecutionGates = mcpExecutionGatesInfo(parsed.options, { now });
       return runtimeResult(parsed.command, mcpExecutionGates, parsed.json, now);
+    }
+
+    if (parsed.command === 'operation registry') {
+      const operationRegistry = operationRegistryInfo(parsed.options, { now });
+      return runtimeResult(parsed.command, operationRegistry, parsed.json, now);
+    }
+
+    if (parsed.command === 'operation roadmap') {
+      const operationRoadmap = operationRoadmapInfo(parsed.options, { now });
+      return runtimeResult(parsed.command, operationRoadmap, parsed.json, now);
+    }
+
+    if (parsed.command === 'operation contracts') {
+      const operationContracts = operationContractsInfo(parsed.options, { now });
+      return runtimeResult(parsed.command, operationContracts, parsed.json, now);
+    }
+
+    if (parsed.command === 'operation policy') {
+      const operationPolicy = operationPolicyInfo(parsed.options, { now, cwd: context.cwd });
+      return runtimeResult(parsed.command, operationPolicy, parsed.json, now);
+    }
+
+    if (parsed.command === 'operation admin-readiness') {
+      const operationAdminReadiness = operationAdminReadinessInfo(parsed.options, { now, cwd: context.cwd });
+      return runtimeResult(parsed.command, operationAdminReadiness, parsed.json, now);
+    }
+
+    if (parsed.command === 'operation provider-readiness') {
+      const operationProviderReadiness = operationProviderReadinessInfo(parsed.options, { now, cwd: context.cwd });
+      return runtimeResult(parsed.command, operationProviderReadiness, parsed.json, now);
     }
 
     return notImplemented(parsed.command, parsed.json, now);
@@ -504,12 +653,13 @@ function usageText(topic) {
   if (topic === 'resource artifacts' || topic === 'resource artifacts plan' || topic === 'resource artifacts cleanup') {
     return [
       `Usage: ${CLI_NAME} resource artifacts plan [--max-bytes <bytes>] [--older-than <dur>] [--json]`,
-      `       ${CLI_NAME} resource artifacts cleanup [--dry-run|--execute] [--max-bytes <bytes>] [--older-than <dur>] [--json]`,
+      `       ${CLI_NAME} resource artifacts cleanup [--dry-run|--execute] [--max-bytes <bytes>] [--older-than <dur>] [--plan-hash <sha256>] [--json]`,
       '',
       'Options:',
       `  --artifact-root <path>   Local artifact root. Default: ${DEFAULT_ARTIFACT_ROOT}`,
       '  --max-bytes <bytes>      Target retained artifact size. Default: 1gib.',
       '  --older-than <dur>       Select regular artifact files older than the duration.',
+      '  --plan-hash <sha256>     Optional cleanup plan hash to revalidate before execution.',
       '  --dry-run                Show cleanup candidates without deleting files.',
       '  --execute                Delete selected regular files under the artifact root and write a receipt.'
     ].join('\n');
@@ -528,8 +678,47 @@ function usageText(topic) {
   if (topic === 'identity' || topic === 'identity audit') {
     return [
       `Usage: ${CLI_NAME} identity audit [--json]`,
+      `       ${CLI_NAME} identity aliases [--json]`,
+      `       ${CLI_NAME} identity aliases removal-readiness [--json]`,
+      `       ${CLI_NAME} identity aliases remove --execute [--json]`,
       '',
-      'Reports product identity, current checkout name, current origin remote, repository rename state, legacy alias compatibility, and artifact-root migration boundaries without mutating Git, contacting remotes, launching browsers, or writing artifacts.'
+      'Reports product identity, current checkout name, current origin remote, repository rename state, legacy alias compatibility, removal readiness, and artifact-root migration boundaries without mutating Git, contacting remotes, launching browsers, removing aliases, or writing artifacts.'
+    ].join('\n');
+  }
+
+  if (topic === 'shell' || topic === 'shell readiness' || topic === 'shell plan' || topic === 'shell run') {
+    return [
+      `Usage: ${CLI_NAME} shell readiness [--json]`,
+      `       ${CLI_NAME} shell plan [--json]`,
+      `       ${CLI_NAME} shell run --execute [--json]`,
+      '',
+      'Reports constrained shell use-case review, threat model, command schema, and readiness boundaries without executing commands. shell run fails closed until a separately approved runner exists.'
+    ].join('\n');
+  }
+
+  if (topic === 'final' || topic === 'final readiness') {
+    return [
+      `Usage: ${CLI_NAME} final readiness [--json]`,
+      '',
+      'Reports the local cross-feature regression matrix, smoke rebaseline plan, security sweep, docs English scan, and final product-gate readiness without running gates, launching browsers, triggering remote CI, publishing, pushing, or mutating files.'
+    ].join('\n');
+  }
+
+  if (topic === 'release' || topic === 'release readiness') {
+    return [
+      `Usage: ${CLI_NAME} release readiness [--json]`,
+      '',
+      'Reports local package release readiness, publication decisions, provenance/2FA/token policy, and publish dry-run boundaries without contacting npm, checking auth, reading tokens, publishing, or mutating package metadata.'
+    ].join('\n');
+  }
+
+  if (topic === 'artifact-root' || topic === 'artifact-root status' || topic === 'artifact-root migration plan' || topic === 'artifact-root migration execute') {
+    return [
+      `Usage: ${CLI_NAME} artifact-root status [--json]`,
+      `       ${CLI_NAME} artifact-root migration plan [--json]`,
+      `       ${CLI_NAME} artifact-root migration execute --execute --fixture-root <path> [--plan-hash <sha256>] [--json]`,
+      '',
+      'Reports artifact-root compatibility policy and migration plans. Migration execution is fixture-only in this phase, copy-only, conflict-skipping, receipt-backed, and does not delete legacy artifacts.'
     ].join('\n');
   }
 
@@ -581,8 +770,8 @@ function usageText(topic) {
       `       ${CLI_NAME} agent workflow status --workflow <agent-workflow> [--json]`,
       `       ${CLI_NAME} agent workflow index [--json]`,
       `       ${CLI_NAME} agent workflow report --workflow <agent-workflow> [--json]`,
-      `       ${CLI_NAME} agent execution plan --package <agent-package> --surface <id> [--json]`,
-      `       ${CLI_NAME} agent execution run --execution <agent-execution> --package <agent-package> --surface <id> --provider <id> --model <id> --execute [--json]`,
+      `       ${CLI_NAME} agent execution plan --package <agent-package> --surface <id> [--provider <id>] [--model <id>] [--idempotency-key <key>] [--json]`,
+      `       ${CLI_NAME} agent execution run --execution <agent-execution> --package <agent-package> --surface <id> --provider <id> --model <id> --execute [--idempotency-key <key>] [--json]`,
       `       ${CLI_NAME} agent execution status --execution <agent-execution> [--json]`,
       `       ${CLI_NAME} agent execution list [--json]`,
       `       ${CLI_NAME} agent ingest --package <agent-package> --input <agent-result-json> [--json]`,
@@ -647,10 +836,53 @@ function usageText(topic) {
     ].join('\n');
   }
 
+  if (topic === 'operation' || topic === 'operation registry' || topic === 'operation roadmap' || topic === 'operation contracts' || topic === 'operation policy' || topic === 'operation admin-readiness' || topic === 'operation provider-readiness') {
+    return [
+      `Usage: ${CLI_NAME} operation registry [--operation <id>|all] [--group <id>|all] [--risk <id>|all] [--json]`,
+      `       ${CLI_NAME} operation roadmap [--phase <n>|all] [--group <id>|all] [--risk <id>|all] [--json]`,
+      `       ${CLI_NAME} operation contracts [--scope <id>|all] [--operation <id>|all] [--json]`,
+      `       ${CLI_NAME} operation policy [--scope <id>|all] [--operation <id>|all] [--json]`,
+      `       ${CLI_NAME} operation admin-readiness [--scope <id>|all] [--operation <id>|all] [--json]`,
+      `       ${CLI_NAME} operation provider-readiness [--scope <id>|all] [--operation <id>|all] [--json]`,
+      `       ${CLI_NAME} release readiness [--json]`,
+      `       ${CLI_NAME} artifact-root status [--json]`,
+      `       ${CLI_NAME} identity aliases [--json]`,
+      `       ${CLI_NAME} shell readiness [--json]`,
+      `       ${CLI_NAME} final readiness [--json]`,
+      '',
+      'Reports read-only operation registry, roadmap, and shared contracts without writing artifacts, executing providers, deleting files, capturing pixels, publishing packages, changing aliases, promoting draft plans, issuing tokens, writing receipts, or exposing MCP write/execute tools.'
+    ].join('\n');
+  }
+
   if (topic === 'capture') {
     return [
-      `Usage: ${CLI_NAME} capture plan [--source screen|window|desktop-app|all] [--json]`,
+      `Usage: ${CLI_NAME} capture readiness [--source screen|window|desktop-app|all] [--json]`,
+      `       ${CLI_NAME} capture status [--source screen|window|desktop-app|all] [--json]`,
+      `       ${CLI_NAME} capture plan [--source screen|window|desktop-app|all] [--json]`,
+      `       ${CLI_NAME} capture run --source screen|window|desktop-app --execute [--json]`,
       `       ${CLI_NAME} capture handoff --image <workspace-image> --source screen|window|desktop-app [--json]`
+    ].join('\n');
+  }
+
+  if (topic === 'settings' || topic === 'settings language' || topic === 'settings language policy' || topic === 'settings locale resources' || topic === 'settings report templates') {
+    return [
+      `Usage: ${CLI_NAME} settings show [--json]`,
+      `       ${CLI_NAME} settings language [--json]`,
+      `       ${CLI_NAME} settings language policy [--json]`,
+      `       ${CLI_NAME} settings locale resources [--locale <code>] [--json]`,
+      `       ${CLI_NAME} settings report templates [--locale <code>] [--json]`,
+      '',
+      'Reports local dashboard display locale, artifact output language settings, UI locale resources, and report templates without writing files, launching browsers, calling providers, translating raw evidence, or changing gates.'
+    ].join('\n');
+  }
+
+  if (topic === 'translation' || topic === 'translation readiness' || topic === 'translation dry-run' || topic === 'translation run') {
+    return [
+      `Usage: ${CLI_NAME} translation readiness [--locale <code>] [--json]`,
+      `       ${CLI_NAME} translation dry-run [--locale <code>] [--provider fake] [--json]`,
+      `       ${CLI_NAME} translation run --provider <id> --execute [--locale <code>] [--json]`,
+      '',
+      'Reports translation readiness and deterministic fake dry-run output for generated UI/report chrome only. Provider execution remains approval-bound and fails closed.'
     ].join('\n');
   }
 
@@ -660,7 +892,13 @@ function usageText(topic) {
       `       ${CLI_NAME} mcp config [--client generic|codex] [--profile safe|full|admin] [--json]`,
       `       ${CLI_NAME} mcp config --transport http --profile safe --host 127.0.0.1 --port <port> [--json]`,
       `       ${CLI_NAME} mcp capabilities [--profile safe|full|admin|all] [--scope all|profiles|excluded] [--json]`,
-      `       ${CLI_NAME} mcp execution gates [--operation <id>|all] [--profile safe|full|admin|all] [--json]`
+      `       ${CLI_NAME} mcp execution gates [--operation <id>|all] [--profile safe|full|admin|all] [--json]`,
+      `       ${CLI_NAME} operation registry [--operation <id>|all] [--json]`,
+      `       ${CLI_NAME} operation roadmap [--phase <n>|all] [--json]`,
+      `       ${CLI_NAME} operation contracts [--scope <id>|all] [--operation <id>|all] [--json]`,
+      `       ${CLI_NAME} operation policy [--scope <id>|all] [--operation <id>|all] [--json]`,
+      `       ${CLI_NAME} operation admin-readiness [--scope <id>|all] [--operation <id>|all] [--json]`,
+      `       ${CLI_NAME} operation provider-readiness [--scope <id>|all] [--operation <id>|all] [--json]`
     ].join('\n');
   }
 
@@ -695,14 +933,36 @@ function usageText(topic) {
     '  visual review dashboard --json',
     '  visual review aggregate --preparation <path> --json',
     '  identity audit --json',
+    '  identity aliases --json',
+    '  identity aliases removal-readiness --json',
+    '  release readiness --json',
+    '  artifact-root status --json',
+    '  artifact-root migration plan --json',
+    '  shell readiness --json',
+    '  shell plan --json',
+    '  final readiness --json',
+    '  capture readiness --json',
     '  capture plan --json',
     '  capture handoff --image <path> --json',
+    '  settings show --json',
+    '  settings language --json',
+    '  settings language policy --json',
+    '  settings locale resources --json',
+    '  settings report templates --json',
+    '  translation readiness --json',
+    '  translation dry-run --locale ja --json',
     '  schema list --json',
     '  schema get --name <schema> --json',
     '  mcp serve --profile safe --json',
     '  mcp config --profile safe --json',
     '  mcp capabilities --json',
     '  mcp execution gates --json',
+    '  operation registry --json',
+    '  operation roadmap --json',
+    '  operation contracts --json',
+    '  operation policy --json',
+    '  operation admin-readiness --json',
+    '  operation provider-readiness --json',
     '',
     'Global options:',
     '  --json',
@@ -866,6 +1126,267 @@ function mcpExecutionGatesInfo(options = {}, context = {}) {
   };
 }
 
+function operationRegistryInfo(options = {}, context = {}) {
+  const report = buildOperationRegistryReport({
+    operation: options.operation,
+    group: options.group,
+    risk: options.risk
+  }, context);
+  if (!report.ok) {
+    return {
+      status: 'error',
+      data: {
+        operation_registry: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{ code: report.code ?? 'INVALID_OPERATION_REGISTRY', message: report.message, details: { operation: options.operation, group: options.group, risk: options.risk } }],
+      artifacts: []
+    };
+  }
+  return {
+    status: 'ok',
+    data: {
+      operation_registry: report.report,
+      boundary: report.report.boundary
+    },
+    warnings: [],
+    errors: [],
+    artifacts: []
+  };
+}
+
+function operationRoadmapInfo(options = {}, context = {}) {
+  const unsupported = Object.keys(options).filter((key) => !['phase', 'group', 'risk'].includes(key));
+  if (unsupported.length > 0) {
+    return {
+      status: 'error',
+      data: {
+        operation_roadmap: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{
+        code: unsupported.includes('execute') ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_OPERATION_ROADMAP_OPTION',
+        message: `operation roadmap does not accept option: ${unsupported[0]}`,
+        details: { unsupported_options: unsupported }
+      }],
+      artifacts: []
+    };
+  }
+  const report = buildOperationRoadmapReport({
+    phase: options.phase,
+    group: options.group,
+    risk: options.risk
+  }, context);
+  if (!report.ok) {
+    return {
+      status: 'error',
+      data: {
+        operation_roadmap: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{ code: report.code ?? 'INVALID_OPERATION_ROADMAP', message: report.message, details: { phase: options.phase, group: options.group, risk: options.risk } }],
+      artifacts: []
+    };
+  }
+  return {
+    status: 'ok',
+    data: {
+      operation_roadmap: report.report,
+      boundary: report.report.boundary
+    },
+    warnings: [],
+    errors: [],
+    artifacts: []
+  };
+}
+
+function operationContractsInfo(options = {}, context = {}) {
+  const unsupported = Object.keys(options).filter((key) => !['scope', 'operation'].includes(key));
+  if (unsupported.length > 0) {
+    return {
+      status: 'error',
+      data: {
+        operation_contracts: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{
+        code: unsupported.includes('execute') ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_OPERATION_CONTRACTS_OPTION',
+        message: `operation contracts does not accept option: ${unsupported[0]}`,
+        details: { unsupported_options: unsupported }
+      }],
+      artifacts: []
+    };
+  }
+  const report = buildOperationContractsReport({
+    scope: options.scope,
+    operation: options.operation
+  }, context);
+  if (!report.ok) {
+    return {
+      status: 'error',
+      data: {
+        operation_contracts: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{ code: report.code ?? 'INVALID_OPERATION_CONTRACTS', message: report.message, details: { scope: options.scope, operation: options.operation } }],
+      artifacts: []
+    };
+  }
+  return {
+    status: 'ok',
+    data: {
+      operation_contracts: report.report,
+      boundary: report.report.boundary
+    },
+    warnings: [],
+    errors: [],
+    artifacts: []
+  };
+}
+
+function operationPolicyInfo(options = {}, context = {}) {
+  const unsupported = Object.keys(options).filter((key) => !['scope', 'operation'].includes(key));
+  if (unsupported.length > 0) {
+    return {
+      status: 'error',
+      data: {
+        operation_policy: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{
+        code: unsupported.includes('execute') ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_OPERATION_POLICY_OPTION',
+        message: `operation policy does not accept option: ${unsupported[0]}`,
+        details: { unsupported_options: unsupported }
+      }],
+      artifacts: []
+    };
+  }
+  const report = buildOperationPolicyReport({
+    scope: options.scope,
+    operation: options.operation
+  }, context);
+  if (!report.ok) {
+    return {
+      status: 'error',
+      data: {
+        operation_policy: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{ code: report.code ?? 'INVALID_OPERATION_POLICY', message: report.message, details: { scope: options.scope, operation: options.operation } }],
+      artifacts: []
+    };
+  }
+  return {
+    status: 'ok',
+    data: {
+      operation_policy: report.report,
+      boundary: report.report.boundary
+    },
+    warnings: [],
+    errors: [],
+    artifacts: []
+  };
+}
+
+function operationAdminReadinessInfo(options = {}, context = {}) {
+  const unsupported = Object.keys(options).filter((key) => !['scope', 'operation'].includes(key));
+  if (unsupported.length > 0) {
+    return {
+      status: 'error',
+      data: {
+        operation_admin_readiness: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{
+        code: unsupported.includes('execute') ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_OPERATION_ADMIN_READINESS_OPTION',
+        message: `operation admin-readiness does not accept option: ${unsupported[0]}`,
+        details: { unsupported_options: unsupported }
+      }],
+      artifacts: []
+    };
+  }
+  const report = buildOperationAdminReadinessReport({
+    scope: options.scope,
+    operation: options.operation
+  }, context);
+  if (!report.ok) {
+    return {
+      status: 'error',
+      data: {
+        operation_admin_readiness: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{ code: report.code ?? 'INVALID_OPERATION_ADMIN_READINESS', message: report.message, details: { scope: options.scope, operation: options.operation } }],
+      artifacts: []
+    };
+  }
+  return {
+    status: 'ok',
+    data: {
+      operation_admin_readiness: report.report,
+      boundary: report.report.boundary
+    },
+    warnings: [],
+    errors: [],
+    artifacts: []
+  };
+}
+
+function operationProviderReadinessInfo(options = {}, context = {}) {
+  const unsupported = Object.keys(options).filter((key) => !['scope', 'operation'].includes(key));
+  if (unsupported.length > 0) {
+    return {
+      status: 'error',
+      data: {
+        operation_provider_readiness: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{
+        code: unsupported.includes('execute') ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_OPERATION_PROVIDER_READINESS_OPTION',
+        message: `operation provider-readiness does not accept option: ${unsupported[0]}`,
+        details: { unsupported_options: unsupported }
+      }],
+      artifacts: []
+    };
+  }
+  const report = buildOperationProviderReadinessReport({
+    scope: options.scope,
+    operation: options.operation
+  }, context);
+  if (!report.ok) {
+    return {
+      status: 'error',
+      data: {
+        operation_provider_readiness: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{ code: report.code ?? 'INVALID_OPERATION_PROVIDER_READINESS', message: report.message, details: { scope: options.scope, operation: options.operation } }],
+      artifacts: []
+    };
+  }
+  return {
+    status: 'ok',
+    data: {
+      operation_provider_readiness: report.report,
+      boundary: report.report.boundary
+    },
+    warnings: [],
+    errors: [],
+    artifacts: []
+  };
+}
+
 function capturePlanInfo(options = {}, context = {}) {
   const result = buildCapturePlan(options, context);
   if (!result.ok) {
@@ -888,6 +1409,95 @@ function capturePlanInfo(options = {}, context = {}) {
     },
     warnings: [],
     errors: [],
+    artifacts: []
+  };
+}
+
+function captureReadinessInfo(options = {}, context = {}) {
+  const result = buildCaptureReadiness(options, context);
+  if (!result.ok) {
+    return {
+      status: 'error',
+      data: {
+        capture_readiness: null,
+        boundary: null
+      },
+      warnings: [],
+      errors: [{ code: result.code, message: result.message }],
+      artifacts: []
+    };
+  }
+  return {
+    status: 'ok',
+    data: {
+      capture_readiness: result.report,
+      boundary: result.report.boundary
+    },
+    warnings: [],
+    errors: [],
+    artifacts: []
+  };
+}
+
+function captureRunUnavailableInfo(options = {}, context = {}) {
+  const readiness = buildCaptureReadiness({ source: options.source }, context);
+  const boundary = readiness.ok ? readiness.report.boundary : null;
+  return {
+    status: 'error',
+    data: {
+      capture_execution: {
+        status: 'not_available',
+        source: options.source ?? null,
+        execute_requested: Boolean(options.execute),
+        approval_required: true,
+        readiness: readiness.ok ? readiness.report : null
+      },
+      boundary
+    },
+    warnings: [],
+    errors: [{
+      code: readiness.ok ? 'CAPTURE_EXECUTION_NOT_AVAILABLE' : readiness.code,
+      message: readiness.ok
+        ? 'Capture execution is approval-bound and is not implemented in this no-capture phase.'
+        : readiness.message,
+      details: readiness.ok
+        ? {
+            capture_performed: false,
+            os_capture_api_used: false,
+            native_capture_dependency_loaded: false,
+            mcp_execution_exposed: false
+          }
+        : {}
+    }],
+    artifacts: []
+  };
+}
+
+function translationRunUnavailableInfo(options = {}) {
+  return {
+    status: 'error',
+    data: {
+      translation_execution: {
+        status: 'not_available',
+        provider: options.provider ?? null,
+        locale: options.locale ?? null,
+        execute_requested: Boolean(options.execute),
+        approval_required: true
+      },
+      boundary: translationBoundary({ dryRun: false })
+    },
+    warnings: [],
+    errors: [{
+      code: 'TRANSLATION_EXECUTION_NOT_AVAILABLE',
+      message: 'Translation provider execution is approval-bound and is not implemented in this provider-free phase.',
+      details: {
+        translation_execution_performed: false,
+        provider_call_performed: false,
+        credential_values_read: false,
+        raw_evidence_translated: false,
+        mcp_write_execute_exposed: false
+      }
+    }],
     artifacts: []
   };
 }

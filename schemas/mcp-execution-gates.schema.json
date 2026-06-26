@@ -23,6 +23,7 @@
     "operation_selection": { "type": "string" },
     "summary": { "type": "object" },
     "operations": { "type": "array" },
+    "registry": { "type": "object" },
     "boundary": { "type": "object" },
     "next_steps": { "type": "array" }
   },

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/localization-resources.schema.json",
+  "title": "TraceCue Localization Resources",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "resources_version",
+    "generated_at",
+    "locale_selection",
+    "baseline_locale",
+    "supported_locale_count",
+    "key_inventory",
+    "selected_resource",
+    "locale_resources",
+    "fallback",
+    "rtl_layout_guard",
+    "raw_evidence_policy",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "resources_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "locale_selection": { "type": "string" },
+    "baseline_locale": { "type": "string" },
+    "supported_locale_count": { "type": "number" },
+    "key_inventory": { "type": "array" },
+    "selected_resource": { "type": "object" },
+    "locale_resources": { "type": "array" },
+    "fallback": { "type": "object" },
+    "rtl_layout_guard": { "type": "object" },
+    "raw_evidence_policy": { "type": "object" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

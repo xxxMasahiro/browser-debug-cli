@@ -5,6 +5,7 @@ const argv = process.argv.slice(2);
 const exitCode = await runCli(argv, {
   cwd: process.cwd(),
   env: process.env,
+  invokedBinName: 'browser-debug',
   nodeVersion: process.versions.node,
   stderr: process.stderr,
   stdinText: await maybeReadStdin(argv),

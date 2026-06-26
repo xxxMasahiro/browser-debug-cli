@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/legacy-alias-audit.schema.json",
+  "title": "TraceCue Legacy Alias Audit",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "alias_audit_version",
+    "generated_at",
+    "product_identity",
+    "policy",
+    "summary",
+    "surfaces",
+    "replacement_map",
+    "migration_status",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "alias_audit_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "product_identity": { "type": "object" },
+    "policy": { "type": "object" },
+    "summary": { "type": "object" },
+    "surfaces": { "type": "array" },
+    "replacement_map": { "type": "object" },
+    "invocation": { "type": "object" },
+    "migration_status": { "type": "object" },
+    "warnings": { "type": "array" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

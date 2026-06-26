@@ -19,6 +19,7 @@ import {
 } from './page-evidence.js';
 import { normalizeTimeout, validateUrl } from './observe.js';
 import { resolveJsonInput } from './input.js';
+import { resolveLanguageSettings } from './language-settings.js';
 import { redact, redactUrl, truncateText } from './redaction.js';
 import {
   buildLocalContentUxAdvisory,
@@ -72,6 +73,16 @@ export async function runSingleUrlReview(options = {}, context = {}) {
   if (urlError) {
     return failure(urlError);
   }
+
+  const language = await resolveLanguageSettings({}, context);
+  if (!language.ok) {
+    return failure({
+      code: language.code,
+      message: language.message,
+      details: language.details ?? {}
+    });
+  }
+  appendWarnings(warnings, language.warnings);
 
   let resourceGuard;
   try {
@@ -260,6 +271,7 @@ export async function runSingleUrlReview(options = {}, context = {}) {
       action_plan: actionPlan,
       review_advisory: reviewAdvisory,
       quality_signals: qualitySignals,
+      language_settings: language.settings,
       visual_evidence: screenshotEvidence ? [{
         id: screenshotEvidence.visualEvidence.id,
         path: screenshotEvidence.visualEvidenceArtifact.path,
@@ -315,6 +327,7 @@ export async function runSingleUrlReview(options = {}, context = {}) {
       artifacts,
       qualitySignals,
       coverage: null,
+      languageSettings: language.settings,
       rerun: {
         command: reviewRerunCommand({
           url: options.url,
@@ -402,6 +415,15 @@ export async function runTargetReview(options = {}, context = {}) {
   const queue = [];
   const routeReviews = [];
   const routeBudget = target.budgets.maxRoutes;
+  const language = await resolveLanguageSettings({}, context);
+  if (!language.ok) {
+    return failure({
+      code: language.code,
+      message: language.message,
+      details: language.details ?? {}
+    });
+  }
+  appendWarnings(warnings, language.warnings);
 
   for (const page of target.pages) {
     enqueueRoute(queue, discovered, page.url, 'expected_page', target, { manifestPage: page });
@@ -573,6 +595,7 @@ export async function runTargetReview(options = {}, context = {}) {
       content_ux_rubric_evaluation: localContentUxAdvisory.rubric_evaluation
     } : {}),
     quality_signals: qualitySignals,
+    language_settings: language.settings,
     resource_guard: resourceGuardSummary({
       mode: resourceGuardMode,
       checks: resourceGuardChecks,
@@ -611,6 +634,7 @@ export async function runTargetReview(options = {}, context = {}) {
     artifacts,
     qualitySignals,
     coverage,
+    languageSettings: language.settings,
     rerun: {
       command: targetRerunCommand({ manifestResult, report: Boolean(options.report) }),
       guidance: [
@@ -2984,6 +3008,7 @@ async function writeReviewArtifactIndex({
   artifacts,
   qualitySignals,
   coverage,
+  languageSettings,
   rerun
 }) {
   const rel = artifactRelPath(artifactRoot, 'review-artifacts', `${id}.json`);
@@ -3009,6 +3034,12 @@ async function writeReviewArtifactIndex({
       rendered_state: qualitySignals?.rendered_state?.status ?? null,
       model_review_enabled: qualitySignals?.model_review_boundary?.status !== 'not_enabled'
     },
+    language_settings: languageSettings ? {
+      schema_version: languageSettings.schema_version,
+      dashboard_ui: languageSettings.dashboard_ui,
+      artifact_output: languageSettings.artifact_output,
+      boundary: languageSettings.boundary
+    } : null,
     coverage_summary: coverage ? {
       discovered_routes: coverage.routes.discovered.length,
       visited_routes: coverage.routes.visited.length,
@@ -3109,7 +3140,7 @@ function quoteCommandValue(value) {
 
 function renderReviewReport(data, artifacts) {
   const lines = [
-    `# Browser Debug Review: ${data.review.id}`,
+    `# ${CLI_NAME} Review: ${data.review.id}`,
     '',
     `- Status: ${data.review.status}`,
     `- Mode: ${data.review.mode}`,
@@ -3122,6 +3153,18 @@ function renderReviewReport(data, artifacts) {
     `- Recommendation: ${data.action_plan?.release_gate?.recommendation ?? 'Review structured JSON output.'}`,
     ''
   ];
+  if (data.language_settings) {
+    lines.push(
+      '## Language Settings',
+      '',
+      `- Dashboard UI locale: ${data.language_settings.dashboard_ui?.locale ?? 'unknown'}`,
+      `- Artifact output language: ${data.language_settings.artifact_output?.language ?? 'unresolved'}`,
+      `- Artifact language mode: ${data.language_settings.artifact_output?.language_mode ?? 'unknown'}`,
+      `- Translation mode: ${data.language_settings.artifact_output?.translation_mode ?? 'none'}`,
+      `- Translation execution: ${data.language_settings.artifact_output?.translation_execution_enabled === true}`,
+      ''
+    );
+  }
   if (data.action_plan?.next_actions?.length) {
     for (const action of data.action_plan.next_actions) {
       lines.push(`- ${action.priority} ${action.severity.toUpperCase()} ${action.category}: ${action.recommendation}`);

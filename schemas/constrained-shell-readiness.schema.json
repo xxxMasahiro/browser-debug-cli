@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/constrained-shell-readiness.schema.json",
+  "title": "TraceCue Constrained Shell Readiness",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "readiness_version",
+    "generated_at",
+    "status",
+    "mode",
+    "product_identity",
+    "use_case_review",
+    "threat_model",
+    "command_schema",
+    "cli_plan",
+    "mcp_readiness",
+    "final_boundary",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "readiness_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "status": { "type": "string" },
+    "mode": { "type": "string" },
+    "product_identity": { "type": "object" },
+    "use_case_review": { "type": "array" },
+    "threat_model": { "type": "object" },
+    "command_schema": { "type": "object" },
+    "cli_plan": { "type": "object" },
+    "mcp_readiness": { "type": "object" },
+    "final_boundary": { "type": "object" },
+    "warnings": { "type": "array" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

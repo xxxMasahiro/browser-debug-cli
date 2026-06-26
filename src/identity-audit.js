@@ -1,6 +1,7 @@
 import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { PRODUCT_IDENTITY, filesystemSafeName, productIdentitySummary } from './product-identity.js';
+import { buildLegacyAliasAudit } from './legacy-alias-audit.js';
 
 export const IDENTITY_AUDIT_VERSION = '1.0.0';
 
@@ -37,6 +38,7 @@ export async function buildIdentityAudit({ cwd = process.cwd(), gitRemoteUrl } =
   const physicalRenamePending = !futureRootMatches;
   const remoteRenamePending = !remoteMatchesFuture;
   const warnings = [];
+  const legacyAliasAudit = await buildLegacyAliasAudit({}, { cwd: rootPath });
 
   if (!root) {
     warnings.push({
@@ -93,7 +95,15 @@ export async function buildIdentityAudit({ cwd = process.cwd(), gitRemoteUrl } =
       future_artifact_root: PRODUCT_IDENTITY.futureArtifactRoot,
       legacy_artifact_roots: PRODUCT_IDENTITY.legacyArtifactRoots,
       legacy_alias_removal_authorized: false,
-      artifact_root_migration_authorized: false
+      artifact_root_migration_authorized: false,
+      legacy_alias_audit: {
+        surface_count: legacyAliasAudit.summary.surface_count,
+        retained_count: legacyAliasAudit.summary.retained_count,
+        warning_eligible_count: legacyAliasAudit.summary.warning_eligible_count,
+        compatibility_window: legacyAliasAudit.summary.compatibility_window,
+        removal_candidate_ready: false,
+        phase_139_removal_boundary: legacyAliasAudit.migration_status.phase_139_removal_boundary
+      }
     },
     package: {
       package_name: PRODUCT_IDENTITY.packageName,

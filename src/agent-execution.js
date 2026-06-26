@@ -1,4 +1,5 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, realpath } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import {
   artifactObject,
@@ -27,7 +28,11 @@ export async function runAgentExecutionPlan(options = {}, context = {}) {
   const now = currentDate(context.now);
   const artifactRootInput = options['artifact-root'] ?? DEFAULT_ARTIFACT_ROOT;
   const root = await ensureArtifactRoot(cwd, artifactRootInput);
-  const id = context.createId?.('agent-execution', now) ?? createArtifactId(now, 'agent-execution');
+  const idempotencyKeyHash = hashIdempotencyKey(options['idempotency-key']);
+  const mcpExecutionExposed = context.mcpProfile === 'admin';
+  const id = idFromIdempotencyKey('agent-execution', idempotencyKeyHash)
+    ?? context.createId?.('agent-execution', now)
+    ?? createArtifactId(now, 'agent-execution');
   const packageRead = await readAgentPackage(cwd, options.package);
   if (!packageRead.ok) {
     return errorResult(packageRead.error.code, packageRead.error.message, packageRead.error.details);
@@ -60,7 +65,9 @@ export async function runAgentExecutionPlan(options = {}, context = {}) {
     surface,
     provider: providerRead.provider,
     model,
-    executeRequested: false
+    executeRequested: false,
+    idempotencyKeyHash,
+    mcpExecutionExposed
   });
   const receipt = buildExecutionReceipt(execution);
 
@@ -148,10 +155,14 @@ export async function runAgentExecutionRun(options = {}, context = {}) {
   }
 
   const promptRead = await readOptionalWorkspaceText(cwd, packageRead.agentPackage.packet.prompt?.path, 'agent prompt');
-  const resultId = context.createId?.('agent-result', now) ?? createArtifactId(now, 'agent-result');
+  const idempotencyKeyHash = hashIdempotencyKey(options['idempotency-key'], executionRead.execution.id);
+  const mcpExecutionExposed = context.mcpProfile === 'admin';
+  const resultId = idFromIdempotencyKey('agent-result', idempotencyKeyHash)
+    ?? context.createId?.('agent-result', now)
+    ?? createArtifactId(now, 'agent-result');
   const resultRel = artifactRelPath(artifactRootInput, 'agent-results', `${resultId}.json`);
   const runReceiptRel = artifactRelPath(artifactRootInput, 'receipts', `${executionRead.execution.id}-run.json`);
-  const providerResult = await executeAgentExecutionProvider({
+  const rawProviderResult = await executeAgentExecutionProvider({
     provider: providerRead.provider,
     model,
     surface,
@@ -163,6 +174,7 @@ export async function runAgentExecutionRun(options = {}, context = {}) {
     now,
     context
   });
+  const providerResult = withMcpExecutionBoundary(rawProviderResult, mcpExecutionExposed);
 
   const execution = buildExecutionRunRecord({
     plan: executionRead.execution,
@@ -172,7 +184,9 @@ export async function runAgentExecutionRun(options = {}, context = {}) {
     model,
     providerResult,
     resultPath: providerResult.ok ? resultRel : null,
-    runReceiptPath: runReceiptRel
+    runReceiptPath: runReceiptRel,
+    idempotencyKeyHash,
+    mcpExecutionExposed
   });
   const receipt = buildExecutionReceipt(execution, {
     type: 'agent_execution_run_receipt',
@@ -312,7 +326,9 @@ function buildExecutionRecord({
   surface,
   provider,
   model,
-  executeRequested
+  executeRequested,
+  idempotencyKeyHash,
+  mcpExecutionExposed
 }) {
   const packet = agentPackage.packet;
   const disclosurePolicy = packet.disclosure_policy ?? {};
@@ -338,6 +354,7 @@ function buildExecutionRecord({
     surface: surfaceSummary(surface),
     provider,
     model,
+    idempotency_key_hash: idempotencyKeyHash,
     steps: {
       plan: {
         status: 'completed',
@@ -396,7 +413,7 @@ function buildExecutionRecord({
     raw_response_stored: false,
     raw_provider_response_stored: false,
     existing_review_mutated: false,
-    mcp_execution_exposed: false,
+    mcp_execution_exposed: Boolean(mcpExecutionExposed),
     raw_pixels_included: false,
     visual_review_provider_execution_authorized: false,
     visual_review_provider_policy: visualReviewProviderPolicy,
@@ -419,16 +436,32 @@ function buildExecutionRecord({
       resultPath: null,
       provider,
       apiCallPerformed: false,
-      externalEvidenceTransfer: false
+      externalEvidenceTransfer: false,
+      mcpExecutionExposed
     }),
-    boundary: executionBoundary({ provider_adapter_implemented: provider.implemented === true })
+    boundary: executionBoundary({
+      provider_adapter_implemented: provider.implemented === true,
+      mcp_execution_exposed: Boolean(mcpExecutionExposed)
+    })
   });
 }
 
-function buildExecutionRunRecord({ plan, now, status, provider, model, providerResult, resultPath, runReceiptPath }) {
+function buildExecutionRunRecord({
+  plan,
+  now,
+  status,
+  provider,
+  model,
+  providerResult,
+  resultPath,
+  runReceiptPath,
+  idempotencyKeyHash,
+  mcpExecutionExposed
+}) {
   const boundary = executionBoundary({
     ...providerResult.boundary,
-    provider_adapter_implemented: provider.implemented === true
+    provider_adapter_implemented: provider.implemented === true,
+    mcp_execution_exposed: Boolean(mcpExecutionExposed)
   });
   const completed = status === 'completed';
   const failedOrBlocked = status === 'failed' || status === 'blocked';
@@ -442,6 +475,7 @@ function buildExecutionRunRecord({ plan, now, status, provider, model, providerR
     completed_at: completed ? now.toISOString() : null,
     provider,
     model,
+    idempotency_key_hash: idempotencyKeyHash ?? plan.idempotency_key_hash ?? null,
     provider_adapter: providerResult.provider_adapter,
     execution_run_receipt_path: runReceiptPath,
     normalized_agent_result_path: resultPath,
@@ -493,7 +527,8 @@ function buildExecutionRunRecord({ plan, now, status, provider, model, providerR
       resultPath,
       provider,
       apiCallPerformed: boundary.api_call_performed,
-      externalEvidenceTransfer: boundary.external_evidence_transfer
+      externalEvidenceTransfer: boundary.external_evidence_transfer,
+      mcpExecutionExposed: boundary.mcp_execution_exposed
     }),
     gate_effect: 'none',
     external_evidence_transfer: boundary.external_evidence_transfer,
@@ -505,7 +540,7 @@ function buildExecutionRunRecord({ plan, now, status, provider, model, providerR
     raw_response_stored: false,
     raw_provider_response_stored: false,
     existing_review_mutated: false,
-    mcp_execution_exposed: false,
+    mcp_execution_exposed: boundary.mcp_execution_exposed,
     boundary
   });
 }
@@ -523,6 +558,7 @@ function buildExecutionReceipt(execution, overrides = {}) {
     surface_id: execution.surface?.id ?? null,
     provider_id: execution.provider?.id ?? null,
     model_id: execution.model?.id ?? null,
+    idempotency_key_hash: execution.idempotency_key_hash ?? null,
     result_path: overrides.resultPath ?? execution.normalized_agent_result_path ?? null,
     api_call_performed: Boolean(execution.api_call_performed),
     external_evidence_transfer: Boolean(execution.external_evidence_transfer),
@@ -533,7 +569,7 @@ function buildExecutionReceipt(execution, overrides = {}) {
     raw_response_stored: false,
     raw_provider_response_stored: false,
     existing_review_mutated: false,
-    mcp_execution_exposed: false,
+    mcp_execution_exposed: Boolean(execution.mcp_execution_exposed),
     provider_error_code: providerResult.error?.code ?? null
   });
 }
@@ -646,6 +682,22 @@ async function readOptionalWorkspaceText(cwd, relativePath, label) {
     };
   }
   try {
+    const realRoot = await realpath(root);
+    const realInput = await realpath(absolute);
+    if (realInput !== realRoot && !realInput.startsWith(`${realRoot}${path.sep}`)) {
+      return {
+        text: '',
+        warnings: [{
+          code: 'AGENT_EXECUTION_PROMPT_REALPATH_OUTSIDE_WORKSPACE',
+          message: `The ${label} path must stay inside the workspace after resolving symlinks.`,
+          details: { path: relativePath }
+        }]
+      };
+    }
+  } catch {
+    // Preserve existing behavior: a missing prompt is a warning, not an execution blocker.
+  }
+  try {
     return { text: await readFile(absolute, 'utf8'), warnings: [] };
   } catch (error) {
     return {
@@ -689,6 +741,29 @@ async function readWorkspaceJson(cwd, relativePath, label) {
         code: 'AGENT_EXECUTION_PATH_OUTSIDE_WORKSPACE',
         message: `The ${label} path must stay inside the workspace.`,
         details: { path: relativePath }
+      }
+    };
+  }
+  try {
+    const realRoot = await realpath(root);
+    const realInput = await realpath(absolute);
+    if (realInput !== realRoot && !realInput.startsWith(`${realRoot}${path.sep}`)) {
+      return {
+        ok: false,
+        error: {
+          code: 'AGENT_EXECUTION_REALPATH_OUTSIDE_WORKSPACE',
+          message: `The ${label} path must stay inside the workspace after resolving symlinks.`,
+          details: { path: relativePath }
+        }
+      };
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: 'AGENT_EXECUTION_READ_FAILED',
+        message: `Could not read the ${label} JSON.`,
+        details: { path: relativePath, reason: error.message }
       }
     };
   }
@@ -784,7 +859,48 @@ function validateExecutionPlan({ execution, executionPath, agentPackage, surface
   return { ok: true };
 }
 
-function executionDashboardStatus({ status, resultPath, provider, apiCallPerformed, externalEvidenceTransfer }) {
+function withMcpExecutionBoundary(providerResult, mcpExecutionExposed) {
+  if (!mcpExecutionExposed) {
+    return providerResult;
+  }
+  const boundary = {
+    ...(providerResult.boundary ?? {}),
+    mcp_execution_exposed: true
+  };
+  const agentResult = providerResult.agent_result
+    ? {
+        ...providerResult.agent_result,
+        boundary: {
+          ...(providerResult.agent_result.boundary ?? {}),
+          mcp_execution_exposed: true
+        },
+        agent_advisory: {
+          ...(providerResult.agent_result.agent_advisory ?? {}),
+          mcp_execution_exposed: true
+        }
+      }
+    : providerResult.agent_result;
+  return {
+    ...providerResult,
+    boundary,
+    provider_adapter: providerResult.provider_adapter
+      ? {
+          ...providerResult.provider_adapter,
+          mcp_execution_exposed: true
+        }
+      : providerResult.provider_adapter,
+    agent_result: agentResult
+  };
+}
+
+function executionDashboardStatus({
+  status,
+  resultPath,
+  provider,
+  apiCallPerformed,
+  externalEvidenceTransfer,
+  mcpExecutionExposed
+}) {
   return {
     status_label: status,
     provider_id: provider.id,
@@ -796,7 +912,7 @@ function executionDashboardStatus({ status, resultPath, provider, apiCallPerform
     credential_values_recorded: false,
     raw_provider_response_stored: false,
     existing_review_mutated: false,
-    mcp_execution_exposed: false,
+    mcp_execution_exposed: Boolean(mcpExecutionExposed),
     raw_pixels_included: false,
     visual_review_provider_execution_authorized: false
   };
@@ -826,6 +942,22 @@ function executionBoundary(overrides = {}) {
 
 function normalizeRelPath(value) {
   return value.replace(/\\/g, '/');
+}
+
+function hashIdempotencyKey(value, namespace = '') {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return null;
+  }
+  return createHash('sha256')
+    .update(`${namespace}\0${value}`)
+    .digest('hex');
+}
+
+function idFromIdempotencyKey(prefix, hash) {
+  if (!hash) {
+    return null;
+  }
+  return `${prefix}-${hash.slice(0, 20)}`;
 }
 
 function currentDate(now) {

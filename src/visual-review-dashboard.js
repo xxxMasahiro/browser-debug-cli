@@ -2,6 +2,7 @@ import { lstat, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { artifactRelPath, resolveArtifactRoot } from './artifacts.js';
 import { CLI_NAME, DEFAULT_ARTIFACT_ROOT, SCHEMA_VERSION } from './constants.js';
+import { resolveLanguageSettings } from './language-settings.js';
 import { redact, truncateText } from './redaction.js';
 
 const DEFAULT_DASHBOARD_MAX_BYTES = 2 * 1024 * 1024;
@@ -33,11 +34,16 @@ export async function runVisualReviewDashboard(options = {}, context = {}) {
     maxBytes: maxBytes.value,
     limit: limit.value
   });
+  const language = await resolveLanguageSettings({}, context);
+  if (!language.ok) {
+    return errorResult(language.code, language.message, language.details);
+  }
   const dashboard = buildDashboard({
     now,
     artifactRootInput,
     artifactSets: scan.artifactSets,
-    limit: limit.value
+    limit: limit.value,
+    languageSettings: language.settings
   });
 
   return {
@@ -46,7 +52,7 @@ export async function runVisualReviewDashboard(options = {}, context = {}) {
       visual_review_dashboard: dashboard,
       boundary: dashboard.boundary
     },
-    warnings: scan.warnings,
+    warnings: [...scan.warnings, ...language.warnings],
     errors: [],
     artifacts: []
   };
@@ -225,7 +231,7 @@ function summarizeRecord(record, relPath, kind) {
   };
 }
 
-function buildDashboard({ now, artifactRootInput, artifactSets, limit }) {
+function buildDashboard({ now, artifactRootInput, artifactSets, limit, languageSettings }) {
   const preparations = artifactSets.map((item) => item.preparation).filter(Boolean);
   const executions = artifactSets.map((item) => item.execution).filter(Boolean);
   const results = artifactSets.map((item) => item.result).filter(Boolean);
@@ -266,11 +272,13 @@ function buildDashboard({ now, artifactRootInput, artifactSets, limit }) {
       result_path: latestResult?.path ?? null,
       result_status: latestResult?.status ?? null
     },
+    language_settings: languageSettings,
     preparations,
     executions,
     results,
     control_center_handoff: {
       dashboard_command: `${CLI_NAME} visual review dashboard --json`,
+      language_settings_command: `${CLI_NAME} settings language --json`,
       prepare_command: `${CLI_NAME} visual review prepare --review-index <review-artifact-index> --json`,
       run_command: latestPreparation?.status === 'prepared'
         ? `${CLI_NAME} visual review run --preparation ${latestPreparation.path} --surface local-subscription-agent --provider fake-agent --model fake-model --execute --json`

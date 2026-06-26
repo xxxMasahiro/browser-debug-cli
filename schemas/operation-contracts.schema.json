@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/operation-contracts.schema.json",
+  "title": "TraceCue Operation Contracts",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contracts_version",
+    "generated_at",
+    "product_identity",
+    "phase_range",
+    "scope_selection",
+    "operation_selection",
+    "summary",
+    "risk_taxonomy",
+    "groups",
+    "selected_operations",
+    "contracts",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "contracts_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "product_identity": { "type": "object" },
+    "phase_range": { "type": "object" },
+    "scope_selection": { "type": "string" },
+    "operation_selection": { "type": "string" },
+    "summary": { "type": "object" },
+    "risk_taxonomy": { "type": "array" },
+    "groups": { "type": "array" },
+    "selected_operations": { "type": "array" },
+    "contracts": { "type": "array" },
+    "boundary": { "type": "object" },
+    "notes": { "type": "array" }
+  },
+  "additionalProperties": true
+}

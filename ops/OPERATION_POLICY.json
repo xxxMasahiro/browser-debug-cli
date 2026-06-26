@@ -1,0 +1,43 @@
+{
+  "schema_version": "0.1.0",
+  "policy_version": "1.0.0",
+  "mode": "read_only_defaults",
+  "admin_policy": {
+    "currently_equivalent_to_full": false,
+    "write_execute_tools_exposed": true,
+    "live_execution_enabled": false,
+    "token_issuance_enabled": false,
+    "receipt_writer_enabled": false,
+    "execution_harness_enabled": false,
+    "agent_execution_plan_enabled": true,
+    "agent_execution_run_enabled": true,
+    "provider_api_execution_enabled": true
+  },
+  "requirements": {
+    "plan_required": true,
+    "explicit_intent_required": true,
+    "approval_required_for_live_execution": true,
+    "receipt_required_for_live_execution": true,
+    "idempotency_key_required": true,
+    "workspace_confinement_required": true,
+    "credential_values_forbidden": true
+  },
+  "mcp_readiness": {
+    "safe_readiness_tool_enabled": true,
+    "admin_execution_tools_enabled": true,
+    "http_full_or_admin_enabled": false,
+    "socket_or_remote_listener_enabled": false
+  },
+  "boundaries": {
+    "writes_artifacts": false,
+    "deletes_files": false,
+    "provider_call_performed": false,
+    "capture_performed": false,
+    "translation_execution_performed": false,
+    "package_publication_performed": false,
+    "artifact_root_migration_performed": false,
+    "legacy_alias_removed": false,
+    "shell_used": false,
+    "mcp_write_execute_exposed": true
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/capture-readiness.schema.json",
+  "title": "TraceCue Capture Readiness",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "readiness_version",
+    "generated_at",
+    "source_selection",
+    "probe",
+    "summary",
+    "capabilities",
+    "privacy_policy",
+    "artifact_contract",
+    "approval_bound_operations",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "readiness_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "source_selection": { "type": "string" },
+    "probe": { "type": "object" },
+    "summary": { "type": "object" },
+    "capabilities": { "type": "array" },
+    "privacy_policy": { "type": "object" },
+    "artifact_contract": { "type": "object" },
+    "approval_bound_operations": { "type": "array" },
+    "boundary": { "type": "object" },
+    "next_steps": { "type": "array" }
+  },
+  "additionalProperties": true
+}

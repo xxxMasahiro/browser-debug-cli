@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/language-settings.schema.json",
+  "title": "TraceCue Language Settings",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "settings_path",
+    "dashboard_ui",
+    "source",
+    "artifact_output",
+    "safety",
+    "diagnostics",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "runtime_schema_version": { "type": "string" },
+    "kind": { "type": "string" },
+    "settings_path": { "type": "string" },
+    "storage": { "type": "object" },
+    "dashboard_ui": { "type": "object" },
+    "source": { "type": "object" },
+    "artifact_output": { "type": "object" },
+    "safety": { "type": "object" },
+    "diagnostics": { "type": "array" },
+    "boundary": { "type": "object" }
+  },
+  "additionalProperties": true
+}

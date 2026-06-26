@@ -11,6 +11,7 @@ import {
   MCP_HTTP_DEFAULT_PROFILE,
   MCP_HTTP_DEFAULT_TOKEN_ENV
 } from './mcp-transport-policy.js';
+import { getCapabilityExcludedOperations } from './operation-registry.js';
 import { PRODUCT_IDENTITY } from './product-identity.js';
 
 export const MCP_CAPABILITY_POLICY_VERSION = '1.0.0';
@@ -18,136 +19,7 @@ export const MCP_CAPABILITY_DEFAULT_SCOPE = 'all';
 
 const CAPABILITY_SCOPES = Object.freeze(['all', 'profiles', 'excluded']);
 
-const EXCLUDED_OPERATIONS = Object.freeze([
-  excludedOperation({
-    id: 'resource_artifacts_cleanup_execute',
-    command: 'resource artifacts cleanup --execute',
-    category: 'cleanup',
-    cli: true,
-    reason: 'Deletes local artifact files and must stay explicit at the CLI boundary.',
-    futureReview: 'Requires selected artifact-root receipts, failure-safe dry-run parity, and separate MCP cleanup approval.'
-  }),
-  excludedOperation({
-    id: 'agent_package_ingest_report',
-    command: 'agent package / ingest / report',
-    category: 'agent_advisory_write',
-    cli: true,
-    reason: 'Creates or imports local advisory artifacts and reports.',
-    futureReview: 'Requires per-command receipts, package/result confinement, and no provider execution.'
-  }),
-  excludedOperation({
-    id: 'agent_workflow_create_report',
-    command: 'agent workflow create / report',
-    category: 'agent_workflow_write',
-    cli: true,
-    reason: 'Creates workflow manifests or writes workflow reports under the local artifact root.',
-    futureReview: 'Requires workflow receipt parity and clear separation from read-only status/index tools.'
-  }),
-  excludedOperation({
-    id: 'agent_execution_plan',
-    command: 'agent execution plan',
-    category: 'agent_execution_write',
-    cli: true,
-    reason: 'Writes dry-run execution plan metadata and receipts.',
-    futureReview: 'Requires a separate MCP planning approval and must not imply execution permission.'
-  }),
-  excludedOperation({
-    id: 'agent_execution_run',
-    command: 'agent execution run --execute',
-    category: 'provider_execution',
-    cli: true,
-    reason: 'May call configured local runners or provider/API adapters after explicit CLI execution approval.',
-    futureReview: 'Requires a dedicated MCP execution design, credential boundary review, and provider disclosure policy.'
-  }),
-  excludedOperation({
-    id: 'daemon_session_control',
-    command: 'daemon start/status/stop and session start/act/report/spec',
-    category: 'local_runtime_control',
-    cli: true,
-    reason: 'Controls local browser runtime state or writes browser/session artifacts.',
-    futureReview: 'Requires lifecycle receipts, process ownership constraints, and browser artifact disclosure review.'
-  }),
-  excludedOperation({
-    id: 'provider_api_execution',
-    command: 'provider/API execution',
-    category: 'external_execution',
-    cli: true,
-    reason: 'May send bounded package/prompt data outside the local process through the Phase 29 adapter.',
-    futureReview: 'Requires explicit external-service, credential, and evidence-disclosure approval before MCP exposure.'
-  }),
-  excludedOperation({
-    id: 'visual_review_result_preparation',
-    command: 'visual review prepare',
-    category: 'visual_review_preparation',
-    cli: true,
-    reason: 'Writes local metadata-only preparation artifacts for future visual review results and is not exposed through MCP in this phase.',
-    futureReview: 'Requires a separate MCP planning approval, receipt parity, and continued no-provider/no-transfer enforcement before exposure.'
-  }),
-  excludedOperation({
-    id: 'desktop_review_provider_preparation_plan',
-    command: 'visual review plan --capture-handoff',
-    category: 'desktop_review_provider_preparation',
-    cli: true,
-    reason: 'Reads caller-declared desktop capture handoff metadata that can reference sensitive desktop content and remains CLI/API-only in this phase.',
-    futureReview: 'Requires owner-review semantics, no raw-pixel transfer guarantees, and MCP read exposure approval before any MCP tool is added.'
-  }),
-  excludedOperation({
-    id: 'visual_review_run',
-    command: 'visual review run --execute',
-    category: 'visual_provider_execution',
-    cli: true,
-    reason: 'Runs visual review provider adapters from preparation metadata and writes local advisory artifacts; MCP exposure is intentionally excluded.',
-    futureReview: 'Requires dedicated MCP planning approval, receipt parity, credential boundary review, and continued no-raw-pixel enforcement before exposure.'
-  }),
-  excludedOperation({
-    id: 'visual_review_aggregation',
-    command: 'visual review aggregate',
-    category: 'visual_review_aggregation',
-    cli: true,
-    reason: 'Aggregates existing local visual review result metadata and untrusted advisory findings; MCP exposure remains excluded until read-only attribution and bounding gates are reviewed.',
-    futureReview: 'Requires no-artifact-write, no-provider-call, no-raw-pixel, untrusted-output bounding, and source-attribution tests before any MCP read exposure.'
-  }),
-  excludedOperation({
-    id: 'capture_handoff_file_read',
-    command: 'capture handoff --image',
-    category: 'desktop_capture_metadata',
-    cli: true,
-    reason: 'Reads existing workspace image bytes for metadata and can reference sensitive desktop content.',
-    futureReview: 'Requires workspace-confined file input policy, owner review, and no raw-pixel JSON guarantees before MCP exposure.'
-  }),
-  excludedOperation({
-    id: 'screen_window_capture_execution',
-    command: 'screen/window/desktop app capture execution',
-    category: 'desktop_capture_execution',
-    cli: false,
-    reason: 'Screen, window, and desktop app capture execution is not implemented in this planning phase.',
-    futureReview: 'Requires owner-initiated capture, selected surface constraints, local artifact receipts, raw-pixel JSON exclusion, and separate MCP execution approval before exposure.'
-  }),
-  excludedOperation({
-    id: 'visual_provider_execution',
-    command: 'raw-pixel visual provider execution',
-    category: 'visual_provider_execution',
-    cli: false,
-    reason: 'Raw-pixel visual provider execution is not available through CLI or MCP in this phase.',
-    futureReview: 'Requires explicit image-transfer approval, size/type/reference caps, transfer receipts, and separate MCP execution approval before exposure.'
-  }),
-  excludedOperation({
-    id: 'arbitrary_shell',
-    command: 'arbitrary shell execution',
-    category: 'shell',
-    cli: false,
-    reason: 'No arbitrary shell tool is exposed by the CLI or MCP profiles.',
-    futureReview: 'Held out of scope until there is a separate threat model, allowlist design, and operational history.'
-  }),
-  excludedOperation({
-    id: 'http_full_admin_socket_remote',
-    command: 'HTTP full/admin, socket transport, or remote HTTP listener',
-    category: 'transport_expansion',
-    cli: false,
-    reason: 'Current HTTP MCP transport is safe-profile-only and loopback-only.',
-    futureReview: 'Requires separate transport security design before any broader listener or profile support.'
-  })
-]);
+const EXCLUDED_OPERATIONS = Object.freeze(getCapabilityExcludedOperations());
 
 export function buildMcpCapabilityReport(options = {}) {
   const scope = String(options.scope ?? MCP_CAPABILITY_DEFAULT_SCOPE).trim();
@@ -257,35 +129,86 @@ function transportReports() {
 }
 
 function adminPolicy() {
+  const adminTools = getMcpTools('admin');
+  const fullToolNames = new Set(getMcpTools('full').map((tool) => tool.name));
+  const adminToolNames = new Set(adminTools.map((tool) => tool.name));
+  const adminOnlyTools = adminTools.filter((tool) => !fullToolNames.has(tool.name));
+  const writeExecuteToolsExposed = adminOnlyTools.some((tool) => (
+    tool.effects?.writesArtifacts
+    || tool.effects?.providerCall
+    || tool.effects?.deletesFiles
+    || tool.effects?.shellUsed
+  ));
+  const agentExecutionRunExposed = adminToolNames.has('browser_debug_agent_execution_run');
   return {
     profile_name: 'admin',
     currently_equivalent_to_full: MCP_PROFILES.admin.tools.join('\n') === MCP_PROFILES.full.tools.join('\n'),
-    write_execute_tools_exposed: false,
+    write_execute_tools_exposed: writeExecuteToolsExposed,
+    cleanup_plan_exposed: adminToolNames.has('browser_debug_resource_artifacts_plan'),
     cleanup_execution_exposed: false,
-    agent_execution_run_exposed: false,
-    provider_api_execution_exposed: false,
+    agent_execution_plan_exposed: adminToolNames.has('browser_debug_agent_execution_plan'),
+    agent_execution_run_exposed: agentExecutionRunExposed,
+    provider_api_execution_exposed: agentExecutionRunExposed,
     visual_provider_execution_exposed: false,
     visual_review_run_exposed: false,
     visual_review_result_preparation_exposed: false,
     visual_review_aggregation_exposed: false,
+    capture_readiness_exposed: adminToolNames.has('browser_debug_capture_readiness'),
+    capture_plan_exposed: adminToolNames.has('browser_debug_capture_plan'),
+    capture_execution_exposed: false,
+    localization_resources_exposed: adminToolNames.has('browser_debug_localization_resources'),
+    report_templates_exposed: adminToolNames.has('browser_debug_report_templates'),
+    translation_readiness_exposed: adminToolNames.has('browser_debug_translation_readiness'),
+    translation_execution_exposed: false,
+    release_readiness_exposed: adminToolNames.has('browser_debug_release_readiness'),
+    npm_publication_exposed: false,
+    artifact_root_status_exposed: adminToolNames.has('browser_debug_artifact_root_status'),
+    artifact_root_migration_exposed: false,
+    legacy_alias_audit_exposed: adminToolNames.has('browser_debug_legacy_alias_audit'),
+    legacy_alias_removal_readiness_exposed: adminToolNames.has('browser_debug_legacy_alias_removal_readiness'),
+    legacy_alias_removal_exposed: false,
+    shell_readiness_exposed: adminToolNames.has('browser_debug_shell_readiness'),
     shell_tools_exposed: false,
+    final_readiness_exposed: adminToolNames.has('browser_debug_final_readiness'),
     daemon_session_control_exposed: false,
     credential_handling_exposed: false,
-    decision: 'read-only policy report only',
-    reason: 'Phase 36 records the current MCP capability boundary without adding write, delete, provider, shell, or runtime-control tools.'
+    decision: agentExecutionRunExposed ? 'admin-only agent execution approved' : 'read-only policy report only',
+    reason: agentExecutionRunExposed
+      ? 'Phase 74-76 exposes agent execution plan/run only on the admin MCP profile while safe and full remain non-execution profiles.'
+      : 'Phase 36 records the current MCP capability boundary without adding write, delete, provider, shell, or runtime-control tools.'
   };
 }
 
 function boundarySummary() {
+  const adminPolicySummary = adminPolicy();
   return {
+    cleanup_plan: adminPolicySummary.cleanup_plan_exposed,
     cleanup_execution: false,
-    agent_execution_run: false,
-    provider_api_execution: false,
+    agent_execution_plan: adminPolicySummary.agent_execution_plan_exposed,
+    agent_execution_run: adminPolicySummary.agent_execution_run_exposed,
+    provider_api_execution: adminPolicySummary.provider_api_execution_exposed,
     visual_provider_execution: false,
     visual_review_run: false,
     visual_review_dashboard_read_only: true,
     visual_review_result_preparation: false,
     visual_review_aggregation: false,
+    capture_readiness: adminPolicySummary.capture_readiness_exposed,
+    capture_plan: adminPolicySummary.capture_plan_exposed,
+    capture_execution: false,
+    localization_resources: adminPolicySummary.localization_resources_exposed,
+    report_templates: adminPolicySummary.report_templates_exposed,
+    translation_readiness: adminPolicySummary.translation_readiness_exposed,
+    translation_execution: false,
+    release_readiness: adminPolicySummary.release_readiness_exposed,
+    npm_publication: false,
+    artifact_root_status: adminPolicySummary.artifact_root_status_exposed,
+    artifact_root_migration: false,
+    legacy_alias_audit: adminPolicySummary.legacy_alias_audit_exposed,
+    legacy_alias_removal_readiness: adminPolicySummary.legacy_alias_removal_readiness_exposed,
+    legacy_alias_removal: false,
+    shell_readiness: adminPolicySummary.shell_readiness_exposed,
+    constrained_shell_execution: false,
+    final_readiness: adminPolicySummary.final_readiness_exposed,
     raw_image_transfer: false,
     arbitrary_shell: false,
     socket_transport: false,
@@ -293,7 +216,7 @@ function boundarySummary() {
     http_full_or_admin: false,
     credential_values_read: false,
     credential_values_stored: false,
-    external_upload: false,
+    external_upload: adminPolicySummary.provider_api_execution_exposed,
     browser_profile_reuse: false,
     config_files_written: false
   };
@@ -302,23 +225,7 @@ function boundarySummary() {
 function nextSteps() {
   return [
     'Use this report to inspect current MCP tool/profile exposure before configuring a client.',
-    'Keep write, delete, provider/API, visual review execution, shell, daemon/session, and credential-bearing operations on the CLI unless a later phase approves one operation at a time.',
+    'Keep delete, visual review execution, shell, daemon/session, and credential-bearing operations on the CLI unless a later phase approves one operation at a time.',
     'Use trace-cue mcp config for token-free client setup metadata.'
   ];
-}
-
-function excludedOperation({ id, command, category, cli, reason, futureReview }) {
-  return Object.freeze({
-    id,
-    command,
-    category,
-    cli_available: cli,
-    mcp_safe: false,
-    mcp_full: false,
-    mcp_admin: false,
-    decision: 'not_exposed',
-    reason,
-    future_review_required: true,
-    future_review: futureReview
-  });
 }

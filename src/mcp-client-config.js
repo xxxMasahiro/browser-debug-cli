@@ -12,7 +12,7 @@ import {
   publicMcpTransportMetadata,
   resolveMcpTransportConfig
 } from './mcp-transport-policy.js';
-import { PRODUCT_IDENTITY } from './product-identity.js';
+import { LEGACY_ALIAS_POLICY, PRODUCT_IDENTITY } from './product-identity.js';
 
 export const MCP_HTTP_DEFAULT_CLIENT_PORT = 8765;
 export const MCP_CONFIG_DEFAULT_CLIENT = 'generic';
@@ -90,7 +90,7 @@ function buildStdioConfig(options, client, env) {
         auth_required: false
       }),
       compatibility: compatibilityMetadata(),
-      boundary: integrationBoundary('stdio'),
+      boundary: integrationBoundary('stdio', profile.profile),
       next_steps: stdioNextSteps(profile.profile)
     }
   };
@@ -157,13 +157,14 @@ function buildHttpConfig(options, client, env) {
         legacy_token_envs: legacyTokenEnvsFor(config.tokenEnv)
       },
       compatibility: compatibilityMetadata(),
-      boundary: integrationBoundary('http'),
+      boundary: integrationBoundary('http', config.profile),
       next_steps: httpNextSteps(config)
     }
   };
 }
 
-function integrationBoundary(transport) {
+function integrationBoundary(transport, profile = MCP_HTTP_DEFAULT_PROFILE) {
+  const adminStdio = transport === 'stdio' && profile === 'admin';
   return {
     local_only: true,
     external_channel: false,
@@ -174,8 +175,8 @@ function integrationBoundary(transport) {
     config_file_written: false,
     shell_tools: false,
     cleanup_execution: false,
-    provider_api_execution: false,
-    agent_execution_run: false,
+    provider_api_execution: adminStdio,
+    agent_execution_run: adminStdio,
     socket_transport: false,
     remote_http_listener: false,
     http_full_or_admin: false,
@@ -208,7 +209,7 @@ function buildLocalCheckoutStdioConfig(args, options) {
       }
     },
     legacy_mcpServers: buildLegacyLocalCheckoutMcpServers(args, options),
-    boundary: integrationBoundary('stdio')
+    boundary: integrationBoundary('stdio', args.includes('admin') ? 'admin' : MCP_HTTP_DEFAULT_PROFILE)
   };
 }
 
@@ -237,7 +238,7 @@ function buildLocalCheckoutHttpConfig(args, config, url, options) {
         'Content-Type': 'application/json'
       }
     },
-    boundary: integrationBoundary('http')
+    boundary: integrationBoundary('http', config.profile)
   };
 }
 
@@ -313,7 +314,8 @@ function compatibilityMetadata() {
     legacy: {
       server_names: PRODUCT_IDENTITY.legacyMcpServerNames,
       mcp_bin_names: PRODUCT_IDENTITY.legacyMcpBins.map((entry) => entry.name),
-      artifact_roots: PRODUCT_IDENTITY.legacyArtifactRoots
+      artifact_roots: PRODUCT_IDENTITY.legacyArtifactRoots,
+      alias_policy: LEGACY_ALIAS_POLICY
     }
   };
 }
