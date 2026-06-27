@@ -28,6 +28,7 @@
     "rubric_profile": { "type": "object" },
     "provider": { "type": "object" },
     "dogfood_set": { "type": "object" },
+    "human_review_maturity_plan": { "type": "object" },
     "workflow": { "type": "object" },
     "evaluation_focus": { "type": "object" },
     "manual_live_provider_policy": { "type": "object" },

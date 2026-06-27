@@ -742,3 +742,18 @@ Persistent boundaries:
 - Do not bypass `agentic review run`, plan hash validation, exact transfer flags, or explicit `--execute`.
 - Do not expose Agentic Human Review through MCP.
 - Do not mutate deterministic findings, metrics, release gates, existing review artifacts, visual review artifacts, or MCP permissions.
+
+## 2026-06-28 Implementation Note: Human Review Maturity Diagnostics
+
+TraceCue now has a read-only maturity layer for moving Agentic Human Review closer to owner-reviewed human-level evidence without claiming equality or superiority.
+
+Implemented scope:
+- `agentic review report-quality` adds `human_review_maturity` and `longitudinal_quality_evaluation`.
+- The maturity output records the current result effort, benchmark case, provider/model ids, live-provider dogfood evidence, single-result maturity score, longitudinal evidence score, missing standard/deep/xhigh effort evidence, missing benchmark cases, comparison/history requirements, and next recommended actions.
+- `agentic review dogfood readiness` and `agentic review dogfood plan` add a standard/deep/xhigh maturity plan and benchmark-case matrix with proposal, plan, run, report-quality, and calibrate command shapes.
+- Public schemas, schema registry entries, and CLI coverage were updated.
+
+Persistent boundaries:
+- The maturity layer is read-only and advisory-only.
+- It does not call providers, read credential values, transfer evidence, write artifacts from readiness/planning, expose Agentic Human Review through MCP, mutate deterministic findings, change release gates, store raw provider responses, or store credential values.
+- `human_equivalent_claim_allowed` and `human_superior_claim_allowed` remain false. Standard/deep/xhigh real-page dogfood, multiple benchmark-case comparison, and longitudinal owner-reviewed quality history remain required before any future claim discussion.

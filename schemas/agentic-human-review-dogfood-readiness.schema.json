@@ -25,6 +25,7 @@
     "provider": { "type": "object" },
     "dogfood_set": { "type": "object" },
     "setup": { "type": "object" },
+    "human_review_maturity_plan": { "type": "object" },
     "required_owner_controls": { "type": "array" },
     "next_commands": { "type": "object" },
     "boundary": { "type": "object" },

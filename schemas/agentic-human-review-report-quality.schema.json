@@ -35,6 +35,10 @@
     "claim_count": { "type": "number" },
     "owner_decision_count": { "type": "number" },
     "quality_warnings": { "type": "array" },
+    "human_review_maturity": { "type": "object" },
+    "longitudinal_quality_evaluation": { "type": "object" },
+    "benchmark_completion_readiness": { "type": ["object", "null"] },
+    "xhigh_multi_round_review": { "type": ["object", "null"] },
     "advisory_only": { "const": true },
     "gate_effect": { "const": "none" },
     "boundary": { "type": "object" }

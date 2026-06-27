@@ -3454,6 +3454,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(dogfoodReadinessBody.data.agentic_human_review_dogfood_readiness.setup.endpoint_configured, true);
   assert.equal(dogfoodReadinessBody.data.agentic_human_review_dogfood_readiness.setup.credential_configured, true);
   assert.equal(dogfoodReadinessBody.data.agentic_human_review_dogfood_readiness.setup.live_dogfood_enabled, true);
+  assert.deepEqual(dogfoodReadinessBody.data.agentic_human_review_dogfood_readiness.human_review_maturity_plan.required_efforts, ['standard', 'deep', 'xhigh']);
+  assert.equal(dogfoodReadinessBody.data.agentic_human_review_dogfood_readiness.human_review_maturity_plan.human_equivalence_claim.human_equivalent_claim_allowed_by_plan, false);
   assert.equal(dogfoodReadinessBody.data.agentic_human_review_dogfood_readiness.boundary.provider_call_performed, false);
   assert.equal(dogfoodReadinessBody.data.agentic_human_review_dogfood_readiness.boundary.credential_values_read, false);
   assert.doesNotMatch(dogfoodReadiness.stdout, /api-secret-value|provider\.example/);
@@ -3487,6 +3489,9 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   const dogfoodPlanBody = JSON.parse(dogfoodPlan.stdout);
   assert.equal(dogfoodPlanBody.command, 'agentic review dogfood plan');
   assert.equal(dogfoodPlanBody.data.agentic_human_review_dogfood_plan.case.case_id, 'article-comprehension-risk');
+  assert.equal(dogfoodPlanBody.data.agentic_human_review_dogfood_plan.human_review_maturity_plan.active_case_id, 'article-comprehension-risk');
+  assert.equal(dogfoodPlanBody.data.agentic_human_review_dogfood_plan.human_review_maturity_plan.active_case_matrix[0].plan_commands.length, 3);
+  assert.equal(dogfoodPlanBody.data.agentic_human_review_dogfood_plan.human_review_maturity_plan.active_case_matrix[0].plan_commands.some((item) => item.effort === 'deep'), true);
   assert.equal(dogfoodPlanBody.data.agentic_human_review_dogfood_plan.manual_live_provider_policy.provider_call_performed_by_plan, false);
   assert.match(dogfoodPlanBody.data.agentic_human_review_dogfood_plan.workflow.compare, /direct-vs-tracecue/);
 
@@ -4182,6 +4187,13 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(qualityBody.data.agentic_human_review_report_quality.actionability_score > 0, true);
   assert.equal(qualityBody.data.agentic_human_review_report_quality.xhigh_multi_round_review.status, 'complete');
   assert.equal(qualityBody.data.agentic_human_review_report_quality.benchmark_completion_readiness.release_gate_policy.blocks_release, false);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.human_equivalence_claim.human_equivalent_claim_allowed, false);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.human_equivalence_claim.human_superior_claim_allowed, false);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.current_result.observed_effort, 'xhigh');
+  assert.deepEqual(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.longitudinal_quality_evaluation.missing_efforts, ['standard', 'deep']);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.real_page_dogfood_evidence.current_result_counts_as_manual_live_provider_dogfood, false);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.gaps.some((gap) => gap.code === 'AHR_MATURITY_COMPARISON_HISTORY_REQUIRED'), true);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.longitudinal_quality_evaluation.current_result_counts_as_longitudinal_series, false);
   assert.equal(qualityBody.data.agentic_human_review_report_quality.boundary.read_only, true);
   assert.equal(qualityBody.data.agentic_human_review_report_quality.boundary.mcp_execution_exposed, false);
 
@@ -4202,6 +4214,7 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   }, { cwd, now: fixedNow });
   assert.equal(directQuality.status, 'ok');
   assert.equal(directQuality.data.agentic_human_review_report_quality.advisory_only, true);
+  assert.equal(directQuality.data.agentic_human_review_report_quality.human_review_maturity.human_equivalence_claim.status, 'not_claimed');
 
   const benchmarkList = await executeCli([
     'agentic',

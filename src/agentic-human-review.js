@@ -37,6 +37,7 @@ export const HUMAN_REVIEW_TEXT_PROVENANCE_VERSION = '1.0.0';
 export const HUMAN_REVIEW_LIVE_DOGFOOD_GATE_VERSION = '1.0.0';
 export const HUMAN_REVIEW_BENCHMARK_COMPLETION_VERSION = '1.0.0';
 export const HUMAN_REVIEW_XHIGH_COMPLETION_VERSION = '1.0.0';
+export const HUMAN_REVIEW_MATURITY_VERSION = '1.0.0';
 
 const DEFAULT_PROVIDER_ID = 'fake-agent';
 const DEFAULT_MODEL_ID = 'fake-model';
@@ -50,6 +51,8 @@ const MAX_FINDINGS = 50;
 const MAX_PROPOSAL_BRIEF_BYTES = 32 * 1024;
 
 const REVIEW_EFFORTS = new Set(['quick', 'standard', 'deep', 'xhigh']);
+const HUMAN_REVIEW_CLAIM_EFFORTS = Object.freeze(['standard', 'deep', 'xhigh']);
+const HUMAN_REVIEW_REQUIRED_COMPARISON_KINDS = Object.freeze(['direct-vs-tracecue', 'provider-dogfood', 'benchmark-regression']);
 const SUBAGENT_EFFORTS = new Set(['low', 'medium', 'high', 'xhigh']);
 const CONFIDENCE_VALUES = new Set(['low', 'medium', 'high', 'inconclusive']);
 const SEVERITIES = new Set(['info', 'low', 'medium', 'high', 'critical']);
@@ -1185,6 +1188,9 @@ export async function runAgenticHumanReviewDogfoodReadiness(options = {}, contex
     },
     dogfood_set: dogfoodSetSummary(),
     setup: setupReadiness,
+    human_review_maturity_plan: buildHumanReviewLongitudinalDogfoodPlan({
+      providerId: provider.provider.id
+    }),
     required_owner_controls: [
       'choose benchmark case',
       'create proposal and plan',
@@ -1246,6 +1252,10 @@ export async function runAgenticHumanReviewDogfoodPlan(options = {}, context = {
       capability_hash: agenticProviderCapabilityHash(provider.provider)
     },
     dogfood_set: dogfoodSetSummary(),
+    human_review_maturity_plan: buildHumanReviewLongitudinalDogfoodPlan({
+      providerId: provider.provider.id,
+      activeCaseId: benchmarkCase.case_id
+    }),
     workflow: {
       proposal: `${CLI_NAME} agentic review propose --brief <human-review-request> --benchmark-case ${benchmarkCase.case_id} --provider ${provider.provider.id} --json`,
       plan: `${CLI_NAME} agentic review plan --proposal <proposal.json> --benchmark-case ${benchmarkCase.case_id} --json`,
@@ -2493,6 +2503,56 @@ function dogfoodSetSummary() {
     required_review_modes: [...DOGFOOD_SET.required_review_modes],
     manual_live_provider_default: DOGFOOD_SET.manual_live_provider_default,
     ci_live_provider_default: DOGFOOD_SET.ci_live_provider_default,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+}
+
+function buildHumanReviewLongitudinalDogfoodPlan({ providerId, activeCaseId = null }) {
+  const activeCases = activeCaseId
+    ? BENCHMARK_CASES.filter((benchmarkCase) => benchmarkCase.case_id === activeCaseId)
+    : BENCHMARK_CASES;
+  const caseMatrix = activeCases.map((benchmarkCase) => ({
+    case_id: benchmarkCase.case_id,
+    fixture_type: benchmarkCase.fixture_type,
+    rubric_profile_id: benchmarkCase.rubric_profile_id,
+    required_efforts: [...HUMAN_REVIEW_CLAIM_EFFORTS],
+    required_dimensions: [...benchmarkCase.required_dimensions],
+    quality_thresholds: { ...benchmarkCase.thresholds },
+    plan_commands: HUMAN_REVIEW_CLAIM_EFFORTS.map((effort) => ({
+      effort,
+      proposal: `${CLI_NAME} agentic review propose --brief <human-review-request> --benchmark-case ${benchmarkCase.case_id} --effort ${effort} --provider ${providerId} --json`,
+      plan: `${CLI_NAME} agentic review plan --proposal <proposal-${benchmarkCase.case_id}-${effort}.json> --benchmark-case ${benchmarkCase.case_id} --effort ${effort} --provider ${providerId} --json`,
+      run: `${CLI_NAME} agentic review run --plan <plan-${benchmarkCase.case_id}-${effort}.json> --plan-hash <sha256> <exact transfer flags> --execute --json`,
+      report_quality: `${CLI_NAME} agentic review report-quality --result <result-${benchmarkCase.case_id}-${effort}.json> --json`,
+      calibrate: `${CLI_NAME} agentic review calibrate --result <result-${benchmarkCase.case_id}-${effort}.json> --case ${benchmarkCase.case_id} --json`
+    }))
+  }));
+  return {
+    schema_version: SCHEMA_VERSION,
+    maturity_version: HUMAN_REVIEW_MATURITY_VERSION,
+    active_case_id: activeCaseId,
+    required_efforts: [...HUMAN_REVIEW_CLAIM_EFFORTS],
+    required_benchmark_case_ids: BENCHMARK_CASES.map((benchmarkCase) => benchmarkCase.case_id),
+    active_case_matrix: caseMatrix,
+    required_comparison_kinds: [...HUMAN_REVIEW_REQUIRED_COMPARISON_KINDS],
+    comparison_workflow: {
+      direct_vs_tracecue: `${CLI_NAME} agentic review compare --baseline <direct-review-result.json> --candidate <tracecue-result.json> --comparison-kind direct-vs-tracecue --json`,
+      provider_dogfood: `${CLI_NAME} agentic review compare --baseline <previous-provider-result.json> --candidate <current-provider-result.json> --comparison-kind provider-dogfood --json`,
+      benchmark_regression: `${CLI_NAME} agentic review compare --baseline <previous-benchmark-result.json> --candidate <current-benchmark-result.json> --comparison-kind benchmark-regression --json`
+    },
+    continuous_quality_evaluation: {
+      repeat_report_quality_per_result: true,
+      repeat_calibration_per_case: true,
+      compare_across_efforts: true,
+      owner_review_required_before_claim: true,
+      release_gate_mutated: false
+    },
+    human_equivalence_claim: {
+      human_equivalent_claim_allowed_by_plan: false,
+      human_superior_claim_allowed_by_plan: false,
+      reason: 'This is a dogfood evidence plan only. It does not authorize a claim that TraceCue is equal or superior to human reviewers.'
+    },
     advisory_only: true,
     gate_effect: 'none'
   };
@@ -4942,6 +5002,7 @@ function buildReportQuality({ result, resultPath, execution, now }) {
     humanReviewCoverage: result.human_review_coverage ?? null,
     readerExperienceReview: result.reader_experience_review ?? null
   });
+  const humanReviewMaturity = buildHumanReviewMaturity({ result, execution, quality });
   return redact({
     schema_version: SCHEMA_VERSION,
     type: 'agentic_human_review_report_quality',
@@ -4951,6 +5012,8 @@ function buildReportQuality({ result, resultPath, execution, now }) {
     result_id: result.id ?? null,
     execution_id: execution?.id ?? null,
     ...quality,
+    human_review_maturity: humanReviewMaturity,
+    longitudinal_quality_evaluation: humanReviewMaturity.longitudinal_quality_evaluation,
     benchmark_completion_readiness: result.benchmark_completion_readiness ?? null,
     xhigh_multi_round_review: result.xhigh_multi_round_review ?? null,
     boundary: agenticHumanReviewBoundary({
@@ -4959,6 +5022,201 @@ function buildReportQuality({ result, resultPath, execution, now }) {
       report_quality_gate_effect: 'none'
     })
   });
+}
+
+function buildHumanReviewMaturity({ result, execution, quality }) {
+  const observedEffort = normalizeObservedReviewEffort(result.agentic_human_review_advisory?.review_effort);
+  const observedEfforts = observedEffort ? [observedEffort] : [];
+  const missingEfforts = HUMAN_REVIEW_CLAIM_EFFORTS.filter((effort) => !observedEfforts.includes(effort));
+  const benchmarkCaseId = result.calibration_metadata?.benchmark_case_id
+    ?? result.benchmark_completion_readiness?.active_case_id
+    ?? result.dogfood_metadata?.case_id
+    ?? null;
+  const benchmarkCase = resolveBenchmarkCase(benchmarkCaseId);
+  const observedBenchmarkCaseIds = benchmarkCaseId ? [benchmarkCaseId] : [];
+  const requiredBenchmarkCaseIds = BENCHMARK_CASES.map((item) => item.case_id);
+  const missingBenchmarkCaseIds = requiredBenchmarkCaseIds.filter((caseId) => !observedBenchmarkCaseIds.includes(caseId));
+  const xhighReview = result.xhigh_multi_round_review ?? null;
+  const qualityEvaluation = result.review_quality_evaluation ?? null;
+  const providerCallPerformed = Boolean(execution?.provider_call_performed ?? result.execution?.provider_call_performed);
+  const apiCallPerformed = Boolean(execution?.api_call_performed ?? result.execution?.api_call_performed);
+  const externalEvidenceTransfer = Boolean(execution?.external_evidence_transfer ?? result.execution?.external_evidence_transfer);
+  const liveProviderDogfoodObserved = apiCallPerformed && externalEvidenceTransfer;
+  const xhighComplete = xhighReview?.status === 'complete';
+  const calibrationReady = qualityEvaluation?.status === 'calibration_ready';
+  const singleResultScore = clampScore(
+    (quality.human_review_coverage_score * 0.25)
+    + (quality.actionability_score * 0.2)
+    + (quality.verification_score * 0.15)
+    + (quality.evidence_coverage_score * 0.15)
+    + (clampScore(qualityEvaluation?.human_likeness_score ?? 0) * 0.15)
+    + (xhighComplete ? 0.1 : 0)
+  );
+  const longitudinalEvidenceScore = clampScore(
+    (observedEfforts.length / HUMAN_REVIEW_CLAIM_EFFORTS.length * 0.35)
+    + (observedBenchmarkCaseIds.length / requiredBenchmarkCaseIds.length * 0.35)
+    + (liveProviderDogfoodObserved ? 0.15 : 0)
+    + (calibrationReady ? 0.15 : 0)
+  );
+  const maturityLevel = classifyHumanReviewMaturityLevel({
+    observedEffort,
+    quality,
+    qualityEvaluation,
+    xhighReview,
+    singleResultScore
+  });
+  const gaps = buildHumanReviewMaturityGaps({
+    observedEffort,
+    missingEfforts,
+    benchmarkCaseId,
+    missingBenchmarkCaseIds,
+    liveProviderDogfoodObserved,
+    xhighReview,
+    qualityEvaluation,
+    quality
+  });
+  const longitudinalQualityEvaluation = {
+    schema_version: SCHEMA_VERSION,
+    evaluation_version: HUMAN_REVIEW_MATURITY_VERSION,
+    status: gaps.length === 0 ? 'single_result_ready_for_owner_longitudinal_rollup' : 'longitudinal_evidence_incomplete',
+    required_efforts: [...HUMAN_REVIEW_CLAIM_EFFORTS],
+    observed_efforts: observedEfforts,
+    missing_efforts: missingEfforts,
+    required_benchmark_case_ids: requiredBenchmarkCaseIds,
+    observed_benchmark_case_ids: observedBenchmarkCaseIds,
+    missing_benchmark_case_ids: missingBenchmarkCaseIds,
+    required_comparison_kinds: [...HUMAN_REVIEW_REQUIRED_COMPARISON_KINDS],
+    comparison_artifacts_observed: false,
+    continuous_report_quality_history_observed: false,
+    current_result_counts_as_longitudinal_series: false,
+    single_result_maturity_score: singleResultScore,
+    longitudinal_evidence_score: longitudinalEvidenceScore,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+  return {
+    schema_version: SCHEMA_VERSION,
+    maturity_version: HUMAN_REVIEW_MATURITY_VERSION,
+    status: gaps.length === 0 ? 'claim_evidence_ready_for_owner_review' : 'claim_evidence_incomplete',
+    maturity_level: maturityLevel,
+    current_result: {
+      result_id: result.id ?? null,
+      observed_effort: observedEffort,
+      benchmark_case_id: benchmarkCaseId,
+      fixture_type: benchmarkCase?.fixture_type ?? result.benchmark_completion_readiness?.active_fixture_type ?? null,
+      provider_id: result.provider?.id ?? execution?.provider?.id ?? null,
+      model_id: result.model?.id ?? execution?.model?.id ?? null,
+      provider_call_performed: providerCallPerformed,
+      api_call_performed: apiCallPerformed,
+      external_evidence_transfer: externalEvidenceTransfer,
+      live_provider_dogfood_observed: liveProviderDogfoodObserved,
+      xhigh_completion_status: xhighReview?.status ?? null,
+      calibration_status: qualityEvaluation?.status ?? null
+    },
+    scorecard: {
+      single_result_maturity_score: singleResultScore,
+      longitudinal_evidence_score: longitudinalEvidenceScore,
+      human_review_coverage_score: quality.human_review_coverage_score,
+      actionability_score: quality.actionability_score,
+      verification_score: quality.verification_score,
+      evidence_coverage_score: quality.evidence_coverage_score,
+      human_likeness_score: clampScore(qualityEvaluation?.human_likeness_score ?? 0)
+    },
+    real_page_dogfood_evidence: {
+      standard_deep_xhigh_required: true,
+      current_result_has_benchmark_case_metadata: Boolean(benchmarkCaseId),
+      current_result_counts_as_manual_live_provider_dogfood: liveProviderDogfoodObserved,
+      current_result_counts_as_longitudinal_series: false,
+      owner_labeled_real_page_targets_required: true
+    },
+    longitudinal_quality_evaluation: longitudinalQualityEvaluation,
+    human_equivalence_claim: {
+      status: 'not_claimed',
+      human_equivalent_claim_allowed: false,
+      human_superior_claim_allowed: false,
+      reason: 'TraceCue can collect advisory evidence toward human-like review quality, but equal-or-superior human judgment requires owner-labeled real-page dogfood across standard, deep, and xhigh efforts, multiple benchmark cases, comparison artifacts, and longitudinal quality history.',
+      advisory_only: true,
+      gate_effect: 'none'
+    },
+    gaps,
+    next_recommended_actions: buildHumanReviewMaturityNextActions({ missingEfforts, missingBenchmarkCaseIds, liveProviderDogfoodObserved, xhighReview, qualityEvaluation }),
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+}
+
+function normalizeObservedReviewEffort(value) {
+  const effort = String(value ?? '').trim();
+  return REVIEW_EFFORTS.has(effort) ? effort : null;
+}
+
+function classifyHumanReviewMaturityLevel({ observedEffort, quality, qualityEvaluation, xhighReview, singleResultScore }) {
+  if (!observedEffort || quality.human_review_coverage_score < 0.5 || quality.actionability_score < 0.5) {
+    return 'thin_advisory';
+  }
+  if (observedEffort === 'quick') {
+    return 'quick_triage';
+  }
+  if (observedEffort === 'standard') {
+    return singleResultScore >= 0.7 ? 'single_standard_candidate' : 'single_standard_needs_review';
+  }
+  if (observedEffort === 'deep') {
+    return singleResultScore >= 0.75 ? 'single_deep_candidate' : 'single_deep_needs_review';
+  }
+  if (observedEffort === 'xhigh') {
+    return xhighReview?.status === 'complete' && qualityEvaluation?.status === 'calibration_ready'
+      ? 'single_xhigh_calibration_candidate'
+      : 'single_xhigh_needs_verification';
+  }
+  return 'thin_advisory';
+}
+
+function buildHumanReviewMaturityGaps({ observedEffort, missingEfforts, benchmarkCaseId, missingBenchmarkCaseIds, liveProviderDogfoodObserved, xhighReview, qualityEvaluation, quality }) {
+  const gaps = [];
+  if (!observedEffort) {
+    gaps.push({ code: 'AHR_MATURITY_EFFORT_UNKNOWN', message: 'The result did not record a supported review effort.', severity: 'high' });
+  }
+  if (missingEfforts.length > 0) {
+    gaps.push({ code: 'AHR_MATURITY_EFFORT_MATRIX_INCOMPLETE', message: 'standard, deep, and xhigh dogfood evidence is not all present.', severity: 'high', missing_efforts: missingEfforts });
+  }
+  if (!benchmarkCaseId || missingBenchmarkCaseIds.length > 0) {
+    gaps.push({ code: 'AHR_MATURITY_BENCHMARK_CASE_MATRIX_INCOMPLETE', message: 'Multiple benchmark cases are required before human-equivalent claims can be considered.', severity: 'high', missing_benchmark_case_ids: missingBenchmarkCaseIds });
+  }
+  if (!liveProviderDogfoodObserved) {
+    gaps.push({ code: 'AHR_MATURITY_LIVE_PROVIDER_DOGFOOD_MISSING', message: 'This result does not by itself prove manual live-provider dogfood on an owner-labeled real page.', severity: 'medium' });
+  }
+  if (observedEffort === 'xhigh' && xhighReview?.status !== 'complete') {
+    gaps.push({ code: 'AHR_MATURITY_XHIGH_INCOMPLETE', message: 'xhigh review needs complete role, critique, verification, and synthesis output.', severity: 'medium', missing_conditions: xhighReview?.missing_conditions ?? [] });
+  }
+  if (qualityEvaluation?.status !== 'calibration_ready') {
+    gaps.push({ code: 'AHR_MATURITY_CALIBRATION_NOT_READY', message: 'The quality evaluator has not marked this result calibration-ready.', severity: 'medium', calibration_status: qualityEvaluation?.status ?? null });
+  }
+  if (quality.verification_score < 0.75) {
+    gaps.push({ code: 'AHR_MATURITY_VERIFICATION_THIN', message: 'Dedicated critique or verification coverage is still thin.', severity: 'medium', verification_score: quality.verification_score });
+  }
+  gaps.push({ code: 'AHR_MATURITY_COMPARISON_HISTORY_REQUIRED', message: 'Direct-vs-TraceCue, provider-dogfood, benchmark-regression comparisons and repeated report-quality history must be reviewed by the owner before any equality or superiority claim.', severity: 'high' });
+  return gaps;
+}
+
+function buildHumanReviewMaturityNextActions({ missingEfforts, missingBenchmarkCaseIds, liveProviderDogfoodObserved, xhighReview, qualityEvaluation }) {
+  const actions = [];
+  if (missingEfforts.length > 0) {
+    actions.push(`Run approved real-page dogfood for missing efforts: ${missingEfforts.join(', ')}.`);
+  }
+  if (missingBenchmarkCaseIds.length > 0) {
+    actions.push('Run calibration across the benchmark case matrix and compare results by case.');
+  }
+  if (!liveProviderDogfoodObserved) {
+    actions.push('When credentials and transfer approval are explicitly provided, repeat standard/deep/xhigh dogfood with manual live-provider opt-in.');
+  }
+  if (xhighReview?.status !== 'complete') {
+    actions.push('Require complete xhigh role, critique, verification, and synthesis output before treating a result as a high-effort candidate.');
+  }
+  if (qualityEvaluation?.status !== 'calibration_ready') {
+    actions.push('Use report-quality, calibrate, and compare outputs to tune the rubric before promoting the result to owner review.');
+  }
+  actions.push('Keep all results advisory-only and store the owner-reviewed longitudinal comparison outside deterministic release gates.');
+  return actions;
 }
 
 function buildReportQualityFromParts({ roleOpinions, findings, ownerDecisions, claims, critiqueRecords, integrationRecord, humanReviewCoverage = null, readerExperienceReview = null }) {
