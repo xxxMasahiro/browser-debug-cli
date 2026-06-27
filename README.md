@@ -106,7 +106,7 @@ node ./bin/trace-cue.js agentic review propose --brief "Review first impression,
 node ./bin/trace-cue.js agentic review plan --proposal .browser-debug/agentic-human-review-proposals/<id>/proposal.json --json
 node ./bin/trace-cue.js agentic review provider-readiness --plan .browser-debug/agentic-human-review-plans/<id>/plan.json --provider generic-api-provider --json
 node ./bin/trace-cue.js agentic review run --plan .browser-debug/agentic-human-review-plans/<id>/plan.json --plan-hash <sha256> --allow-page-text --allow-url --allow-artifact-refs --allow-accessibility-summary --execute --json
-AGENTIC_HUMAN_REVIEW_API_TOKEN=<tok> AGENTIC_HUMAN_REVIEW_OPENAI_API_KEY=<key> AGENTIC_HUMAN_REVIEW_OPENAI_MODEL=<model> npm run ahr:responses-adapter -- --json
+AGENTIC_HUMAN_REVIEW_API_TOKEN=<tok> AGENTIC_HUMAN_REVIEW_API_TIMEOUT_MS=90000 AGENTIC_HUMAN_REVIEW_OPENAI_API_KEY=<key> AGENTIC_HUMAN_REVIEW_OPENAI_MODEL=<model> npm run ahr:responses-adapter -- --json
 node ./bin/trace-cue.js visual review prepare --review-index .browser-debug/review-artifacts/<id>.json --json
 node ./bin/trace-cue.js visual review run --preparation .browser-debug/visual-review-results/<id>/preparation.json --surface local-subscription-agent --provider fake-agent --model fake-model --execute --json
 node ./bin/trace-cue.js visual review aggregate --preparation .browser-debug/visual-review-results/<id>/preparation.json --json

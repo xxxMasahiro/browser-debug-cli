@@ -135,6 +135,7 @@ import {
 import {
   AGENTIC_REVIEW_API_CREDENTIAL_ENV,
   AGENTIC_REVIEW_API_ENDPOINT_ENV,
+  AGENTIC_REVIEW_API_TIMEOUT_ENV,
   AGENTIC_REVIEW_LIVE_DOGFOOD_ENV
 } from '../src/agentic-human-review-providers.js';
 import {
@@ -3409,6 +3410,23 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.match(readinessBody.data.agentic_human_review_provider_readiness.providers[0].capability_hash, /^[a-f0-9]{64}$/);
   assert.equal(readinessBody.data.agentic_human_review_provider_readiness.providers[0].transfer_policy.requires_matching_provider_capability_hash, true);
 
+  const fakeReadinessWithInvalidGenericTimeout = await executeCli([
+    'agentic',
+    'review',
+    'provider-readiness',
+    '--provider',
+    'fake-agent',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    env: {
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: 'invalid'
+    }
+  });
+  assert.equal(fakeReadinessWithInvalidGenericTimeout.exitCode, 0);
+  assert.equal(JSON.parse(fakeReadinessWithInvalidGenericTimeout.stdout).data.agentic_human_review_provider_readiness.providers[0].id, 'fake-agent');
+
   const directProposal = await runAgenticHumanReviewPropose({
     brief: 'Quick first-impression review proposal.',
     provider: 'fake-agent',
@@ -3426,6 +3444,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   }, { cwd, now: fixedNow });
   assert.equal(directReadiness.status, 'ok');
   assert.equal(directReadiness.data.agentic_human_review_provider_readiness.providers[0].credential_values_read_by_readiness, false);
+  assert.equal(directReadiness.data.agentic_human_review_provider_readiness.providers[0].timeout_env, AGENTIC_REVIEW_API_TIMEOUT_ENV);
+  assert.equal(directReadiness.data.agentic_human_review_provider_readiness.providers[0].timeout_ms, 30000);
 
   const parsedDogfoodReadiness = parseCliArgs([
     'agentic',
@@ -3773,10 +3793,17 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   ], {
     cwd,
     now: fixedNow,
-    createId: () => 'agentic-plan-api'
+    createId: () => 'agentic-plan-api',
+    env: {
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '90000'
+    }
   });
   assert.equal(apiPlanResult.exitCode, 0);
   const apiPlanBody = JSON.parse(apiPlanResult.stdout);
+  assert.equal(apiPlanBody.data.agentic_human_review_plan.provider.timeout_env, AGENTIC_REVIEW_API_TIMEOUT_ENV);
+  assert.equal(apiPlanBody.data.agentic_human_review_plan.provider.timeout_ms, 90000);
+  assert.equal(apiPlanBody.data.agentic_human_review_plan.provider_capability_contract.timeout_env, AGENTIC_REVIEW_API_TIMEOUT_ENV);
+  assert.equal(apiPlanBody.data.agentic_human_review_plan.provider_capability_contract.timeout_ms, 90000);
   const apiRequiredFlags = apiPlanBody.data.agentic_human_review_plan.transfer_permissions.required_flags.slice().sort();
   assert.deepEqual(apiRequiredFlags, ['allow-accessibility-summary', 'allow-artifact-refs', 'allow-page-text']);
   assert.equal(apiPlanBody.data.agentic_human_review_plan.transfer_permissions.default_external_transfer, true);
@@ -3784,6 +3811,60 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   let apiRequestPayload = null;
   const apiPlanPath = '.browser-debug/agentic-human-review-plans/agentic-plan-api/plan.json';
   const apiPlanHash = apiPlanBody.data.plan_hash;
+  const apiReadinessWithTimeout = await executeCli([
+    'agentic',
+    'review',
+    'provider-readiness',
+    '--plan',
+    apiPlanPath,
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    env: {
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '90000'
+    }
+  });
+  assert.equal(apiReadinessWithTimeout.exitCode, 0);
+  const apiReadinessBody = JSON.parse(apiReadinessWithTimeout.stdout);
+  assert.equal(apiReadinessBody.data.agentic_human_review_provider_readiness.providers[0].timeout_env, AGENTIC_REVIEW_API_TIMEOUT_ENV);
+  assert.equal(apiReadinessBody.data.agentic_human_review_provider_readiness.providers[0].timeout_ms, 90000);
+  assert.equal(apiReadinessBody.data.agentic_human_review_provider_readiness.providers[0].setup_readiness.timeout_env, AGENTIC_REVIEW_API_TIMEOUT_ENV);
+
+  const invalidApiTimeoutReadiness = await executeCli([
+    'agentic',
+    'review',
+    'provider-readiness',
+    '--provider',
+    'generic-api-provider',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    env: {
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: 'invalid'
+    }
+  });
+  assert.equal(invalidApiTimeoutReadiness.exitCode, 1);
+  assert.equal(JSON.parse(invalidApiTimeoutReadiness.stdout).errors[0].code, 'AGENTIC_REVIEW_PROVIDER_RUNTIME_CONFIG_INVALID');
+
+  const overflowApiTimeoutReadiness = await executeCli([
+    'agentic',
+    'review',
+    'provider-readiness',
+    '--provider',
+    'generic-api-provider',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    env: {
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '2147483648'
+    }
+  });
+  assert.equal(overflowApiTimeoutReadiness.exitCode, 1);
+  assert.equal(JSON.parse(overflowApiTimeoutReadiness.stdout).errors[0].code, 'AGENTIC_REVIEW_PROVIDER_RUNTIME_CONFIG_INVALID');
+
   const apiRunArgs = [
     'agentic',
     'review',
@@ -3800,6 +3881,20 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
     '--execute',
     '--json'
   ];
+  const apiRunWithoutTimeout = await executeCli(apiRunArgs, {
+    cwd,
+    now: fixedNow,
+    env: {
+      [AGENTIC_REVIEW_API_ENDPOINT_ENV]: 'https://provider.example/review',
+      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value'
+    },
+    fetch: async () => {
+      throw new Error('fetch should not be called when provider capability drift is detected');
+    }
+  });
+  assert.equal(apiRunWithoutTimeout.exitCode, 1);
+  assert.equal(JSON.parse(apiRunWithoutTimeout.stdout).errors[0].code, 'AGENTIC_REVIEW_PROVIDER_CAPABILITY_DRIFT');
+
   const apiRunResult = await executeCli(apiRunArgs, {
     cwd,
     now: fixedNow,
@@ -3814,7 +3909,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
     },
     env: {
       [AGENTIC_REVIEW_API_ENDPOINT_ENV]: 'https://provider.example/review',
-      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value'
+      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value',
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '90000'
     },
     fetch: async (url, init) => {
       assert.equal(url, 'https://provider.example/review');
@@ -4048,7 +4144,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
     now: fixedNow,
     env: {
       [AGENTIC_REVIEW_API_ENDPOINT_ENV]: 'http://provider.example/review',
-      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value'
+      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value',
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '90000'
     },
     fetch: async () => {
       throw new Error('fetch must not be called for unsupported protocol');
@@ -4065,7 +4162,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
     now: fixedNow,
     env: {
       [AGENTIC_REVIEW_API_ENDPOINT_ENV]: 'https://user:pass@provider.example/review',
-      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value'
+      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value',
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '90000'
     },
     fetch: async () => {
       throw new Error('fetch must not be called for endpoint URL credentials');
@@ -4079,7 +4177,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
     now: fixedNow,
     env: {
       [AGENTIC_REVIEW_API_ENDPOINT_ENV]: 'https://provider.example/review?token=secret',
-      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value'
+      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value',
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '90000'
     },
     fetch: async () => {
       throw new Error('fetch must not be called for sensitive endpoint query');

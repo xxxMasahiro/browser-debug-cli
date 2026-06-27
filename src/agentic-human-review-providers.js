@@ -4,9 +4,11 @@ import { redact, truncateText } from './redaction.js';
 
 export const AGENTIC_REVIEW_API_ENDPOINT_ENV = 'AGENTIC_HUMAN_REVIEW_API_ENDPOINT';
 export const AGENTIC_REVIEW_API_CREDENTIAL_ENV = 'AGENTIC_HUMAN_REVIEW_API_TOKEN';
+export const AGENTIC_REVIEW_API_TIMEOUT_ENV = 'AGENTIC_HUMAN_REVIEW_API_TIMEOUT_MS';
 export const AGENTIC_REVIEW_LIVE_DOGFOOD_ENV = 'AGENTIC_HUMAN_REVIEW_LIVE_DOGFOOD';
 
 const DEFAULT_TIMEOUT_MS = 30000;
+const MAX_TIMEOUT_MS = 2147483647;
 const DEFAULT_MAX_REQUEST_BYTES = 128 * 1024;
 const DEFAULT_MAX_RESPONSE_BYTES = 256 * 1024;
 const CAPABILITY_CONTRACT_VERSION = '2.0.0';
@@ -78,6 +80,7 @@ export const AGENTIC_HUMAN_REVIEW_PROVIDERS = Object.freeze([
     credential_mode: 'environment_variable_only',
     endpoint_env: AGENTIC_REVIEW_API_ENDPOINT_ENV,
     credential_env: AGENTIC_REVIEW_API_CREDENTIAL_ENV,
+    timeout_env: AGENTIC_REVIEW_API_TIMEOUT_ENV,
     default_model: 'generic-agentic-review-model',
     supported_modalities: Object.freeze(['metadata', 'text_summary', 'artifact_references']),
     transferable_evidence_classes: Object.freeze(['page_text', 'url', 'artifact_refs', 'accessibility_summary']),
@@ -107,6 +110,7 @@ export function agenticProviderCapabilityContract(provider) {
     credential_mode: normalized.credential_mode,
     endpoint_env: normalized.endpoint_env ?? null,
     credential_env: normalized.credential_env ?? null,
+    timeout_env: normalized.timeout_env ?? null,
     default_model: normalized.default_model,
     supported_modalities: supportedModalities,
     transferable_evidence_classes: transferableEvidenceClasses,
@@ -243,6 +247,7 @@ export function agenticProviderSummary(provider) {
     credential_mode: normalized.credential_mode,
     endpoint_env: normalized.endpoint_env ?? null,
     credential_env: normalized.credential_env ?? null,
+    timeout_env: normalized.timeout_env ?? null,
     default_model: normalized.default_model,
     supported_modalities: [...(normalized.supported_modalities ?? [])],
     transferable_evidence_classes: [...(normalized.transferable_evidence_classes ?? [])],
@@ -263,12 +268,12 @@ export function agenticProviderSummary(provider) {
 }
 
 export function resolveAgenticHumanReviewProvider({ providerId, context = {} } = {}) {
-  const prepared = prepareProviderDescriptors(context);
+  const id = providerId ?? 'fake-agent';
+  const prepared = prepareProviderDescriptors(context, { providerId: id });
   if (!prepared.ok) {
     return prepared;
   }
   const providers = prepared.providers;
-  const id = providerId ?? 'fake-agent';
   const provider = providers.find((candidate) => candidate.id === id);
   if (!provider) {
     return {
@@ -295,7 +300,7 @@ export function buildAgenticProviderReadiness({
   context = {},
   now = new Date()
 } = {}) {
-  const prepared = prepareProviderDescriptors(context);
+  const prepared = prepareProviderDescriptors(context, { providerId });
   if (!prepared.ok) {
     return prepared;
   }
@@ -364,13 +369,17 @@ export function buildAgenticDogfoodSetupReadiness({ provider, context = {} } = {
   const env = context.env ?? process.env;
   const endpointEnv = provider?.endpoint_env ?? null;
   const credentialEnv = provider?.credential_env ?? null;
+  const timeoutEnv = provider?.timeout_env ?? null;
   const liveDogfoodValue = env[AGENTIC_REVIEW_LIVE_DOGFOOD_ENV];
   return redact({
     endpoint_env: endpointEnv,
     credential_env: credentialEnv,
+    timeout_env: timeoutEnv,
     live_dogfood_env: AGENTIC_REVIEW_LIVE_DOGFOOD_ENV,
     endpoint_configured: hasEnvKey(env, endpointEnv),
     credential_configured: hasEnvKey(env, credentialEnv),
+    timeout_configured: hasEnvKey(env, timeoutEnv),
+    timeout_ms: provider?.timeout_ms ?? DEFAULT_TIMEOUT_MS,
     live_dogfood_enabled: liveDogfoodValue === '1' || String(liveDogfoodValue ?? '').toLowerCase() === 'true',
     manual_live_provider_default: false,
     ci_live_provider_default: false,
@@ -739,6 +748,7 @@ function readinessProviderRecord(provider, { surface, model }) {
       ci_live_provider_default: false,
       endpoint_env: summary.endpoint_env,
       credential_env: summary.credential_env,
+      timeout_env: summary.timeout_env,
       live_dogfood_env: AGENTIC_REVIEW_LIVE_DOGFOOD_ENV,
       credential_values_read_by_readiness: false,
       credential_values_recorded: false,
@@ -747,7 +757,7 @@ function readinessProviderRecord(provider, { surface, model }) {
   };
 }
 
-function prepareProviderDescriptors(context = {}) {
+function prepareProviderDescriptors(context = {}, { providerId = 'all' } = {}) {
   const customDescriptors = normalizeProviderDescriptors(context.agenticReviewProviders);
   const customProviders = [];
   for (const descriptor of customDescriptors) {
@@ -757,11 +767,22 @@ function prepareProviderDescriptors(context = {}) {
     }
     customProviders.push(validation.provider);
   }
+  const builtInProviders = [];
+  for (const descriptor of AGENTIC_HUMAN_REVIEW_PROVIDERS) {
+    const selected = providerId === 'all' || providerId === descriptor.id;
+    const runtime = selected
+      ? applyRuntimeProviderConfig(descriptor, context)
+      : { ok: true, provider: normalizeProviderDescriptor(descriptor) };
+    if (!runtime.ok) {
+      return runtime;
+    }
+    builtInProviders.push(runtime.provider);
+  }
   return {
     ok: true,
     providers: [
       ...customProviders,
-      ...AGENTIC_HUMAN_REVIEW_PROVIDERS.map(normalizeProviderDescriptor)
+      ...builtInProviders
     ]
   };
 }
@@ -780,6 +801,7 @@ function normalizeProviderDescriptor(provider) {
     credential_mode: provider.credential_mode ?? 'none',
     endpoint_env: provider.endpoint_env ?? null,
     credential_env: provider.credential_env ?? null,
+    timeout_env: provider.timeout_env ?? null,
     default_model: provider.default_model ?? 'fake-model',
     supported_modalities: Array.isArray(provider.supported_modalities) ? provider.supported_modalities : ['metadata'],
     transferable_evidence_classes: Array.isArray(provider.transferable_evidence_classes)
@@ -794,6 +816,64 @@ function normalizeProviderDescriptor(provider) {
     max_response_bytes: Number.isFinite(Number(provider.max_response_bytes)) ? Number(provider.max_response_bytes) : DEFAULT_MAX_RESPONSE_BYTES,
     cost_policy: provider.cost_policy ?? 'unknown_cost_requires_owner_review'
   };
+}
+
+function applyRuntimeProviderConfig(provider, context = {}) {
+  const normalized = normalizeProviderDescriptor(provider);
+  if (normalized.id !== 'generic-api-provider') {
+    return { ok: true, provider: normalized };
+  }
+  const env = context.env ?? process.env;
+  const timeout = parseOptionalPositiveIntegerEnv(env, normalized.timeout_env, 'timeout_ms');
+  if (!timeout.ok) {
+    return {
+      ok: false,
+      error: {
+        code: 'AGENTIC_REVIEW_PROVIDER_RUNTIME_CONFIG_INVALID',
+        message: 'Agentic human review provider runtime configuration is invalid.',
+        details: timeout.details
+      }
+    };
+  }
+  return {
+    ok: true,
+    provider: {
+      ...normalized,
+      timeout_ms: timeout.configured ? timeout.value : normalized.timeout_ms
+    }
+  };
+}
+
+function parseOptionalPositiveIntegerEnv(env, key, field) {
+  if (!hasEnvKey(env, key)) {
+    return { ok: true, configured: false, value: null };
+  }
+  const raw = String(env[key] ?? '').trim();
+  if (!/^[1-9]\d*$/.test(raw)) {
+    return {
+      ok: false,
+      details: {
+        env: key,
+        field,
+        value_present: raw.length > 0,
+        expected: 'positive integer milliseconds'
+      }
+    };
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value > MAX_TIMEOUT_MS) {
+    return {
+      ok: false,
+      details: {
+        env: key,
+        field,
+        value_present: true,
+        max: MAX_TIMEOUT_MS,
+        expected: 'safe positive integer milliseconds within Node timer range'
+      }
+    };
+  }
+  return { ok: true, configured: true, value };
 }
 
 function buildAgenticApiPayload({ plan, planPath, reviewPackage, transferFlags, provider, model, surface, execution }) {
