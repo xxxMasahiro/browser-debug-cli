@@ -40,7 +40,7 @@ const BLOCKED_MODEL_IDS = new Set([
   'injected-local-model'
 ]);
 
-const MAX_ADAPTER_EVIDENCE_CATALOG_ITEMS = 32;
+const MAX_ADAPTER_EVIDENCE_CATALOG_ITEMS = 96;
 const MAX_ADAPTER_EVIDENCE_REFS = 12;
 const MAX_ADAPTER_REPAIR_RECORDS = 32;
 const MAX_ADAPTER_REPAIR_EVIDENCE_IDS = 32;
@@ -61,6 +61,7 @@ const RECORD_LABEL_ALIASES = Object.freeze({
 function buildAdvisoryResponseSchema(traceCueRequest) {
   const benchmarkEnabled = isBenchmarkEnabled(traceCueRequest);
   const ownerBaselineEnabled = isOwnerBaselineEnabled(traceCueRequest);
+  const effectiveCoverageEnabled = effectiveBenchmarkCoverageRequirements(traceCueRequest).enabled;
   const ownerBaselineCriterionCount = ownerBaselineEnabled
     ? targetSpecificOwnerBaselineCriteria(ownerBaselineRequirementContract(traceCueRequest)).length
     : 0;
@@ -208,7 +209,7 @@ function buildAdvisoryResponseSchema(traceCueRequest) {
     },
     required: ['summary', 'role_opinions']
   };
-  if (benchmarkEnabled) {
+  if (benchmarkEnabled || effectiveCoverageEnabled) {
     schema.required = [...schema.required, 'benchmark_requirement_coverage'];
   }
   if (benchmarkEnabled || ownerBaselineEnabled) {
@@ -460,6 +461,7 @@ export function buildOpenAiResponsesRequest({ traceCueRequest, model, generatedA
   const safePayload = sanitizeTraceCuePayloadForProvider(traceCueRequest);
   const evidenceCatalog = buildProviderEvidenceReferenceCatalog(traceCueRequest);
   const requiredOwnerBaselineFindings = buildRequiredOwnerBaselineFindingRecords(traceCueRequest, evidenceCatalog);
+  const requiredOwnerBaselineCoverage = buildRequiredOwnerBaselineCoverageRecords(traceCueRequest, evidenceCatalog);
   const providerEffortBinding = resolveResponsesProviderEffortBinding(traceCueRequest);
   const input = {
     generated_at: generatedAt,
@@ -469,6 +471,9 @@ export function buildOpenAiResponsesRequest({ traceCueRequest, model, generatedA
   };
   if (requiredOwnerBaselineFindings.length > 0) {
     input.required_owner_baseline_findings = requiredOwnerBaselineFindings;
+  }
+  if (ownerBaselineCoverageRecordCount(requiredOwnerBaselineCoverage) > 0) {
+    input.required_owner_baseline_coverage = requiredOwnerBaselineCoverage;
   }
   const request = {
     model,
@@ -551,8 +556,11 @@ function buildAdapterInstructions(traceCueRequest, repairContext = null) {
         'Owner-approved human baseline contract is mandatory.',
         'Return one structured agentic_human_review_findings record for each target-specific must-not-miss criterion in review_request.plan.owner_baseline_requirement_contract.must_not_miss_criteria.',
         'Copy every record from required_owner_baseline_findings into provider-authored structured agentic_human_review_findings, preserving must_not_miss_criterion_id, criteria_refs, owner_label_ids, required fields, and catalog-backed evidence_refs.',
+        'Copy every record from required_owner_baseline_coverage into benchmark_requirement_coverage.required_mentions, required_dimensions, and forbidden_claims, preserving exact mention/dimension/claim strings and catalog-backed evidence_refs.',
         `Use this compact target-specific owner baseline id map for required ids, owner label ids, required fields, and preferred evidence refs: ${JSON.stringify(compactOwnerBaselineInstructionMap(traceCueRequest, ownerBaselineContract))}.`,
+        `Use this compact owner baseline coverage map for additional exact required_mentions, required_dimensions, and forbidden_claims: ${JSON.stringify(compactOwnerBaselineCoverageInstructionMap(traceCueRequest))}.`,
         'Each owner-baseline finding must include a non-empty message, recommendation, evidence_refs from evidence_reference_catalog, owner_label_ids when the contract has owner labels for that criterion, and either must_not_miss_criterion_id or criteria_refs matching the contract.',
+        'Each owner-baseline required mention or dimension must be an evidence-backed structured coverage record; each owner-baseline forbidden claim must be a structured absence record with present=false, status=absent or not_present, non-empty evidence, and evidence_refs.',
         'Do not satisfy owner-approved must-not-miss criteria through free text only; TraceCue will post-validate structured ids and evidence references.'
       ].join(' ')
     : 'No owner-approved human baseline contract is active for this request.';
@@ -601,6 +609,7 @@ function buildAdapterContractRepairContext(validation, attempt) {
     invalid_review_claims: compactRepairRecords(validation?.details?.invalid_review_claims),
     owner_baseline_criterion_hints: compactRepairOwnerBaselineHints(validation?.details?.owner_baseline_criterion_hints),
     required_owner_baseline_findings: compactRepairOwnerBaselineFindingTemplates(validation?.details?.required_owner_baseline_findings),
+    required_owner_baseline_coverage: compactRepairOwnerBaselineCoverageTemplates(validation?.details?.required_owner_baseline_coverage),
     evidence_reference_ids: compactRepairEvidenceReferenceIds(validation?.details?.evidence_reference_catalog),
     missing_roles: compactRepairStrings(validation?.details?.missing_roles),
     missing_rounds: compactRepairStrings(validation?.details?.missing_rounds),
@@ -653,6 +662,20 @@ function compactRepairOwnerBaselineFindingTemplates(values) {
   })).filter((template) => template.must_not_miss_criterion_id || template.criteria_refs.length > 0 || template.owner_label_ids.length > 0);
 }
 
+function compactRepairOwnerBaselineCoverageTemplates(value) {
+  const compactRecords = (records, labelKey) => arrayOrEmpty(records).slice(0, MAX_ADAPTER_REPAIR_OWNER_HINTS).map((record) => Object.fromEntries(Object.entries({
+    [labelKey]: truncateText(firstString(record?.[labelKey], null), 240),
+    required_present: record?.required_present === undefined ? undefined : record.required_present,
+    required_fields: compactRepairStrings(record?.required_fields),
+    recommended_evidence_ref_ids: compactRepairStrings(record?.recommended_evidence_ref_ids)
+  }).filter(([, item]) => item !== undefined && item !== null && !(Array.isArray(item) && item.length === 0))));
+  return {
+    required_mentions: compactRecords(value?.required_mentions, 'mention'),
+    required_dimensions: compactRecords(value?.required_dimensions, 'dimension'),
+    forbidden_claims: compactRecords(value?.forbidden_claims, 'claim')
+  };
+}
+
 function compactRepairEvidenceReferenceIds(values) {
   return uniqueAdapterStrings(arrayOrEmpty(values)
     .map((reference) => firstString(reference?.id, reference?.ref_id, reference?.reference_id, null)))
@@ -690,6 +713,10 @@ function buildAdapterContractRepairInstruction(repairContext) {
   const requiredOwnerBaselineFindings = Array.isArray(repairContext.required_owner_baseline_findings)
     ? repairContext.required_owner_baseline_findings
     : [];
+  const requiredOwnerBaselineCoverage = repairContext.required_owner_baseline_coverage && typeof repairContext.required_owner_baseline_coverage === 'object'
+    ? repairContext.required_owner_baseline_coverage
+    : {};
+  const requiredOwnerBaselineCoverageCount = ownerBaselineCoverageRecordCount(requiredOwnerBaselineCoverage);
   return [
     'Contract repair retry is active because the previous provider output failed TraceCue post-validation.',
     `Repair reason code: ${repairContext.reason_code}.`,
@@ -711,6 +738,9 @@ function buildAdapterContractRepairInstruction(repairContext) {
       : '',
     requiredOwnerBaselineFindings.length > 0
       ? `Required owner-baseline finding templates: copy these ids into complete agentic_human_review_findings records with evidence_refs from evidence_reference_catalog: ${JSON.stringify(requiredOwnerBaselineFindings)}.`
+      : '',
+    requiredOwnerBaselineCoverageCount > 0
+      ? `Required owner-baseline coverage templates: copy these exact mention, dimension, and forbidden-claim rows into benchmark_requirement_coverage with evidence_refs from evidence_reference_catalog: ${JSON.stringify(requiredOwnerBaselineCoverage)}.`
       : '',
     missingConditions.length > 0
       ? `Satisfy these missing xhigh mechanical conditions: ${JSON.stringify(missingConditions)}.`
@@ -954,6 +984,45 @@ function buildRequiredOwnerBaselineFindingRecords(traceCueRequest, evidenceCatal
   );
 }
 
+function buildRequiredOwnerBaselineCoverageRecords(traceCueRequest, evidenceCatalog = buildLocalEvidenceReferenceCatalog(traceCueRequest)) {
+  const contract = ownerBaselineRequirementContract(traceCueRequest);
+  const recordsFor = (values, section, labelKey, type, requiredPresent) => normalizeStringArray(values).slice(0, MAX_ADAPTER_REPAIR_OWNER_HINTS).map((value, index) => ({
+    [labelKey]: value,
+    section,
+    required_present: requiredPresent,
+    required_fields: uniqueAdapterStrings([
+      labelKey,
+      'present',
+      'status',
+      'evidence',
+      'evidence_refs',
+      ...(requiredPresent === false ? ['absence_confirmation'] : [])
+    ]),
+    recommended_evidence_ref_ids: recommendedEvidenceRefIdsForOwnerCoverage({
+      section,
+      type,
+      index,
+      evidenceCatalog
+    })
+  }));
+  return {
+    required_mentions: recordsFor(contract?.required_mentions, 'required_mentions', 'mention', 'owner_baseline_required_mention', true),
+    required_dimensions: recordsFor(contract?.required_dimensions, 'required_dimensions', 'dimension', 'owner_baseline_required_dimension', true),
+    forbidden_claims: recordsFor(contract?.forbidden_claims, 'forbidden_claims', 'claim', 'owner_baseline_forbidden_claim', false)
+  };
+}
+
+function compactOwnerBaselineCoverageInstructionMap(traceCueRequest) {
+  const evidenceCatalog = buildLocalEvidenceReferenceCatalog(traceCueRequest);
+  return buildRequiredOwnerBaselineCoverageRecords(traceCueRequest, evidenceCatalog);
+}
+
+function ownerBaselineCoverageRecordCount(value) {
+  return arrayOrEmpty(value?.required_mentions).length
+    + arrayOrEmpty(value?.required_dimensions).length
+    + arrayOrEmpty(value?.forbidden_claims).length;
+}
+
 function requiredOwnerBaselineFindingRecordsFromContract(contract, criteria, evidenceCatalog) {
   return arrayOrEmpty(criteria).slice(0, MAX_ADAPTER_REPAIR_OWNER_HINTS).map((criterion) => {
     const criterionId = String(criterion?.id ?? '').trim();
@@ -978,6 +1047,19 @@ function requiredOwnerBaselineFindingRecordsFromContract(contract, criteria, evi
       })
     };
   }).filter((record) => record.must_not_miss_criterion_id || record.criteria_refs.length > 0 || record.owner_label_ids.length > 0);
+}
+
+function recommendedEvidenceRefIdsForOwnerCoverage({ section, type, index, evidenceCatalog }) {
+  const exactId = ownerBaselineCoverageReferenceId(section, index);
+  const exact = arrayOrEmpty(evidenceCatalog)
+    .filter((reference) => String(reference?.id ?? reference?.ref_id ?? '') === exactId || String(reference?.type ?? reference?.evidence_class ?? '') === type)
+    .map((reference) => reference.id)
+    .filter(Boolean);
+  const supporting = arrayOrEmpty(evidenceCatalog)
+    .filter((reference) => /text|artifact|visual/i.test(String(reference?.type ?? reference?.evidence_class ?? '')))
+    .map((reference) => reference.id)
+    .filter(Boolean);
+  return uniqueAdapterStrings([...exact, ...supporting]).slice(0, 8);
 }
 
 function findingUsesExpectedOwnerLabelIds(finding, ownerLabelIds) {
@@ -1110,16 +1192,17 @@ function uniqueAdapterStrings(values) {
 }
 
 function validateAdapterBenchmarkCoverage(advisory, traceCueRequest) {
-  if (!isBenchmarkEnabled(traceCueRequest)) {
+  const benchmarkRequirements = effectiveBenchmarkCoverageRequirements(traceCueRequest);
+  if (!benchmarkRequirements.enabled) {
     return { ok: true };
   }
-  const benchmark = traceCueRequest?.plan?.review_quality_benchmark ?? {};
   const coverage = advisory?.benchmark_requirement_coverage ?? {};
   const evidenceCatalog = buildLocalEvidenceReferenceCatalog(traceCueRequest);
+  const requiredOwnerBaselineCoverage = buildRequiredOwnerBaselineCoverageRecords(traceCueRequest, evidenceCatalog);
   const sections = [
-    ['required_mentions', 'mention', benchmark.required_mentions ?? []],
-    ['required_dimensions', 'dimension', benchmark.required_dimensions ?? []],
-    ['forbidden_claims', 'claim', benchmark.forbidden_claims ?? []]
+    ['required_mentions', 'mention', benchmarkRequirements.required_mentions],
+    ['required_dimensions', 'dimension', benchmarkRequirements.required_dimensions],
+    ['forbidden_claims', 'claim', benchmarkRequirements.forbidden_claims]
   ];
   const missing = [];
   for (const [section, labelKey, expectedValues] of sections) {
@@ -1174,7 +1257,11 @@ function validateAdapterBenchmarkCoverage(advisory, traceCueRequest) {
       ok: false,
       code: 'AHR_RESPONSES_ADAPTER_BENCHMARK_CONTRACT_INCOMPLETE',
       message: 'Provider output did not satisfy the benchmark coverage contract with evidence and evidence references.',
-      details: { missing_benchmark_records: missing, raw_provider_response_stored: false }
+      details: {
+        missing_benchmark_records: missing,
+        required_owner_baseline_coverage: requiredOwnerBaselineCoverage,
+        raw_provider_response_stored: false
+      }
     };
   }
   return { ok: true };
@@ -1196,7 +1283,7 @@ function normalizeAdvisoryForTraceCue(advisory, traceCueRequest) {
     benchmark_requirement_coverage: normalizeAdapterBenchmarkRequirementCoverage(
       advisory.benchmark_requirement_coverage ?? advisory.benchmark_calibration_evidence ?? advisory.calibration_evidence ?? null,
       evidenceCatalog,
-      { required: isBenchmarkEnabled(traceCueRequest) }
+      { required: effectiveBenchmarkCoverageRequirements(traceCueRequest).enabled }
     ),
     role_opinions: Array.isArray(advisory.role_opinions) ? advisory.role_opinions : [],
     findings,
@@ -1266,11 +1353,16 @@ function buildProviderEvidenceReferenceCatalog(traceCueRequest) {
 
 function buildLocalEvidenceReferenceCatalog(traceCueRequest) {
   const references = [];
+  const seenIds = new Set();
   const addReference = (reference = {}) => {
     if (references.length >= MAX_ADAPTER_EVIDENCE_CATALOG_ITEMS) {
       return;
     }
     const id = truncateText(firstString(reference.id, reference.ref_id, reference.reference_id, reference.evidence_id, reference.source_id, `evidence-${references.length + 1}`), 100);
+    if (!id || seenIds.has(id)) {
+      return;
+    }
+    seenIds.add(id);
     const type = truncateText(firstString(reference.type, reference.evidence_class, reference.kind, 'agentic_human_review_evidence'), 100);
     const description = truncateText(redactString(firstString(
       reference.description,
@@ -1291,6 +1383,30 @@ function buildLocalEvidenceReferenceCatalog(traceCueRequest) {
   };
 
   const ownerBaseline = ownerBaselineRequirementContract(traceCueRequest);
+  for (const [index, mention] of normalizeStringArray(ownerBaseline.required_mentions).entries()) {
+    addReference({
+      id: ownerBaselineCoverageReferenceId('required_mentions', index),
+      type: 'owner_baseline_required_mention',
+      description: `Owner-approved baseline required mention: ${mention}`,
+      content_included: false
+    });
+  }
+  for (const [index, dimension] of normalizeStringArray(ownerBaseline.required_dimensions).entries()) {
+    addReference({
+      id: ownerBaselineCoverageReferenceId('required_dimensions', index),
+      type: 'owner_baseline_required_dimension',
+      description: `Owner-approved baseline required dimension: ${dimension}`,
+      content_included: false
+    });
+  }
+  for (const [index, claim] of normalizeStringArray(ownerBaseline.forbidden_claims).entries()) {
+    addReference({
+      id: ownerBaselineCoverageReferenceId('forbidden_claims', index),
+      type: 'owner_baseline_forbidden_claim',
+      description: `Owner-approved baseline forbidden claim check: ${claim}`,
+      content_included: false
+    });
+  }
   for (const [index, criterion] of arrayOrEmpty(ownerBaseline.must_not_miss_criteria).entries()) {
     const criterionId = criterion?.id ?? `owner-baseline-criterion-${index + 1}`;
     addReference({
@@ -1359,6 +1475,48 @@ function buildLocalEvidenceReferenceCatalog(traceCueRequest) {
     });
   }
   return references;
+}
+
+function ownerBaselineCoverageReferenceId(section, index) {
+  if (section === 'required_mentions') {
+    return `owner-baseline-required-mention-${index + 1}`;
+  }
+  if (section === 'required_dimensions') {
+    return `owner-baseline-required-dimension-${index + 1}`;
+  }
+  if (section === 'forbidden_claims') {
+    return `owner-baseline-forbidden-claim-${index + 1}`;
+  }
+  return `owner-baseline-coverage-${index + 1}`;
+}
+
+function effectiveBenchmarkCoverageRequirements(traceCueRequest) {
+  const benchmark = traceCueRequest?.plan?.review_quality_benchmark ?? {};
+  const ownerBaseline = ownerBaselineRequirementContract(traceCueRequest);
+  const requiredMentions = uniqueAdapterStrings([
+    ...normalizeStringArray(benchmark.required_mentions),
+    ...normalizeStringArray(benchmark.owner_baseline_requirement_contract?.required_mentions),
+    ...normalizeStringArray(ownerBaseline.required_mentions)
+  ]);
+  const requiredDimensions = uniqueAdapterStrings([
+    ...normalizeStringArray(benchmark.required_dimensions),
+    ...normalizeStringArray(benchmark.owner_baseline_requirement_contract?.required_dimensions),
+    ...normalizeStringArray(ownerBaseline.required_dimensions)
+  ]);
+  const forbiddenClaims = uniqueAdapterStrings([
+    ...normalizeStringArray(benchmark.forbidden_claims),
+    ...normalizeStringArray(benchmark.owner_baseline_requirement_contract?.forbidden_claims),
+    ...normalizeStringArray(ownerBaseline.forbidden_claims)
+  ]);
+  return {
+    enabled: isBenchmarkEnabled(traceCueRequest)
+      || requiredMentions.length > 0
+      || requiredDimensions.length > 0
+      || forbiddenClaims.length > 0,
+    required_mentions: requiredMentions,
+    required_dimensions: requiredDimensions,
+    forbidden_claims: forbiddenClaims
+  };
 }
 
 function normalizeAdapterBenchmarkRequirementCoverage(value, evidenceCatalog, { required = false } = {}) {

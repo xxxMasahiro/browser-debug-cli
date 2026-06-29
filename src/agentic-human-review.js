@@ -6113,27 +6113,34 @@ function buildProviderDeclaredBenchmarkRequirementCoverage({ plan, input }) {
   if (!benchmarkCase) {
     return null;
   }
+  const effectiveRequirements = buildEffectiveBenchmarkCoverageRequirements({
+    contract: plan.review_quality_benchmark ?? null,
+    resolvedCase: benchmarkCase,
+    ownerBaselineRequirementContract: plan.owner_baseline_requirement_contract
+      ?? plan.review_quality_benchmark?.owner_baseline_requirement_contract
+      ?? null
+  });
   return {
     schema_version: SCHEMA_VERSION,
     coverage_version: HUMAN_REVIEW_CALIBRATION_VERSION,
     source: 'deterministic_fake_provider_contract',
     case_id: benchmarkCase.case_id,
     rubric_profile_id: benchmarkCase.rubric_profile_id,
-    required_mentions: benchmarkCase.required_mentions.map((mention, index) => ({
+    required_mentions: effectiveRequirements.required_mentions.map((mention, index) => ({
       mention,
       status: 'covered',
       present: true,
       evidence: benchmarkRequirementEvidenceText({ kind: 'mention', id: mention, input }),
       evidence_refs: [benchmarkRequirementEvidenceReference({ plan, kind: 'mention', id: mention, index })]
     })),
-    required_dimensions: benchmarkCase.required_dimensions.map((dimension, index) => ({
+    required_dimensions: effectiveRequirements.required_dimensions.map((dimension, index) => ({
       dimension,
       status: 'covered',
       present: true,
       evidence: benchmarkRequirementEvidenceText({ kind: 'dimension', id: dimension, input }),
       evidence_refs: [benchmarkRequirementEvidenceReference({ plan, kind: 'dimension', id: dimension, index })]
     })),
-    forbidden_claims: benchmarkCase.forbidden_claims.map((claim, index) => ({
+    forbidden_claims: effectiveRequirements.forbidden_claims.map((claim, index) => ({
       claim,
       status: 'absent',
       present: false,
@@ -6194,9 +6201,16 @@ function buildBenchmarkRequirementCoverage({ plan = null, input = {}, humanRevie
   const resolvedCase = benchmarkCase
     ?? resolveBenchmarkCase(contract?.case_id ?? plan?.dogfood_metadata?.case_id ?? input?.calibration_metadata?.benchmark_case_id ?? input?.dogfood_metadata?.case_id);
   const enabled = Boolean(contract?.enabled || resolvedCase);
-  const requiredMentions = normalizeStringArray(contract?.required_mentions ?? resolvedCase?.required_mentions);
-  const requiredDimensions = normalizeStringArray(contract?.required_dimensions ?? resolvedCase?.required_dimensions);
-  const forbiddenClaims = normalizeStringArray(contract?.forbidden_claims ?? resolvedCase?.forbidden_claims);
+  const effectiveRequirements = buildEffectiveBenchmarkCoverageRequirements({
+    contract,
+    resolvedCase,
+    ownerBaselineRequirementContract: plan?.owner_baseline_requirement_contract
+      ?? contract?.owner_baseline_requirement_contract
+      ?? null
+  });
+  const requiredMentions = effectiveRequirements.required_mentions;
+  const requiredDimensions = effectiveRequirements.required_dimensions;
+  const forbiddenClaims = effectiveRequirements.forbidden_claims;
   const thresholds = {
     coverage_score: Number(contract?.thresholds?.coverage_score ?? resolvedCase?.thresholds?.coverage_score ?? 0.75),
     actionability_score: Number(contract?.thresholds?.actionability_score ?? resolvedCase?.thresholds?.actionability_score ?? 0.6),
@@ -6342,6 +6356,47 @@ function buildBenchmarkRequirementCoverage({ plan = null, input = {}, humanRevie
     advisory_only: true,
     gate_effect: 'none'
   });
+}
+
+function buildEffectiveBenchmarkCoverageRequirements({ contract = null, resolvedCase = null, ownerBaselineRequirementContract = null } = {}) {
+  const benchmarkMentions = contract?.required_mentions !== undefined
+    ? normalizeStringArray(contract.required_mentions)
+    : normalizeStringArray(resolvedCase?.required_mentions);
+  const benchmarkDimensions = contract?.required_dimensions !== undefined
+    ? normalizeStringArray(contract.required_dimensions)
+    : normalizeStringArray(resolvedCase?.required_dimensions);
+  const benchmarkForbiddenClaims = contract?.forbidden_claims !== undefined
+    ? normalizeStringArray(contract.forbidden_claims)
+    : normalizeStringArray(resolvedCase?.forbidden_claims);
+  return {
+    required_mentions: uniqueRequirementStrings([
+      ...benchmarkMentions,
+      ...normalizeStringArray(ownerBaselineRequirementContract?.required_mentions)
+    ]),
+    required_dimensions: uniqueRequirementStrings([
+      ...benchmarkDimensions,
+      ...normalizeStringArray(ownerBaselineRequirementContract?.required_dimensions)
+    ]),
+    forbidden_claims: uniqueRequirementStrings([
+      ...benchmarkForbiddenClaims,
+      ...normalizeStringArray(ownerBaselineRequirementContract?.forbidden_claims)
+    ])
+  };
+}
+
+function uniqueRequirementStrings(values) {
+  const seen = new Set();
+  const output = [];
+  for (const value of values) {
+    const item = String(value ?? '').trim();
+    const key = item.toLowerCase().replace(/[-_\s]+/g, ' ');
+    if (!item || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(item);
+  }
+  return output;
 }
 
 function normalizeProviderBenchmarkRequirementCoverage(value) {
@@ -10222,6 +10277,7 @@ function buildProviderInstructionContract({
       'compare deterministic technical issues with content value and reader impact',
       'preserve evidence, uncertainty, dissent, and owner-decision needs',
       'when review_quality_benchmark is enabled, return benchmark_requirement_coverage with one evidence-backed record for every required mention, required dimension, and forbidden claim',
+      'when owner_baseline_requirement_contract is present, include its required mentions, required dimensions, and forbidden claims as additional evidence-backed benchmark_requirement_coverage records',
       'when owner_baseline_requirement_contract is present, return structured agentic_human_review_findings for every target-specific must-not-miss criterion, using criterion ids and owner label ids from the contract',
       'return findings or agentic_human_review_findings with local evidence_refs for material owner-label and benchmark matches instead of relying only on advisory text search',
       'return normalized JSON matching agentic_human_review_advisory'
@@ -10288,6 +10344,9 @@ function buildReviewQualityBenchmarkContract({
     owner_baseline_requirement_contract: ownerBaselineRequirementContract ? {
       baseline_id: ownerBaselineRequirementContract.baseline_id ?? null,
       case_id: ownerBaselineRequirementContract.case_id ?? null,
+      required_dimensions: ownerBaselineRequirementContract.required_dimensions ?? [],
+      required_mentions: ownerBaselineRequirementContract.required_mentions ?? [],
+      forbidden_claims: ownerBaselineRequirementContract.forbidden_claims ?? [],
       must_not_miss_criteria: ownerBaselineRequirementContract.must_not_miss_criteria ?? [],
       owner_labels: ownerBaselineRequirementContract.owner_labels ?? [],
       required_structured_finding_fields: ownerBaselineRequirementContract.required_structured_finding_fields ?? []
