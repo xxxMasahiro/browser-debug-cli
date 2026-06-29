@@ -6625,10 +6625,21 @@ test('agentic human review responses adapter retries repairable owner baseline c
 
   assert.equal(result.statusCode, 200);
   assert.equal(observedRequests.length, 2);
+  const initialInput = JSON.parse(observedRequests[0].input);
+  const repairInput = JSON.parse(observedRequests[1].input);
+  assert.equal(initialInput.required_owner_baseline_findings[0].must_not_miss_criterion_id, 'owner-final-ambiguity');
+  assert.equal(initialInput.required_owner_baseline_findings[0].owner_label_ids[0], 'owner-label-final-ambiguity');
+  assert.equal(initialInput.required_owner_baseline_findings[0].required_fields.includes('owner_label_ids'), true);
+  assert.equal(initialInput.required_owner_baseline_findings[0].recommended_evidence_ref_ids.includes('owner-final-ambiguity'), true);
+  assert.equal(repairInput.contract_repair_request.required_owner_baseline_findings[0].must_not_miss_criterion_id, 'owner-final-ambiguity');
+  assert.equal(repairInput.contract_repair_request.required_owner_baseline_findings[0].recommended_evidence_ref_ids.includes('owner-final-ambiguity'), true);
   assert.match(observedRequests[0].instructions, /Owner-approved human baseline contract is mandatory/);
   assert.match(observedRequests[0].instructions, /compact target-specific owner baseline id map/);
+  assert.match(observedRequests[0].instructions, /required_owner_baseline_findings/);
   assert.doesNotMatch(observedRequests[0].instructions, /must remain visible to the reviewer/);
+  assert.doesNotMatch(JSON.stringify(initialInput.required_owner_baseline_findings), /must remain visible to the reviewer/);
   assert.match(observedRequests[1].instructions, /owner-approved must-not-miss criteria/);
+  assert.match(observedRequests[1].instructions, /Required owner-baseline finding templates/);
   assert.match(observedRequests[0].input, /owner-final-ambiguity/);
   assert.match(observedRequests[0].input, /owner-label-final-ambiguity/);
   assert.doesNotMatch(observedRequests[0].input, /must remain visible to the reviewer/);
@@ -6640,6 +6651,105 @@ test('agentic human review responses adapter retries repairable owner baseline c
   assert.equal(result.body.agentic_human_review_findings[0].owner_label_ids[0], 'owner-label-final-ambiguity');
   assert.equal(result.body.agentic_human_review_findings[0].evidence_refs[0].id, 'owner-final-ambiguity');
   assert.equal(result.body.adapter_boundary.contract_repair_attempts_performed, 1);
+  assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value|output_text/);
+});
+
+test('agentic human review responses adapter accepts role-level owner-baseline structured findings', async () => {
+  const request = adapterTraceCueRequest();
+  request.plan.review_effort = { mode: 'standard' };
+  attachAdapterOwnerBaselineContract(request);
+  const advisory = {
+    summary: 'The adapter provider returned the owner-baseline finding inside a planned role.',
+    role_opinions: [{
+      role: 'content_reviewer',
+      display_name: 'Content Reviewer',
+      effort: 'standard',
+      round: 1,
+      summary: 'The content reviewer covered the owner-approved ambiguity criterion.',
+      findings: [{
+        id: 'role-owner-finding',
+        category: 'content_comprehension',
+        severity: 'high',
+        message: 'The ambiguous ending interpretation must stay visible.',
+        recommendation: 'Preserve the ambiguity and avoid a single definitive conclusion.',
+        criterion_ref: 'owner-final-ambiguity',
+        owner_label_id: 'owner-label-final-ambiguity',
+        evidence_reference_ids: ['owner-final-ambiguity'],
+        target_specific: true
+      }],
+      uncertainties: []
+    }]
+  };
+  const result = await handleAgenticHumanReviewResponsesAdapterRequest({
+    method: 'POST',
+    url: '/agentic-human-review',
+    headers: {
+      host: '127.0.0.1:8787',
+      authorization: 'Bearer adapter-secret-value',
+      'content-type': 'application/json'
+    },
+    remoteAddress: '127.0.0.1',
+    bodyText: JSON.stringify(request),
+    env: adapterEnv(),
+    config: { contractRepairAttempts: 0 },
+    fetchImpl: async () => jsonResponse({ output_text: JSON.stringify(advisory) }),
+    now: fixedNow
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.agentic_human_review_findings.length, 1);
+  assert.equal(result.body.agentic_human_review_findings[0].must_not_miss_criterion_id, '');
+  assert.deepEqual(result.body.agentic_human_review_findings[0].criteria_refs, ['owner-final-ambiguity']);
+  assert.deepEqual(result.body.agentic_human_review_findings[0].owner_label_ids, ['owner-label-final-ambiguity']);
+  assert.equal(result.body.agentic_human_review_findings[0].evidence_refs[0].id, 'owner-final-ambiguity');
+  assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value|output_text/);
+});
+
+test('agentic human review responses adapter rejects free-text-only owner baseline discussion', async () => {
+  const request = adapterTraceCueRequest();
+  request.plan.review_effort = { mode: 'standard' };
+  attachAdapterOwnerBaselineContract(request);
+  const invalidAdvisory = {
+    summary: 'The adapter provider discussed the owner baseline only in prose.',
+    role_opinions: [{
+      role: 'content_reviewer',
+      display_name: 'Content Reviewer',
+      effort: 'standard',
+      round: 1,
+      summary: 'The ambiguous ending interpretation should remain visible, but no structured owner ids were returned.',
+      findings: [],
+      uncertainties: []
+    }],
+    agentic_human_review_findings: [{
+      id: 'free-text-owner-baseline',
+      category: 'content_comprehension',
+      severity: 'high',
+      message: 'The ambiguous ending interpretation should remain visible.',
+      recommendation: 'Preserve ambiguity.',
+      evidence_ref_ids: ['owner-final-ambiguity']
+    }]
+  };
+  const result = await handleAgenticHumanReviewResponsesAdapterRequest({
+    method: 'POST',
+    url: '/agentic-human-review',
+    headers: {
+      host: '127.0.0.1:8787',
+      authorization: 'Bearer adapter-secret-value',
+      'content-type': 'application/json'
+    },
+    remoteAddress: '127.0.0.1',
+    bodyText: JSON.stringify(request),
+    env: adapterEnv(),
+    config: { contractRepairAttempts: 0 },
+    fetchImpl: async () => jsonResponse({ output_text: JSON.stringify(invalidAdvisory) }),
+    now: fixedNow
+  });
+
+  assert.equal(result.statusCode, 502);
+  assert.equal(result.body.error.code, 'AHR_RESPONSES_ADAPTER_OWNER_BASELINE_CONTRACT_INCOMPLETE');
+  assert.equal(result.body.error.details.missing_owner_baseline_records[0].missing_fields.includes('structured_finding'), true);
+  assert.equal(result.body.error.details.required_owner_baseline_findings[0].must_not_miss_criterion_id, 'owner-final-ambiguity');
+  assert.equal(result.body.error.details.required_owner_baseline_findings[0].recommended_evidence_ref_ids.includes('owner-final-ambiguity'), true);
   assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value|output_text/);
 });
 
@@ -9680,6 +9790,32 @@ function adapterTraceCueRequest() {
       mcp_execution_allowed: false
     }
   };
+}
+
+function attachAdapterOwnerBaselineContract(request) {
+  request.plan.owner_baseline_requirement_contract = {
+    baseline_id: 'owner-baseline-fixed',
+    case_id: 'blog-content-value',
+    must_not_miss_criteria: [{
+      id: 'owner-final-ambiguity',
+      dimension: 'content_comprehension',
+      summary: 'The review must preserve the target-specific ambiguous ending interpretation.',
+      severity: 'high',
+      target_specific: true
+    }],
+    owner_labels: [{
+      id: 'owner-label-final-ambiguity',
+      must_not_miss_criterion_id: 'owner-final-ambiguity',
+      criteria_refs: ['owner-final-ambiguity'],
+      target_specific: true,
+      evidence_ref_count: 1
+    }],
+    required_structured_finding_fields: ['must_not_miss_criterion_id', 'owner_label_ids', 'evidence_refs'],
+    target_specific_must_not_miss_required: true,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+  return request.plan.owner_baseline_requirement_contract;
 }
 
 function adapterEnv(extra = {}) {

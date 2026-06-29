@@ -61,6 +61,9 @@ const RECORD_LABEL_ALIASES = Object.freeze({
 function buildAdvisoryResponseSchema(traceCueRequest) {
   const benchmarkEnabled = isBenchmarkEnabled(traceCueRequest);
   const ownerBaselineEnabled = isOwnerBaselineEnabled(traceCueRequest);
+  const ownerBaselineCriterionCount = ownerBaselineEnabled
+    ? targetSpecificOwnerBaselineCriteria(ownerBaselineRequirementContract(traceCueRequest)).length
+    : 0;
   const evidenceRefSchema = {
     type: 'object',
     additionalProperties: true,
@@ -114,6 +117,10 @@ function buildAdvisoryResponseSchema(traceCueRequest) {
       source_refs: { type: 'array' }
     },
     required: ['message', 'evidence_refs']
+  };
+  const ownerBaselineFindingSchema = {
+    ...findingSchema,
+    required: ['message', 'recommendation', 'must_not_miss_criterion_id', 'owner_label_ids', 'evidence_refs']
   };
   const schema = {
     type: 'object',
@@ -170,7 +177,16 @@ function buildAdvisoryResponseSchema(traceCueRequest) {
         }
       },
       findings: { type: 'array', items: findingSchema },
-      agentic_human_review_findings: { type: 'array', items: findingSchema },
+      agentic_human_review_findings: {
+        type: 'array',
+        ...(ownerBaselineCriterionCount > 0 ? { minItems: ownerBaselineCriterionCount } : {}),
+        items: findingSchema
+      },
+      owner_baseline_findings: {
+        type: 'array',
+        ...(ownerBaselineCriterionCount > 0 ? { minItems: ownerBaselineCriterionCount } : {}),
+        items: ownerBaselineFindingSchema
+      },
       strengths: { type: 'array', items: { type: 'string' } },
       improvement_suggestions: { type: 'array', items: { type: 'string' } },
       owner_decision_requests: { type: 'array' },
@@ -443,18 +459,23 @@ export async function handleAgenticHumanReviewResponsesAdapterRequest({
 export function buildOpenAiResponsesRequest({ traceCueRequest, model, generatedAt, repairContext = null }) {
   const safePayload = sanitizeTraceCuePayloadForProvider(traceCueRequest);
   const evidenceCatalog = buildProviderEvidenceReferenceCatalog(traceCueRequest);
+  const requiredOwnerBaselineFindings = buildRequiredOwnerBaselineFindingRecords(traceCueRequest, evidenceCatalog);
   const providerEffortBinding = resolveResponsesProviderEffortBinding(traceCueRequest);
+  const input = {
+    generated_at: generatedAt,
+    review_request: safePayload,
+    evidence_reference_catalog: evidenceCatalog,
+    contract_repair_request: repairContext
+  };
+  if (requiredOwnerBaselineFindings.length > 0) {
+    input.required_owner_baseline_findings = requiredOwnerBaselineFindings;
+  }
   const request = {
     model,
     store: false,
     tools: [],
     instructions: buildAdapterInstructions(traceCueRequest, repairContext),
-    input: JSON.stringify({
-      generated_at: generatedAt,
-      review_request: safePayload,
-      evidence_reference_catalog: evidenceCatalog,
-      contract_repair_request: repairContext
-    }),
+    input: JSON.stringify(input),
     text: {
       format: {
         type: 'json_schema',
@@ -529,7 +550,8 @@ function buildAdapterInstructions(traceCueRequest, repairContext = null) {
     ? [
         'Owner-approved human baseline contract is mandatory.',
         'Return one structured agentic_human_review_findings record for each target-specific must-not-miss criterion in review_request.plan.owner_baseline_requirement_contract.must_not_miss_criteria.',
-        `Use this compact target-specific owner baseline id map for required ids, owner label ids, and preferred evidence refs: ${JSON.stringify(compactOwnerBaselineInstructionMap(traceCueRequest, ownerBaselineContract))}.`,
+        'Copy every record from required_owner_baseline_findings into provider-authored structured agentic_human_review_findings, preserving must_not_miss_criterion_id, criteria_refs, owner_label_ids, required fields, and catalog-backed evidence_refs.',
+        `Use this compact target-specific owner baseline id map for required ids, owner label ids, required fields, and preferred evidence refs: ${JSON.stringify(compactOwnerBaselineInstructionMap(traceCueRequest, ownerBaselineContract))}.`,
         'Each owner-baseline finding must include a non-empty message, recommendation, evidence_refs from evidence_reference_catalog, owner_label_ids when the contract has owner labels for that criterion, and either must_not_miss_criterion_id or criteria_refs matching the contract.',
         'Do not satisfy owner-approved must-not-miss criteria through free text only; TraceCue will post-validate structured ids and evidence references.'
       ].join(' ')
@@ -552,22 +574,11 @@ function buildAdapterInstructions(traceCueRequest, repairContext = null) {
 
 function compactOwnerBaselineInstructionMap(traceCueRequest, ownerBaselineContract) {
   const evidenceCatalog = buildLocalEvidenceReferenceCatalog(traceCueRequest);
-  return arrayOrEmpty(ownerBaselineContract?.must_not_miss_criteria)
-    .filter((criterion) => criterion?.target_specific === true)
-    .slice(0, 50)
-    .map((criterion) => {
-      const criterionId = String(criterion?.id ?? '').trim();
-      const ownerLabelIds = ownerLabelIdsForCriterion(ownerBaselineContract, criterionId);
-      return {
-        criterion_id: criterionId || null,
-        owner_label_ids: ownerLabelIds,
-        recommended_evidence_ref_ids: recommendedEvidenceRefIdsForOwnerCriterion({
-          criterionId,
-          ownerLabelIds,
-          evidenceCatalog
-        })
-      };
-    });
+  return requiredOwnerBaselineFindingRecordsFromContract(
+    ownerBaselineContract,
+    targetSpecificOwnerBaselineCriteria(ownerBaselineContract),
+    evidenceCatalog
+  );
 }
 
 function isRepairableAdapterContractValidation(validation) {
@@ -589,6 +600,7 @@ function buildAdapterContractRepairContext(validation, attempt) {
     missing_owner_baseline_records: compactRepairRecords(validation?.details?.missing_owner_baseline_records),
     invalid_review_claims: compactRepairRecords(validation?.details?.invalid_review_claims),
     owner_baseline_criterion_hints: compactRepairOwnerBaselineHints(validation?.details?.owner_baseline_criterion_hints),
+    required_owner_baseline_findings: compactRepairOwnerBaselineFindingTemplates(validation?.details?.required_owner_baseline_findings),
     evidence_reference_ids: compactRepairEvidenceReferenceIds(validation?.details?.evidence_reference_catalog),
     missing_roles: compactRepairStrings(validation?.details?.missing_roles),
     missing_rounds: compactRepairStrings(validation?.details?.missing_rounds),
@@ -613,6 +625,7 @@ function compactRepairRecords(values) {
       criterion_id: truncateText(firstString(record.criterion_id, record.must_not_miss_criterion_id, null), 120),
       owner_label_ids: compactRepairStrings(record.owner_label_ids),
       criteria_refs: compactRepairStrings(record.criteria_refs),
+      recommended_evidence_ref_ids: compactRepairStrings(record.recommended_evidence_ref_ids),
       claim_id: truncateText(firstString(record.claim_id, record.id, null), 120),
       index: Number.isFinite(Number(record.index)) ? Number(record.index) : undefined,
       supported_role_count: Number.isFinite(Number(record.supported_role_count)) ? Number(record.supported_role_count) : undefined,
@@ -628,6 +641,16 @@ function compactRepairOwnerBaselineHints(values) {
     required_finding_fields: compactRepairStrings(hint?.required_finding_fields),
     recommended_evidence_ref_ids: compactRepairStrings(hint?.recommended_evidence_ref_ids)
   })).filter((hint) => hint.criterion_id || hint.owner_label_ids.length > 0 || hint.recommended_evidence_ref_ids.length > 0);
+}
+
+function compactRepairOwnerBaselineFindingTemplates(values) {
+  return arrayOrEmpty(values).slice(0, MAX_ADAPTER_REPAIR_OWNER_HINTS).map((template) => ({
+    must_not_miss_criterion_id: truncateText(firstString(template?.must_not_miss_criterion_id, template?.criterion_id, null), 120),
+    criteria_refs: compactRepairStrings(template?.criteria_refs),
+    owner_label_ids: compactRepairStrings(template?.owner_label_ids),
+    required_fields: compactRepairStrings(template?.required_fields),
+    recommended_evidence_ref_ids: compactRepairStrings(template?.recommended_evidence_ref_ids)
+  })).filter((template) => template.must_not_miss_criterion_id || template.criteria_refs.length > 0 || template.owner_label_ids.length > 0);
 }
 
 function compactRepairEvidenceReferenceIds(values) {
@@ -664,6 +687,9 @@ function buildAdapterContractRepairInstruction(repairContext) {
   const ownerBaselineCriterionHints = Array.isArray(repairContext.owner_baseline_criterion_hints)
     ? repairContext.owner_baseline_criterion_hints
     : [];
+  const requiredOwnerBaselineFindings = Array.isArray(repairContext.required_owner_baseline_findings)
+    ? repairContext.required_owner_baseline_findings
+    : [];
   return [
     'Contract repair retry is active because the previous provider output failed TraceCue post-validation.',
     `Repair reason code: ${repairContext.reason_code}.`,
@@ -682,6 +708,9 @@ function buildAdapterContractRepairInstruction(repairContext) {
       : '',
     ownerBaselineCriterionHints.length > 0
       ? `Owner-baseline criterion repair hints: ${JSON.stringify(ownerBaselineCriterionHints)}.`
+      : '',
+    requiredOwnerBaselineFindings.length > 0
+      ? `Required owner-baseline finding templates: copy these ids into complete agentic_human_review_findings records with evidence_refs from evidence_reference_catalog: ${JSON.stringify(requiredOwnerBaselineFindings)}.`
       : '',
     missingConditions.length > 0
       ? `Satisfy these missing xhigh mechanical conditions: ${JSON.stringify(missingConditions)}.`
@@ -832,6 +861,7 @@ function validateAdapterOwnerBaselineCoverage(advisory, traceCueRequest) {
   const evidenceCatalog = buildLocalEvidenceReferenceCatalog(traceCueRequest);
   const findings = normalizeAdapterFindings(advisory, evidenceCatalog);
   const criterionHints = ownerBaselineCriterionHints(contract, criteria, evidenceCatalog);
+  const requiredOwnerBaselineFindings = requiredOwnerBaselineFindingRecordsFromContract(contract, criteria, evidenceCatalog);
   const missing = [];
   for (const criterion of criteria) {
     const criterionId = String(criterion?.id ?? '').trim();
@@ -886,6 +916,7 @@ function validateAdapterOwnerBaselineCoverage(advisory, traceCueRequest) {
       details: {
         missing_owner_baseline_records: missing,
         owner_baseline_criterion_hints: criterionHints,
+        required_owner_baseline_findings: requiredOwnerBaselineFindings,
         evidence_reference_catalog: summarizeAdapterEvidenceReferenceCatalog(evidenceCatalog),
         raw_provider_response_stored: false
       }
@@ -907,6 +938,46 @@ function ownerLabelIdsForCriterion(contract, criterionId) {
     .filter((label) => label?.must_not_miss_criterion_id === criterionId || arrayOrEmpty(label?.criteria_refs).includes(criterionId))
     .map((label) => label.id)
     .filter(Boolean);
+}
+
+function targetSpecificOwnerBaselineCriteria(contract) {
+  return arrayOrEmpty(contract?.must_not_miss_criteria)
+    .filter((criterion) => criterion?.target_specific === true);
+}
+
+function buildRequiredOwnerBaselineFindingRecords(traceCueRequest, evidenceCatalog = buildLocalEvidenceReferenceCatalog(traceCueRequest)) {
+  const contract = ownerBaselineRequirementContract(traceCueRequest);
+  return requiredOwnerBaselineFindingRecordsFromContract(
+    contract,
+    targetSpecificOwnerBaselineCriteria(contract),
+    evidenceCatalog
+  );
+}
+
+function requiredOwnerBaselineFindingRecordsFromContract(contract, criteria, evidenceCatalog) {
+  return arrayOrEmpty(criteria).slice(0, MAX_ADAPTER_REPAIR_OWNER_HINTS).map((criterion) => {
+    const criterionId = String(criterion?.id ?? '').trim();
+    const ownerLabelIds = ownerLabelIdsForCriterion(contract, criterionId);
+    const requiredFields = uniqueAdapterStrings([
+      'message',
+      'recommendation',
+      'must_not_miss_criterion_id',
+      'criteria_refs',
+      ...(ownerLabelIds.length > 0 ? ['owner_label_ids'] : []),
+      'evidence_refs'
+    ]);
+    return {
+      must_not_miss_criterion_id: criterionId || null,
+      criteria_refs: criterionId ? [criterionId] : [],
+      owner_label_ids: ownerLabelIds,
+      required_fields: requiredFields,
+      recommended_evidence_ref_ids: recommendedEvidenceRefIdsForOwnerCriterion({
+        criterionId,
+        ownerLabelIds,
+        evidenceCatalog
+      })
+    };
+  }).filter((record) => record.must_not_miss_criterion_id || record.criteria_refs.length > 0 || record.owner_label_ids.length > 0);
 }
 
 function findingUsesExpectedOwnerLabelIds(finding, ownerLabelIds) {
@@ -1397,11 +1468,7 @@ function adapterForbiddenClaimAbsenceConfirmed(source, statusText, evidenceText)
 }
 
 function normalizeAdapterFindings(advisory, evidenceCatalog) {
-  const source = Array.isArray(advisory?.agentic_human_review_findings)
-    ? advisory.agentic_human_review_findings
-    : Array.isArray(advisory?.findings)
-      ? advisory.findings
-      : [];
+  const source = collectAdapterFindingRecords(advisory);
   return source.slice(0, 50).map((finding, index) => {
     const item = finding && typeof finding === 'object' && !Array.isArray(finding) ? finding : {};
     return {
@@ -1412,12 +1479,74 @@ function normalizeAdapterFindings(advisory, evidenceCatalog) {
       message: truncateText(redactString(firstString(item.message, item.summary, item.description, 'Agentic Human Review advisory finding.')), 700),
       recommendation: truncateText(redactString(firstString(item.recommendation, item.suggested_fix, item.next_action, 'Review this advisory item with the owner before implementation.')), 900),
       must_not_miss_criterion_id: truncateText(firstString(item.must_not_miss_criterion_id, item.criterion_id, item.must_not_miss_id, null), 120),
-      criteria_refs: normalizeStringArray(item.criteria_refs ?? item.criterion_refs ?? item.must_not_miss_criteria_refs).slice(0, 12),
-      owner_label_ids: normalizeStringArray(item.owner_label_ids ?? item.owner_labels ?? item.label_ids).slice(0, 12),
+      criteria_refs: normalizeAdapterStringReferences(
+        item.criteria_refs,
+        item.criterion_refs,
+        item.criterion_ref,
+        item.must_not_miss_criteria_refs,
+        item.must_not_miss_criterion_ids
+      ).slice(0, 12),
+      owner_label_ids: normalizeAdapterStringReferences(
+        item.owner_label_ids,
+        item.owner_label_id,
+        item.owner_baseline_label_ids,
+        item.owner_baseline_label_id,
+        item.owner_labels,
+        item.label_ids
+      ).slice(0, 12),
       target_specific: item.target_specific === true,
-      evidence_refs: normalizeAdapterEvidenceRefs(item.evidence_refs ?? item.evidence_ref_ids ?? item.citations ?? item.source_refs ?? item.references ?? item.artifacts, evidenceCatalog)
+      evidence_refs: normalizeAdapterEvidenceRefs(
+        item.evidence_refs
+          ?? item.evidence_ref_ids
+          ?? item.evidence_reference_ids
+          ?? item.evidence_reference_id
+          ?? item.citations
+          ?? item.source_refs
+          ?? item.references
+          ?? item.artifacts,
+        evidenceCatalog
+      )
     };
   });
+}
+
+function collectAdapterFindingRecords(advisory) {
+  const records = [];
+  const addRecords = (values) => {
+    for (const value of arrayOrEmpty(values)) {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        records.push(value);
+      }
+    }
+  };
+  addRecords(advisory?.agentic_human_review_findings);
+  addRecords(advisory?.owner_baseline_findings);
+  addRecords(advisory?.findings);
+  for (const opinion of arrayOrEmpty(advisory?.role_opinions)) {
+    addRecords(opinion?.findings);
+  }
+  return dedupeAdapterFindingRecords(records);
+}
+
+function dedupeAdapterFindingRecords(records) {
+  const seen = new Set();
+  const output = [];
+  for (const record of records) {
+    const key = [
+      firstString(record?.id, ''),
+      firstString(record?.must_not_miss_criterion_id, record?.criterion_id, record?.must_not_miss_id, ''),
+      firstString(record?.message, record?.summary, record?.description, '')
+    ].join('|');
+    const normalizedKey = key.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (normalizedKey && seen.has(normalizedKey)) {
+      continue;
+    }
+    if (normalizedKey) {
+      seen.add(normalizedKey);
+    }
+    output.push(record);
+  }
+  return output;
 }
 
 function normalizeAdapterReviewClaims(advisory, evidenceCatalog) {
@@ -2017,6 +2146,18 @@ function normalizeStringArray(value) {
     return [];
   }
   return value.map((item) => truncateText(redactString(String(item ?? '')), 1000)).filter(Boolean);
+}
+
+function normalizeAdapterStringReferences(...values) {
+  const output = [];
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      output.push(...normalizeStringArray(value));
+    } else if (typeof value === 'string' && value.trim()) {
+      output.push(truncateText(redactString(value), 1000));
+    }
+  }
+  return uniqueAdapterStrings(output);
 }
 
 function arrayOrEmpty(value) {
