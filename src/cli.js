@@ -11,6 +11,7 @@ import {
   runAgenticHumanReviewCalibrate,
   runAgenticHumanReviewClaimAudit,
   runAgenticHumanReviewClaimPolicy,
+  runAgenticHumanReviewClaimStandardGate,
   runAgenticHumanReviewCompare,
   runAgenticHumanReviewCompareBatch,
   runAgenticHumanReviewDogfoodPlan,
@@ -386,6 +387,10 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'agentic review claim policy') {
       return runtimeResult(parsed.command, await (context.agenticHumanReviewClaimPolicyRunner ?? runAgenticHumanReviewClaimPolicy)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agentic review claim standard-gate') {
+      return runtimeResult(parsed.command, await (context.agenticHumanReviewClaimStandardGateRunner ?? runAgenticHumanReviewClaimStandardGate)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'agentic review claim audit') {
@@ -895,8 +900,8 @@ function usageText(topic) {
     || topic === 'agentic review claim'
   ) {
     return [
-      `Usage: ${CLI_NAME} agentic review propose --brief <request> [--review-index <review-artifact-index>] [--effort quick|standard|deep|xhigh] [--json]`,
-      `       ${CLI_NAME} agentic review plan --proposal <proposal> [--review-index <review-artifact-index>] [--json]`,
+      `Usage: ${CLI_NAME} agentic review propose --brief <request> [--review-index <review-artifact-index>] [--human-baseline <owner-baseline-json>] [--effort quick|standard|deep|xhigh] [--json]`,
+      `       ${CLI_NAME} agentic review plan --proposal <proposal> [--review-index <review-artifact-index>] [--human-baseline <owner-baseline-json>] [--json]`,
       `       ${CLI_NAME} agentic review provider-readiness [--provider <id>|--proposal <proposal>|--plan <plan>] [--json]`,
       `       ${CLI_NAME} agentic review run --plan <plan> --plan-hash <sha256> [--allow-raw-pixels] [--allow-page-text] [--allow-url] [--allow-artifact-refs] [--allow-accessibility-summary] --execute [--json]`,
       `       ${CLI_NAME} agentic review report-quality --result <agentic-human-review-result> [--execution <agentic-human-review-execution>] [--json]`,
@@ -921,6 +926,7 @@ function usageText(topic) {
       `       ${CLI_NAME} agentic review xhigh simulate --plan <agentic-human-review-plan> --round-input <workspace-json> [--json]`,
       `       ${CLI_NAME} agentic review quality longitudinal --evidence-set <workspace-json> [--json]`,
       `       ${CLI_NAME} agentic review claim policy [--input <workspace-json>] [--json]`,
+      `       ${CLI_NAME} agentic review claim standard-gate --evidence-set <workspace-json> [--policy <workspace-json>] [--json]`,
       `       ${CLI_NAME} agentic review claim audit --result <agentic-human-review-result> [--policy <workspace-json>] [--json]`,
       `       ${CLI_NAME} agentic review status --execution <agentic-human-review-execution> [--json]`,
       `       ${CLI_NAME} agentic review list [--json]`,

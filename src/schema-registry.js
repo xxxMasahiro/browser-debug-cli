@@ -1486,6 +1486,35 @@ const schemas = Object.freeze({
     },
     additionalProperties: true
   }),
+  agentic_human_review_claim_standard_gate: Object.freeze({
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: 'https://trace-cue.local/schemas/agentic-human-review-claim-standard-gate.schema.json',
+    title: 'TraceCue Agentic Human Review Claim Standard Gate',
+    type: 'object',
+    required: ['schema_version', 'type', 'claim_standard_gate_version', 'generated_at', 'status', 'passed', 'evidence_set', 'policy', 'readiness', 'longitudinal_quality', 'claim_audit_summary', 'conditions', 'claim_states', 'blockers', 'warnings', 'boundary', 'advisory_only', 'gate_effect'],
+    properties: {
+      schema_version: { type: 'string' },
+      type: { const: 'agentic_human_review_claim_standard_gate' },
+      claim_standard_gate_version: { type: 'string' },
+      generated_at: { type: 'string' },
+      status: { enum: ['owner_claim_review_ready', 'not_ready'] },
+      passed: { type: 'boolean' },
+      evidence_set: { type: 'object' },
+      policy: { type: 'object' },
+      readiness: { type: 'object' },
+      longitudinal_quality: { type: 'object' },
+      claim_audit_summary: { type: 'object' },
+      conditions: { type: 'object' },
+      claim_states: { type: 'object' },
+      summary: { type: 'object' },
+      blockers: { type: 'array' },
+      warnings: { type: 'array' },
+      boundary: { type: 'object' },
+      advisory_only: { const: true },
+      gate_effect: { const: 'none' }
+    },
+    additionalProperties: true
+  }),
   agentic_human_review_claim_audit: Object.freeze({
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: 'https://trace-cue.local/schemas/agentic-human-review-claim-audit.schema.json',

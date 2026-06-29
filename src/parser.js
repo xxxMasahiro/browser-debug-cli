@@ -35,6 +35,7 @@ const VALUE_OPTIONS = new Set([
   'fixture-root',
   'group',
   'host',
+  'human-baseline',
   'idle-timeout',
   'image',
   'input',
@@ -1078,6 +1079,7 @@ function parseAgentic(args, globals) {
       'case-id',
       'benchmark-case',
       'fixture-id',
+      'human-baseline',
       'baseline-snapshot-hash',
       'comparison-run-id',
       'rubric-profile',
@@ -1146,6 +1148,7 @@ function parseAgentic(args, globals) {
       'case-id',
       'benchmark-case',
       'fixture-id',
+      'human-baseline',
       'baseline-snapshot-hash',
       'comparison-run-id',
       'rubric-profile',
@@ -1712,10 +1715,26 @@ function parseAgentic(args, globals) {
       }
       return parsed;
     }
+    if (claimAction === 'standard-gate') {
+      const command = 'agentic review claim standard-gate';
+      const parsed = parseRequiredOptions(command, args.slice(3), globals, ['evidence-set']);
+      if (!parsed.ok) {
+        return parsed;
+      }
+      const unsupported = Object.keys(parsed.options).find((option) => !['evidence-set', 'policy', 'max-bytes'].includes(option));
+      if (unsupported) {
+        return parseError(command, globals.json, {
+          code: unsupported === 'execute' ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_AGENTIC_REVIEW_CLAIM_STANDARD_GATE_OPTION',
+          message: `${command} does not accept --${unsupported} because it is read-only.`,
+          details: { option: unsupported }
+        });
+      }
+      return parsed;
+    }
     return parseError('agentic review claim', globals.json, {
       code: claimAction ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
-      message: claimAction ? `Unknown agentic review claim subcommand: ${claimAction}` : 'agentic review claim requires policy or audit.',
-      details: { subcommands: ['policy', 'audit'] }
+      message: claimAction ? `Unknown agentic review claim subcommand: ${claimAction}` : 'agentic review claim requires policy, standard-gate, or audit.',
+      details: { subcommands: ['policy', 'standard-gate', 'audit'] }
     });
   }
   const parsed = parseOptions('agentic review list', args.slice(2), globals.json);
@@ -2387,6 +2406,7 @@ function plannedCommands() {
     'agentic review xhigh simulate',
     'agentic review quality longitudinal',
     'agentic review claim policy',
+    'agentic review claim standard-gate',
     'agentic review claim audit',
     'visual review plan',
     'visual review prepare',

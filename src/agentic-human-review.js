@@ -44,6 +44,7 @@ export const HUMAN_REVIEW_EVALUATOR_POLICY_VERSION = '1.0.0';
 export const HUMAN_REVIEW_XHIGH_ROUND_PLAN_VERSION = '1.0.0';
 export const HUMAN_REVIEW_LONGITUDINAL_QUALITY_VERSION = '1.0.0';
 export const HUMAN_REVIEW_CLAIM_POLICY_VERSION = '1.0.0';
+export const HUMAN_REVIEW_CLAIM_STANDARD_VERSION = '1.0.0';
 export const HUMAN_REVIEW_HUMAN_BASELINE_VERSION = '1.0.0';
 export const HUMAN_REVIEW_HUMAN_BASELINE_COMPARISON_VERSION = '1.0.0';
 export const HUMAN_REVIEW_HUMAN_BASELINE_OPERATIONS_VERSION = '1.0.0';
@@ -352,6 +353,15 @@ export async function runAgenticHumanReviewPropose(options = {}, context = {}) {
   if (!reviewIndexPreview.ok) {
     return errorResult(reviewIndexPreview.error.code, reviewIndexPreview.error.message, reviewIndexPreview.error.details);
   }
+  const ownerBaselineContractRead = await readOwnerBaselineRequirementContract({
+    cwd,
+    options,
+    maxBytes: maxBytes.value,
+    now
+  });
+  if (!ownerBaselineContractRead.ok) {
+    return errorResult(ownerBaselineContractRead.error.code, ownerBaselineContractRead.error.message, ownerBaselineContractRead.error.details);
+  }
 
   const proposalRel = artifactRelPath(artifactRootInput, 'agentic-human-review-proposals', id, 'proposal.json');
   const receiptRel = artifactRelPath(artifactRootInput, 'receipts', `${id}-agentic-proposal.json`);
@@ -397,6 +407,7 @@ export async function runAgenticHumanReviewPropose(options = {}, context = {}) {
       target_audience: structuredIntent.target_audience,
       expected_impression: structuredIntent.expected_impression,
       benchmark_case_id: stringOrNull(options['benchmark-case'] ?? options['case-id']),
+      human_baseline_path: ownerBaselineContractRead.relativePath,
       rubric_profile_id: stringOrNull(options['rubric-profile']),
       evidence_plan_mode: stringOrNull(options['evidence-plan-mode']),
       dogfood_metadata: buildDogfoodMetadataFromOptions(options)
@@ -421,6 +432,7 @@ export async function runAgenticHumanReviewPropose(options = {}, context = {}) {
     sub_agents: orchestration.sub_agents,
     rounds: orchestration.rounds,
     transfer_preview: reviewIndexPreview.transferPermissions,
+    owner_baseline_requirement_preview: ownerBaselineContractRead.contract,
     provider: provider.provider,
     model,
     surface: surfaceSummary(surface),
@@ -488,7 +500,7 @@ export async function runAgenticHumanReviewPropose(options = {}, context = {}) {
       approval_required: true,
       boundary: proposal.boundary
     },
-    warnings: [...briefRead.warnings, ...reviewIndexPreview.warnings],
+    warnings: [...briefRead.warnings, ...reviewIndexPreview.warnings, ...ownerBaselineContractRead.warnings],
     errors: [],
     artifacts: [
       artifactObject({
@@ -603,12 +615,25 @@ export async function runAgenticHumanReviewPlan(options = {}, context = {}) {
     expectedImpression: planOptions['expected-impression']
   });
   const requestedBenchmarkCaseId = planOptions['benchmark-case'] ?? planOptions['case-id'];
-  const benchmarkCase = resolveBenchmarkCase(requestedBenchmarkCaseId);
+  let benchmarkCase = resolveBenchmarkCase(requestedBenchmarkCaseId);
   if (requestedBenchmarkCaseId && !benchmarkCase) {
     return errorResult('AGENTIC_REVIEW_BENCHMARK_CASE_NOT_FOUND', 'No agentic human review benchmark case matched the requested id.', {
       case: requestedBenchmarkCaseId,
       available_cases: BENCHMARK_CASES.map((item) => item.case_id)
     });
+  }
+  const ownerBaselineContractRead = await readOwnerBaselineRequirementContract({
+    cwd,
+    options: planOptions,
+    maxBytes: maxBytes.value,
+    now,
+    benchmarkCase
+  });
+  if (!ownerBaselineContractRead.ok) {
+    return errorResult(ownerBaselineContractRead.error.code, ownerBaselineContractRead.error.message, ownerBaselineContractRead.error.details);
+  }
+  if (!benchmarkCase && ownerBaselineContractRead.contract?.case_id) {
+    benchmarkCase = resolveBenchmarkCase(ownerBaselineContractRead.contract.case_id);
   }
   const rubricProfile = resolveRubricProfile({
     profileId: planOptions['rubric-profile'],
@@ -723,6 +748,7 @@ export async function runAgenticHumanReviewPlan(options = {}, context = {}) {
     xhigh_multi_step_contract: effortExecutionContract.xhigh_multi_step_contract,
     role_instruction_contracts: roleInstructionContracts,
     dogfood_metadata: buildDogfoodMetadataFromOptions(planOptions),
+    owner_baseline_requirement_contract: ownerBaselineContractRead.contract,
     live_dogfood_execution_gate: buildAgenticLiveDogfoodExecutionGate({
       provider: provider.provider,
       plan: {
@@ -730,7 +756,8 @@ export async function runAgenticHumanReviewPlan(options = {}, context = {}) {
         review_quality_benchmark: buildReviewQualityBenchmarkContract({
           dogfoodMetadata: buildDogfoodMetadataFromOptions(planOptions),
           benchmarkCase,
-          rubricProfile
+          rubricProfile,
+          ownerBaselineRequirementContract: ownerBaselineContractRead.contract
         })
       },
       context,
@@ -765,12 +792,14 @@ export async function runAgenticHumanReviewPlan(options = {}, context = {}) {
       rubricProfile,
       evidencePlan,
       roleInstructionContracts,
-      benchmarkCase
+      benchmarkCase,
+      ownerBaselineRequirementContract: ownerBaselineContractRead.contract
     }),
     review_quality_benchmark: buildReviewQualityBenchmarkContract({
       dogfoodMetadata: buildDogfoodMetadataFromOptions(planOptions),
       benchmarkCase,
-      rubricProfile
+      rubricProfile,
+      ownerBaselineRequirementContract: ownerBaselineContractRead.contract
     }),
     benchmark_completion_readiness: buildBenchmarkCompletionReadiness({
       benchmarkCase,
@@ -783,6 +812,8 @@ export async function runAgenticHumanReviewPlan(options = {}, context = {}) {
       result_type: 'agentic_human_review_advisory',
       benchmark_requirement_coverage_required: Boolean(benchmarkCase),
       benchmark_requirement_coverage_source: 'review_quality_benchmark',
+      owner_baseline_requirement_contract_required: Boolean(ownerBaselineContractRead.contract),
+      owner_baseline_structured_findings_required: Boolean(ownerBaselineContractRead.contract),
       effort_execution_contract_required: true,
       strict_tracecue_output_validation_required: effortExecutionContract.strict_output_contract.tracecue_post_validation_required,
       xhigh_mechanical_completion_required: effortExecutionContract.xhigh_required,
@@ -867,7 +898,7 @@ export async function runAgenticHumanReviewPlan(options = {}, context = {}) {
   await writeJsonArtifact(root, ['agentic-human-review-plans', id, 'plan.json'], plan);
   await writeJsonArtifact(root, ['receipts', `${id}-agentic-plan.json`], planReceipt);
 
-  const warnings = [...reviewArtifact.warnings, ...intentRead.warnings];
+  const warnings = [...reviewArtifact.warnings, ...intentRead.warnings, ...ownerBaselineContractRead.warnings];
   return {
     status: 'ok',
     data: {
@@ -2204,6 +2235,98 @@ export async function runAgenticHumanReviewClaimPolicy(options = {}, context = {
   };
 }
 
+export async function runAgenticHumanReviewClaimStandardGate(options = {}, context = {}) {
+  const cwd = context.cwd ?? process.cwd();
+  const now = materializeNow(context.now);
+  const maxBytes = parseMaxBytes(options['max-bytes']);
+  if (!maxBytes.ok) {
+    return errorResult('AGENTIC_REVIEW_INVALID_MAX_BYTES', maxBytes.message, { max_bytes: options['max-bytes'] });
+  }
+  const evidenceSetRead = await readWorkspaceJson({
+    cwd,
+    inputPath: options['evidence-set'],
+    label: 'agentic human review claim standard evidence set',
+    maxBytes: maxBytes.value
+  });
+  if (!evidenceSetRead.ok) {
+    return errorResult(evidenceSetRead.error.code, evidenceSetRead.error.message, evidenceSetRead.error.details);
+  }
+  const policyRead = options.policy
+    ? await readOptionalPolicyInput({
+        cwd,
+        inputPath: options.policy,
+        label: 'agentic human review claim standard policy',
+        maxBytes: maxBytes.value
+      })
+    : { ok: true, value: null, relativePath: null, hash: null };
+  if (!policyRead.ok) {
+    return errorResult(policyRead.error.code, policyRead.error.message, policyRead.error.details);
+  }
+  const evidenceSet = isEvidenceSetOutput(evidenceSetRead.value)
+    ? normalizeEvidenceSetOutput(evidenceSetRead.value)
+    : await buildEvidenceSetSummary({
+        cwd,
+        manifest: evidenceSetRead.value,
+        manifestPath: evidenceSetRead.relativePath,
+        manifestHash: hashText(evidenceSetRead.text),
+        now,
+        maxBytes: maxBytes.value,
+        mode: 'claim-standard-gate'
+      });
+  const policy = normalizeClaimPolicy(policyRead.value);
+  const readiness = buildHumanBaselineClaimReadiness({
+    evidenceSet,
+    evidenceSetPath: evidenceSetRead.relativePath,
+    evidenceSetHash: hashText(evidenceSetRead.text),
+    policy,
+    policyPath: policyRead.relativePath,
+    policyHash: policyRead.hash,
+    now
+  });
+  const longitudinal = buildLongitudinalQualityRollup({
+    evidenceSet,
+    evidenceSetPath: evidenceSetRead.relativePath,
+    evidenceSetHash: hashText(evidenceSetRead.text),
+    now
+  });
+  const claimAuditSummary = await buildClaimStandardClaimAuditSummary({
+    cwd,
+    evidenceSet,
+    policy,
+    now,
+    maxBytes: maxBytes.value
+  });
+  const gate = buildClaimStandardGate({
+    evidenceSet,
+    evidenceSetPath: evidenceSetRead.relativePath,
+    evidenceSetHash: hashText(evidenceSetRead.text),
+    policy,
+    policyInput: policyRead.value,
+    policyPath: policyRead.relativePath,
+    policyHash: policyRead.hash,
+    readiness,
+    longitudinal,
+    claimAuditSummary,
+    now
+  });
+  return {
+    status: gate.passed ? 'ok' : 'error',
+    data: {
+      agentic_human_review_claim_standard_gate: gate,
+      boundary: gate.boundary
+    },
+    warnings: gate.warnings,
+    errors: gate.passed
+      ? []
+      : [{
+          code: 'AHR_CLAIM_STANDARD_GATE_FAILED',
+          message: 'The Agentic Human Review claim-standard gate did not pass.',
+          details: { status: gate.status, blocker_count: gate.blockers.length }
+        }],
+    artifacts: []
+  };
+}
+
 export async function runAgenticHumanReviewClaimAudit(options = {}, context = {}) {
   const cwd = context.cwd ?? process.cwd();
   const now = materializeNow(context.now);
@@ -2479,12 +2602,16 @@ function unwrapEvidenceSetRuntimeResultArtifact(value, dataKeys = []) {
   if (!isPlainObject(value) || !isPlainObject(value.data)) {
     return value;
   }
-  const looksLikeRuntimeResult = typeof value.command === 'string'
+  const looksLikeCliRuntimeResult = typeof value.command === 'string'
     && typeof value.status === 'string'
     && Array.isArray(value.warnings)
     && Array.isArray(value.errors)
     && Array.isArray(value.artifacts);
-  if (!looksLikeRuntimeResult) {
+  const looksLikeApiRuntimeResult = typeof value.status === 'string'
+    && Array.isArray(value.warnings)
+    && Array.isArray(value.errors)
+    && Array.isArray(value.artifacts);
+  if (!looksLikeCliRuntimeResult && !looksLikeApiRuntimeResult) {
     return value;
   }
   for (const key of dataKeys) {
@@ -2637,10 +2764,16 @@ function evidenceSetComparisonRecord({ entry, comparison, comparisonPath, compar
     improved_score_count: Number(comparison.summary?.improved_score_count ?? 0),
     human_baseline_overall_alignment_score: Number(comparison.scores?.overall_alignment_score ?? 0),
     human_baseline_ready_for_owner_review: comparison.summary?.ready_for_owner_review === true,
+    human_baseline_candidate_matches_owner_baseline: comparison.summary?.candidate_matches_owner_baseline === true,
+    human_baseline_owner_labeled_baseline_verified: comparison.summary?.owner_labeled_baseline_verified === true
+      || comparison.baseline?.owner_labeled_baseline_verified === true,
     candidate_mechanical_contract_satisfied: comparison.summary?.candidate_mechanical_contract_satisfied === true
       || comparison.candidate?.mechanical_contract_satisfied === true,
+    human_baseline_must_not_miss_miss_count: Number(comparison.scores?.must_not_miss_miss_count ?? 0),
     human_baseline_miss_count: Number(comparison.scores?.miss_count ?? comparison.matches?.classifications?.misses?.length ?? 0),
     human_baseline_over_report_count: Number(comparison.scores?.over_report_count ?? comparison.matches?.classifications?.over_reports?.length ?? 0),
+    human_baseline_severity_mismatch_count: Number(comparison.scores?.severity_mismatch_count ?? comparison.matches?.classifications?.severity_mismatches?.length ?? 0),
+    human_baseline_insufficient_evidence_count: Number(comparison.scores?.insufficient_evidence_count ?? comparison.matches?.classifications?.insufficient_evidence?.length ?? 0),
     advisory_only: comparison.advisory_only !== false,
     gate_effect: comparison.gate_effect ?? 'none'
   };
@@ -2706,6 +2839,13 @@ function evidenceSetCoverageSummary({ results, calibrations, comparisons, humanB
     comparisons,
     requiredCaseIds: requiredBenchmarkCaseIds
   });
+  const proofReadinessBlockers = buildProofReadinessBlockers({
+    results,
+    calibrations,
+    requiredCaseIds: requiredBenchmarkCaseIds,
+    requiredEfforts: HUMAN_REVIEW_CLAIM_EFFORTS,
+    comparisonCaseMatrix
+  });
   const observedHumanBaselineCaseIds = uniqueSorted(humanBaselines
     .filter((baseline) => baseline.owner_labeled_baseline_verified)
     .map((baseline) => baseline.case_id)
@@ -2762,6 +2902,11 @@ function evidenceSetCoverageSummary({ results, calibrations, comparisons, humanB
     calibration_pass_matrix: calibrationPassMatrix,
     calibration_pass_matrix_complete: calibrationPassMatrix.complete,
     missing_calibration_case_efforts: calibrationPassMatrix.missing_case_efforts,
+    proof_readiness_blockers: proofReadinessBlockers,
+    missing_result_case_efforts: proofReadinessBlockers.missing_result_case_efforts,
+    mechanical_incomplete_case_efforts: proofReadinessBlockers.mechanical_incomplete_case_efforts,
+    calibration_failed_case_efforts: proofReadinessBlockers.calibration_failed_case_efforts,
+    comparison_missing_case_matrix: proofReadinessBlockers.comparison_missing_case_matrix,
     xhigh_complete_count: results.filter((result) => result.xhigh_completion_status === 'complete').length,
     xhigh_mechanically_complete_count: results.filter((result) => result.effort === 'xhigh' && result.mechanical_contract_satisfied).length,
     live_provider_dogfood_count: results.filter((result) => result.api_call_performed && result.external_evidence_transfer).length,
@@ -2780,6 +2925,46 @@ function evidenceSetCoverageSummary({ results, calibrations, comparisons, humanB
       && results.length > 1,
     human_equivalent_claim_allowed: false,
     human_superior_claim_allowed: false
+  };
+}
+
+function buildProofReadinessBlockers({ results, calibrations, requiredCaseIds, requiredEfforts, comparisonCaseMatrix }) {
+  const resultCells = new Set(results
+    .filter((result) => result.case_id && result.effort)
+    .map((result) => `${result.case_id}\u0000${result.effort}`));
+  const mechanicalCells = new Set(results
+    .filter((result) => result.case_id && result.effort && result.mechanical_contract_satisfied)
+    .map((result) => `${result.case_id}\u0000${result.effort}`));
+  const claimEligibleCells = new Set(results
+    .filter((result) => result.case_id && result.effort && result.claim_numerator_eligible)
+    .map((result) => `${result.case_id}\u0000${result.effort}`));
+  const passedCalibrationCells = new Set(calibrations
+    .filter((calibration) => calibration.case_id && calibration.effort && calibration.passed)
+    .map((calibration) => `${calibration.case_id}\u0000${calibration.effort}`));
+  const allRequiredCells = requiredCaseIds.flatMap((caseId) => requiredEfforts.map((effort) => ({ case_id: caseId, effort })));
+  const missingResultCaseEfforts = allRequiredCells.filter((cell) => !resultCells.has(`${cell.case_id}\u0000${cell.effort}`));
+  const mechanicalIncompleteCaseEfforts = allRequiredCells
+    .filter((cell) => resultCells.has(`${cell.case_id}\u0000${cell.effort}`) && !mechanicalCells.has(`${cell.case_id}\u0000${cell.effort}`));
+  const claimIneligibleCaseEfforts = allRequiredCells
+    .filter((cell) => resultCells.has(`${cell.case_id}\u0000${cell.effort}`) && !claimEligibleCells.has(`${cell.case_id}\u0000${cell.effort}`));
+  const calibrationFailedCaseEfforts = allRequiredCells
+    .filter((cell) => resultCells.has(`${cell.case_id}\u0000${cell.effort}`) && !passedCalibrationCells.has(`${cell.case_id}\u0000${cell.effort}`));
+  const comparisonMissingCaseMatrix = Array.isArray(comparisonCaseMatrix?.missing_case_comparisons)
+    ? comparisonCaseMatrix.missing_case_comparisons
+    : [];
+  return {
+    missing_result_case_efforts: missingResultCaseEfforts,
+    mechanical_incomplete_case_efforts: mechanicalIncompleteCaseEfforts,
+    claim_ineligible_case_efforts: claimIneligibleCaseEfforts,
+    calibration_failed_case_efforts: calibrationFailedCaseEfforts,
+    comparison_missing_case_matrix: comparisonMissingCaseMatrix,
+    categories: {
+      missing_result_count: missingResultCaseEfforts.length,
+      mechanical_incomplete_count: mechanicalIncompleteCaseEfforts.length,
+      claim_ineligible_count: claimIneligibleCaseEfforts.length,
+      calibration_failed_count: calibrationFailedCaseEfforts.length,
+      comparison_missing_count: comparisonMissingCaseMatrix.length
+    }
   };
 }
 
@@ -2908,13 +3093,13 @@ function evidenceSetCoverageWarnings(summary) {
     warnings.push({ code: 'AHR_EVIDENCE_SET_HUMAN_BASELINE_COMPARISON_CASE_MATRIX_INCOMPLETE', message: 'Ready owner-labeled baseline comparisons are incomplete by benchmark case.', details: { missing_case_ids: summary.missing_human_baseline_comparison_case_ids } });
   }
   if (summary.real_provider_claim_numerator_matrix_complete === false) {
-    warnings.push({ code: 'AHR_EVIDENCE_SET_REAL_PROVIDER_CLAIM_NUMERATOR_INCOMPLETE', message: 'The evidence set does not yet contain the required real-provider dogfood result matrix for future claim review.', details: { eligible_result_count: summary.claim_numerator_eligible_result_count, required_result_count: summary.real_provider_claim_numerator_required_count, missing_case_efforts: summary.missing_real_provider_claim_numerator_case_efforts ?? [] } });
+    warnings.push({ code: 'AHR_EVIDENCE_SET_REAL_PROVIDER_CLAIM_NUMERATOR_INCOMPLETE', message: 'The evidence set does not yet contain the required real-provider dogfood result matrix for future claim review.', details: { eligible_result_count: summary.claim_numerator_eligible_result_count, required_result_count: summary.real_provider_claim_numerator_required_count, missing_case_efforts: summary.missing_real_provider_claim_numerator_case_efforts ?? [], blockers: summary.proof_readiness_blockers ?? {} } });
   }
   if (summary.mechanical_contract_matrix_complete === false) {
-    warnings.push({ code: 'AHR_EVIDENCE_SET_MECHANICAL_CONTRACT_MATRIX_INCOMPLETE', message: 'TraceCue mechanical contract coverage is incomplete for the required benchmark case and effort matrix.', details: { satisfied_result_count: summary.mechanical_contract_satisfied_result_count, missing_case_efforts: summary.missing_mechanical_contract_case_efforts ?? [] } });
+    warnings.push({ code: 'AHR_EVIDENCE_SET_MECHANICAL_CONTRACT_MATRIX_INCOMPLETE', message: 'TraceCue mechanical contract coverage is incomplete for the required benchmark case and effort matrix.', details: { satisfied_result_count: summary.mechanical_contract_satisfied_result_count, missing_case_efforts: summary.missing_mechanical_contract_case_efforts ?? [], mechanical_incomplete_case_efforts: summary.mechanical_incomplete_case_efforts ?? [] } });
   }
   if (summary.calibration_pass_matrix_complete === false) {
-    warnings.push({ code: 'AHR_EVIDENCE_SET_CALIBRATION_MATRIX_INCOMPLETE', message: 'Evidence-backed calibration pass coverage is incomplete for the required benchmark case and effort matrix.', details: { missing_case_efforts: summary.missing_calibration_case_efforts ?? [] } });
+    warnings.push({ code: 'AHR_EVIDENCE_SET_CALIBRATION_MATRIX_INCOMPLETE', message: 'Evidence-backed calibration pass coverage is incomplete for the required benchmark case and effort matrix.', details: { missing_case_efforts: summary.missing_calibration_case_efforts ?? [], calibration_failed_case_efforts: summary.calibration_failed_case_efforts ?? [] } });
   }
   return warnings;
 }
@@ -3264,7 +3449,8 @@ function buildHumanBaselineClaimReadiness({ evidenceSet, evidenceSetPath, eviden
       ? []
       : (Array.isArray(summary.missing_calibration_case_efforts) ? summary.missing_calibration_case_efforts : requiredCaseIds),
     comparison_case_matrix: Array.isArray(summary.missing_comparison_case_matrix) ? summary.missing_comparison_case_matrix : [],
-    direct_vs_tracecue_comparison_cases: Array.isArray(summary.missing_direct_vs_tracecue_case_ids) ? summary.missing_direct_vs_tracecue_case_ids : requiredCaseIds
+    direct_vs_tracecue_comparison_cases: Array.isArray(summary.missing_direct_vs_tracecue_case_ids) ? summary.missing_direct_vs_tracecue_case_ids : requiredCaseIds,
+    proof_readiness_blockers: isPlainObject(summary.proof_readiness_blockers) ? summary.proof_readiness_blockers : {}
   };
   const conditions = {
     standard_deep_xhigh_complete: missing.efforts.length === 0,
@@ -3322,6 +3508,13 @@ function buildHumanBaselineClaimReadiness({ evidenceSet, evidenceSetPath, eviden
     },
     conditions,
     missing,
+    blocker_summary: {
+      missing_result_case_efforts: missing.proof_readiness_blockers.missing_result_case_efforts ?? [],
+      mechanical_incomplete_case_efforts: missing.proof_readiness_blockers.mechanical_incomplete_case_efforts ?? [],
+      calibration_failed_case_efforts: missing.proof_readiness_blockers.calibration_failed_case_efforts ?? [],
+      comparison_missing_case_matrix: missing.proof_readiness_blockers.comparison_missing_case_matrix ?? [],
+      categories: missing.proof_readiness_blockers.categories ?? {}
+    },
     summary: {
       result_count: Number(summary.result_count ?? 0),
       owner_labeled_baseline_count: Number(summary.owner_labeled_baseline_count ?? 0),
@@ -3349,6 +3542,326 @@ function buildHumanBaselineClaimReadiness({ evidenceSet, evidenceSetPath, eviden
     advisory_only: true,
     gate_effect: 'none'
   });
+}
+
+async function buildClaimStandardClaimAuditSummary({ cwd, evidenceSet, policy, now, maxBytes }) {
+  const normalizedEvidenceSet = normalizeEvidenceSetOutput(evidenceSet);
+  const resultRecords = Array.isArray(normalizedEvidenceSet.results) ? normalizedEvidenceSet.results : [];
+  const failures = [];
+  const audits = [];
+  for (const resultRecord of resultRecords) {
+    if (!resultRecord.path) {
+      failures.push({
+        code: 'AHR_CLAIM_STANDARD_GATE_RESULT_PATH_MISSING',
+        message: 'A result could not be audited because the evidence-set record did not include a path.',
+        details: { result_id: resultRecord.result_id ?? null, case_id: resultRecord.case_id ?? null, effort: resultRecord.effort ?? null }
+      });
+      continue;
+    }
+    const resultRead = await readWorkspaceJson({
+      cwd,
+      inputPath: resultRecord.path,
+      label: 'agentic human review claim standard audited result',
+      maxBytes
+    });
+    if (!resultRead.ok) {
+      failures.push({
+        code: 'AHR_CLAIM_STANDARD_GATE_RESULT_AUDIT_READ_FAILED',
+        message: 'A result could not be read for claim audit.',
+        details: { path: resultRecord.path, reason: resultRead.error.message }
+      });
+      continue;
+    }
+    const validation = validateAdvisoryResultArtifact({ result: resultRead.value, resultPath: resultRead.relativePath });
+    if (!validation.ok) {
+      failures.push({
+        code: 'AHR_CLAIM_STANDARD_GATE_RESULT_AUDIT_CONTRACT_FAILED',
+        message: 'A result could not be audited because it did not satisfy the advisory-result contract.',
+        details: validation.error.details
+      });
+      continue;
+    }
+    const audit = buildClaimAudit({
+      result: resultRead.value,
+      resultPath: resultRead.relativePath,
+      resultHash: hashText(resultRead.text),
+      policy,
+      policyPath: null,
+      policyHash: null,
+      now
+    });
+    audits.push(audit);
+    if (audit.forbidden_claim_matches.length > 0 || audit.missing_evidence_claim_count > 0 || audit.equality_or_superiority_text_present) {
+      failures.push({
+        code: 'AHR_CLAIM_STANDARD_GATE_RESULT_CLAIM_AUDIT_FAILED',
+        message: 'A result claim audit found forbidden, unsupported, or evidence-missing claim text.',
+        details: {
+          path: resultRead.relativePath,
+          result_id: audit.result_id ?? null,
+          forbidden_claim_match_count: audit.forbidden_claim_matches.length,
+          missing_evidence_claim_count: audit.missing_evidence_claim_count,
+          equality_or_superiority_text_present: audit.equality_or_superiority_text_present
+        }
+      });
+    }
+  }
+  return {
+    audited_result_count: audits.length,
+    failed_result_count: failures.length,
+    forbidden_claim_match_count: audits.reduce((sum, audit) => sum + audit.forbidden_claim_matches.length, 0),
+    missing_evidence_claim_count: audits.reduce((sum, audit) => sum + Number(audit.missing_evidence_claim_count ?? 0), 0),
+    equality_or_superiority_text_present_count: audits.filter((audit) => audit.equality_or_superiority_text_present).length,
+    failures
+  };
+}
+
+function buildClaimStandardGate({
+  evidenceSet,
+  evidenceSetPath,
+  evidenceSetHash,
+  policy,
+  policyInput,
+  policyPath,
+  policyHash,
+  readiness,
+  longitudinal,
+  claimAuditSummary,
+  now
+}) {
+  const normalizedEvidenceSet = normalizeEvidenceSetOutput(evidenceSet);
+  const summary = normalizedEvidenceSet.summary ?? {};
+  const results = Array.isArray(normalizedEvidenceSet.results) ? normalizedEvidenceSet.results : [];
+  const comparisons = Array.isArray(normalizedEvidenceSet.comparisons) ? normalizedEvidenceSet.comparisons : [];
+  const humanBaselines = Array.isArray(normalizedEvidenceSet.human_baselines) ? normalizedEvidenceSet.human_baselines : [];
+  const evidenceWarnings = Array.isArray(normalizedEvidenceSet.warnings) ? normalizedEvidenceSet.warnings : [];
+  const policyDiagnostics = claimStandardPolicyInputDiagnostics(policyInput);
+  const directRegressions = comparisons.filter((comparison) => comparison.comparison_kind === 'direct-vs-tracecue' && Number(comparison.regressed_score_count ?? 0) > 0);
+  const providerOrBenchmarkRegressions = comparisons.filter((comparison) => ['provider-dogfood', 'benchmark-regression'].includes(comparison.comparison_kind) && Number(comparison.regressed_score_count ?? 0) > 0);
+  const ownerBaselineComparisonBlockers = comparisons
+    .filter((comparison) => comparison.comparison_kind === 'owner-labeled-human-baseline')
+    .filter((comparison) => comparison.human_baseline_ready_for_owner_review !== true
+      || comparison.human_baseline_candidate_matches_owner_baseline !== true
+      || comparison.human_baseline_owner_labeled_baseline_verified !== true
+      || comparison.candidate_mechanical_contract_satisfied !== true
+      || Number(comparison.human_baseline_must_not_miss_miss_count ?? 0) > 0
+      || Number(comparison.human_baseline_miss_count ?? 0) > 0
+      || Number(comparison.human_baseline_insufficient_evidence_count ?? 0) > 0);
+  const invalidBaselines = humanBaselines.filter((baseline) => baseline.owner_labeled_baseline_verified !== true);
+  const ineligibleResults = results.filter((result) => result.claim_numerator_eligible !== true || result.strict_claim_numerator_eligible !== true);
+  const incompleteXhighResults = results.filter((result) => result.effort === 'xhigh' && (result.xhigh_completion_status !== 'complete' || result.mechanical_contract_satisfied !== true));
+  const nonAdvisoryRecords = [
+    ...results.filter((result) => result.advisory_only !== true || result.gate_effect !== 'none').map((result) => ({ kind: 'result', path: result.path, case_id: result.case_id, effort: result.effort })),
+    ...comparisons.filter((comparison) => comparison.advisory_only !== true || comparison.gate_effect !== 'none').map((comparison) => ({ kind: 'comparison', path: comparison.path, case_id: comparison.case_id, comparison_kind: comparison.comparison_kind })),
+    ...humanBaselines.filter((baseline) => baseline.advisory_only !== true || baseline.gate_effect !== 'none').map((baseline) => ({ kind: 'human_baseline', path: baseline.path, case_id: baseline.case_id }))
+  ];
+  const conditions = {
+    evidence_set_has_no_warnings: evidenceWarnings.length === 0,
+    readiness_ready_for_owner_claim_standard_review: readiness.status === 'ready_for_separate_owner_claim_standard_review',
+    longitudinal_ready_for_owner_review: longitudinal.status === 'ready_for_owner_longitudinal_review',
+    standard_deep_xhigh_complete: readiness.conditions?.standard_deep_xhigh_complete === true,
+    benchmark_case_matrix_complete: readiness.conditions?.benchmark_case_matrix_complete === true,
+    owner_labeled_baseline_matrix_complete: readiness.conditions?.owner_labeled_baseline_matrix_complete === true,
+    required_comparison_kinds_complete: readiness.conditions?.required_comparison_kinds_complete === true,
+    comparison_case_matrix_complete: readiness.conditions?.comparison_case_matrix_complete === true,
+    direct_vs_tracecue_case_matrix_complete: readiness.conditions?.direct_vs_tracecue_case_matrix_complete === true,
+    human_baseline_comparisons_ready: readiness.conditions?.human_baseline_comparisons_ready === true,
+    real_provider_claim_numerator_matrix_complete: readiness.conditions?.real_provider_claim_numerator_matrix_complete === true,
+    mechanical_contract_matrix_complete: readiness.conditions?.mechanical_contract_matrix_complete === true,
+    calibration_pass_matrix_complete: readiness.conditions?.calibration_pass_matrix_complete === true,
+    repeated_observations_present: readiness.conditions?.repeated_observations_present === true,
+    policy_keeps_claim_flags_false: readiness.conditions?.policy_keeps_claim_flags_false === true && policy.equality_or_superiority_claims_allowed === false,
+    policy_input_does_not_attempt_equality_or_superiority: policyDiagnostics.authorization_attempts.length === 0,
+    all_results_claim_numerator_eligible: results.length > 0 && ineligibleResults.length === 0,
+    all_xhigh_results_mechanically_complete: incompleteXhighResults.length === 0,
+    all_records_advisory_only: nonAdvisoryRecords.length === 0,
+    direct_vs_tracecue_has_no_regressions: directRegressions.length === 0,
+    provider_and_benchmark_comparisons_have_no_regressions: providerOrBenchmarkRegressions.length === 0,
+    owner_baseline_comparisons_match: ownerBaselineComparisonBlockers.length === 0,
+    owner_baselines_verified: invalidBaselines.length === 0,
+    claim_audits_passed: claimAuditSummary.failed_result_count === 0
+  };
+  const blockers = [
+    ...(conditions.evidence_set_has_no_warnings ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_EVIDENCE_SET_WARNINGS_PRESENT', 'The evidence-set summary has warnings that must be resolved before owner claim review can pass.', { warning_codes: evidenceWarnings.map((warning) => warning.code) })]),
+    ...(conditions.readiness_ready_for_owner_claim_standard_review ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_READINESS_INCOMPLETE', 'Human-baseline claim-readiness is not ready for owner claim-standard review.', { readiness_status: readiness.status, warning_codes: readiness.warnings.map((warning) => warning.code) })]),
+    ...(conditions.longitudinal_ready_for_owner_review ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_LONGITUDINAL_INCOMPLETE', 'Longitudinal quality evidence is not ready for owner review.', { longitudinal_status: longitudinal.status, warning_codes: longitudinal.warnings.map((warning) => warning.code) })]),
+    ...claimStandardConditionBlockers(readiness),
+    ...(conditions.policy_input_does_not_attempt_equality_or_superiority ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_POLICY_TOO_PERMISSIVE', 'The raw policy input attempted to authorize equality or superiority claims.', { authorization_attempts: policyDiagnostics.authorization_attempts })]),
+    ...(conditions.all_results_claim_numerator_eligible ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_RESULT_CLAIM_NUMERATOR_INELIGIBLE', 'At least one result is not eligible for the future claim numerator.', { results: ineligibleResults.map(claimStandardResultDetails) })]),
+    ...(conditions.all_xhigh_results_mechanically_complete ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_XHIGH_INCOMPLETE', 'At least one xhigh result does not expose a complete mechanical effort contract.', { results: incompleteXhighResults.map(claimStandardResultDetails) })]),
+    ...(conditions.all_records_advisory_only ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_NON_ADVISORY_RECORD', 'Every claim-standard evidence record must remain advisory-only with no gate effect.', { records: nonAdvisoryRecords })]),
+    ...(conditions.direct_vs_tracecue_has_no_regressions ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_DIRECT_REGRESSION_PRESENT', 'Direct-vs-TraceCue comparison contains at least one regressed score.', { comparisons: directRegressions.map(claimStandardComparisonDetails) })]),
+    ...(conditions.provider_and_benchmark_comparisons_have_no_regressions ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_DOGFOOD_REGRESSION_PRESENT', 'Provider dogfood or benchmark-regression comparison contains at least one regressed score.', { comparisons: providerOrBenchmarkRegressions.map(claimStandardComparisonDetails) })]),
+    ...(conditions.owner_baseline_comparisons_match ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_OWNER_BASELINE_COMPARISON_NOT_MATCHED', 'At least one owner-labeled human baseline comparison is not ready or does not match the owner baseline.', { comparisons: ownerBaselineComparisonBlockers.map(claimStandardComparisonDetails) })]),
+    ...(conditions.owner_baselines_verified ? [] : [claimStandardBlocker('AHR_CLAIM_STANDARD_GATE_OWNER_BASELINE_INVALID', 'At least one human baseline is not verified owner-labeled evidence.', { baselines: invalidBaselines.map((baseline) => ({ path: baseline.path, case_id: baseline.case_id, baseline_id: baseline.baseline_id })) })]),
+    ...(conditions.claim_audits_passed ? [] : claimAuditSummary.failures)
+  ];
+  const passed = Object.values(conditions).every(Boolean) && blockers.length === 0;
+  const equalityPolicyBlocker = claimStandardBlocker(
+    'AHR_CLAIM_STANDARD_EQUALITY_OR_SUPERIORITY_DISABLED',
+    'Human-equivalent and human-superior claims remain disabled by policy even when owner claim-review evidence is ready.',
+    { equality_or_superiority_claims_allowed: false }
+  );
+  return redact({
+    schema_version: SCHEMA_VERSION,
+    type: 'agentic_human_review_claim_standard_gate',
+    claim_standard_gate_version: HUMAN_REVIEW_CLAIM_STANDARD_VERSION,
+    generated_at: now.toISOString(),
+    status: passed ? 'owner_claim_review_ready' : 'not_ready',
+    passed,
+    evidence_set: {
+      path: evidenceSetPath,
+      hash: evidenceSetHash,
+      type: normalizedEvidenceSet.type ?? null,
+      generated_at: normalizedEvidenceSet.generated_at ?? null
+    },
+    policy: {
+      path: policyPath,
+      hash: policyHash,
+      normalized: policy,
+      input_diagnostics: policyDiagnostics
+    },
+    readiness: {
+      status: readiness.status,
+      conditions: readiness.conditions,
+      blocker_summary: readiness.blocker_summary,
+      summary: readiness.summary
+    },
+    longitudinal_quality: {
+      status: longitudinal.status,
+      repeated_case_count: longitudinal.repeated_case_count,
+      longitudinal_stability_score: longitudinal.longitudinal_stability_score,
+      warning_count: longitudinal.warnings.length
+    },
+    claim_audit_summary: claimAuditSummary,
+    conditions,
+    claim_states: {
+      owner_claim_review_ready: {
+        allowed: passed,
+        passed,
+        blockers
+      },
+      human_equivalent_candidate: {
+        allowed: false,
+        passed: false,
+        blocked_by_policy: true,
+        blockers: [equalityPolicyBlocker, ...blockers]
+      },
+      human_superior_candidate: {
+        allowed: false,
+        passed: false,
+        blocked_by_policy: true,
+        blockers: [equalityPolicyBlocker, ...blockers]
+      }
+    },
+    summary: {
+      result_count: Number(summary.result_count ?? 0),
+      calibration_count: Number(summary.calibration_count ?? 0),
+      comparison_count: Number(summary.comparison_count ?? 0),
+      owner_labeled_baseline_count: Number(summary.owner_labeled_baseline_count ?? 0),
+      claim_numerator_eligible_result_count: Number(summary.claim_numerator_eligible_result_count ?? 0),
+      human_equivalent_claim_allowed: false,
+      human_superior_claim_allowed: false
+    },
+    blockers,
+    warnings: [
+      ...evidenceWarnings,
+      ...readiness.warnings,
+      ...longitudinal.warnings
+    ],
+    boundary: agenticHumanReviewBoundary({ read_only: true }),
+    advisory_only: true,
+    gate_effect: 'none'
+  });
+}
+
+function claimStandardConditionBlockers(readiness) {
+  const conditionMessages = [
+    ['standard_deep_xhigh_complete', 'AHR_CLAIM_STANDARD_GATE_EFFORT_MATRIX_INCOMPLETE', 'standard/deep/xhigh evidence is incomplete.', { missing_efforts: readiness.missing?.efforts ?? [] }],
+    ['benchmark_case_matrix_complete', 'AHR_CLAIM_STANDARD_GATE_CASE_MATRIX_INCOMPLETE', 'Benchmark case coverage is incomplete.', { missing_case_ids: readiness.missing?.benchmark_cases ?? [] }],
+    ['owner_labeled_baseline_matrix_complete', 'AHR_CLAIM_STANDARD_GATE_OWNER_BASELINE_MATRIX_INCOMPLETE', 'Owner-labeled human baseline coverage is incomplete.', { missing_case_ids: readiness.missing?.owner_labeled_baselines ?? [] }],
+    ['required_comparison_kinds_complete', 'AHR_CLAIM_STANDARD_GATE_COMPARISON_KINDS_INCOMPLETE', 'Required comparison kinds are incomplete.', { missing_comparison_kinds: readiness.missing?.comparison_kinds ?? [] }],
+    ['comparison_case_matrix_complete', 'AHR_CLAIM_STANDARD_GATE_COMPARISON_CASE_MATRIX_INCOMPLETE', 'Required comparison coverage is incomplete by benchmark case.', { missing_case_comparisons: readiness.missing?.comparison_case_matrix ?? [] }],
+    ['direct_vs_tracecue_case_matrix_complete', 'AHR_CLAIM_STANDARD_GATE_DIRECT_CASE_MATRIX_INCOMPLETE', 'Direct-vs-TraceCue comparison coverage is incomplete by benchmark case.', { missing_case_ids: readiness.missing?.direct_vs_tracecue_comparison_cases ?? [] }],
+    ['human_baseline_comparisons_ready', 'AHR_CLAIM_STANDARD_GATE_OWNER_BASELINE_COMPARISONS_NOT_READY', 'Owner-labeled human baseline comparisons are not all ready for owner review.', { missing_case_ids: readiness.missing?.human_baseline_comparisons ?? [] }],
+    ['real_provider_claim_numerator_matrix_complete', 'AHR_CLAIM_STANDARD_GATE_REAL_PROVIDER_MATRIX_INCOMPLETE', 'Real-provider claim-numerator coverage is incomplete.', { missing_case_efforts: readiness.missing?.real_provider_claim_numerator_results ?? [] }],
+    ['mechanical_contract_matrix_complete', 'AHR_CLAIM_STANDARD_GATE_MECHANICAL_CONTRACT_MATRIX_INCOMPLETE', 'Mechanical contract coverage is incomplete.', { missing_case_efforts: readiness.missing?.mechanical_contract_case_efforts ?? [] }],
+    ['calibration_pass_matrix_complete', 'AHR_CLAIM_STANDARD_GATE_CALIBRATION_MATRIX_INCOMPLETE', 'Calibration pass coverage is incomplete.', { missing_case_efforts: readiness.missing?.calibration_case_efforts ?? [] }],
+    ['repeated_observations_present', 'AHR_CLAIM_STANDARD_GATE_LONGITUDINAL_HISTORY_THIN', 'Repeated observations are required before owner claim review can pass.', {}],
+    ['policy_keeps_claim_flags_false', 'AHR_CLAIM_STANDARD_GATE_POLICY_FLAGS_NOT_FALSE', 'The normalized claim policy must keep equality and superiority flags false.', {}]
+  ];
+  return conditionMessages.flatMap(([condition, code, message, details]) => readiness.conditions?.[condition] === true
+    ? []
+    : [claimStandardBlocker(code, message, details)]);
+}
+
+function claimStandardPolicyInputDiagnostics(policyInput) {
+  const authorizationAttempts = [];
+  collectClaimStandardPolicyAuthorizationAttempts(policyInput, [], authorizationAttempts);
+  return {
+    authorization_attempted: authorizationAttempts.length > 0,
+    authorization_attempts: authorizationAttempts
+  };
+}
+
+function collectClaimStandardPolicyAuthorizationAttempts(value, pathParts, attempts) {
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      collectClaimStandardPolicyAuthorizationAttempts(item, [...pathParts, String(index)], attempts);
+    }
+    return;
+  }
+  if (isPlainObject(value)) {
+    for (const [key, item] of Object.entries(value)) {
+      const nextPath = [...pathParts, key];
+      const normalizedKey = key.toLowerCase().replace(/[-_\s]/g, '');
+      const keyLooksLikeClaimAuthorization = normalizedKey.includes('humanequivalent')
+        || normalizedKey.includes('humansuperior')
+        || normalizedKey.includes('equalityorsuperiority')
+        || normalizedKey.includes('equalorsuperior')
+        || (normalizedKey.includes('claim') && (normalizedKey.includes('allow') || normalizedKey.includes('authoriz') || normalizedKey.includes('permit')));
+      if (keyLooksLikeClaimAuthorization && item === true) {
+        attempts.push({ path: nextPath.join('.'), value: true });
+      }
+      if (keyLooksLikeClaimAuthorization && typeof item === 'string' && /human[-\s]?(equivalent|superior)|better than human/i.test(item)) {
+        attempts.push({ path: nextPath.join('.'), value: secretSafeText(item, 200) });
+      }
+      collectClaimStandardPolicyAuthorizationAttempts(item, nextPath, attempts);
+    }
+  }
+}
+
+function claimStandardBlocker(code, message, details = {}) {
+  return { code, message, details };
+}
+
+function claimStandardResultDetails(result) {
+  return {
+    path: result.path,
+    result_id: result.result_id ?? null,
+    case_id: result.case_id ?? null,
+    effort: result.effort ?? null,
+    origin_kind: result.origin_kind ?? null,
+    provider_execution_class: result.provider_execution_class ?? null,
+    excluded_from_claim_reason: result.excluded_from_claim_reason ?? null,
+    strict_eligibility_checks: result.strict_eligibility_checks ?? {}
+  };
+}
+
+function claimStandardComparisonDetails(comparison) {
+  return {
+    path: comparison.path,
+    comparison_kind: comparison.comparison_kind,
+    case_id: comparison.case_id ?? comparison.baseline_case_id ?? comparison.candidate_case_id ?? null,
+    regressed_score_count: Number(comparison.regressed_score_count ?? 0),
+    improved_score_count: Number(comparison.improved_score_count ?? 0),
+    ready_for_owner_review: comparison.human_baseline_ready_for_owner_review ?? null,
+    candidate_matches_owner_baseline: comparison.human_baseline_candidate_matches_owner_baseline ?? null,
+    owner_labeled_baseline_verified: comparison.human_baseline_owner_labeled_baseline_verified ?? null,
+    candidate_mechanical_contract_satisfied: comparison.candidate_mechanical_contract_satisfied ?? null,
+    must_not_miss_miss_count: Number(comparison.human_baseline_must_not_miss_miss_count ?? 0),
+    miss_count: Number(comparison.human_baseline_miss_count ?? 0),
+    insufficient_evidence_count: Number(comparison.human_baseline_insufficient_evidence_count ?? 0)
+  };
 }
 
 function normalizeClaimPolicy(input) {
@@ -4526,17 +5039,23 @@ function buildBenchmarkRequirementCoverage({ plan = null, input = {}, humanRevie
     const providerRecord = findBenchmarkCoverageRecord(normalizedCoverage.forbidden_claims, claim, ['claim', 'forbidden_claim', 'id', 'name', 'label', 'text']);
     const diagnosticTextPresent = textIncludesLoose(text, claim);
     const structuredPresent = Boolean(providerRecord);
-    const present = structuredPresent ? benchmarkRecordIsPresent(providerRecord) : diagnosticTextPresent;
+    const absenceConfirmed = structuredPresent ? benchmarkForbiddenClaimAbsenceConfirmed(providerRecord) : false;
+    const present = structuredPresent ? benchmarkForbiddenClaimPresent(providerRecord) : diagnosticTextPresent;
+    const presenceContradiction = structuredPresent && present && absenceConfirmed;
     const evidenceRefs = normalizeArtifactReferences(providerRecord?.evidence_refs ?? providerRecord?.artifacts);
     return {
       claim,
       present,
-      status: present ? 'forbidden_claim_present' : (structuredPresent ? 'absent' : 'absent_but_missing_structured_record'),
+      status: present
+        ? (presenceContradiction ? 'forbidden_claim_present_with_absence_text' : 'forbidden_claim_present')
+        : (structuredPresent ? 'absent' : 'absent_but_missing_structured_record'),
       evidence: secretSafeText(providerRecord?.evidence ?? providerRecord?.reason ?? '', 700),
       evidence_refs: evidenceRefs,
       structured_record_present: structuredPresent,
       evidence_backed: structuredPresent && secretSafeText(providerRecord?.evidence ?? providerRecord?.reason ?? '', 700).length > 0,
       evidence_ref_backed: evidenceRefs.length > 0,
+      forbidden_claim_absence_confirmed: absenceConfirmed,
+      forbidden_claim_presence_contradiction: presenceContradiction,
       diagnostic_text_present: diagnosticTextPresent
     };
   });
@@ -4638,6 +5157,54 @@ function benchmarkRecordIsPresent(record) {
   }
   const status = normalizeCoverageKey(record.status);
   return ['covered', 'present', 'met', 'addressed', 'absent'].includes(status) && status !== 'absent';
+}
+
+function benchmarkForbiddenClaimPresent(record) {
+  if (!record || typeof record !== 'object') {
+    return false;
+  }
+  if (record.claim_present === true || record.detected === true || record.found === true) {
+    return true;
+  }
+  if (record.present === true) {
+    return true;
+  }
+  const status = normalizeCoverageKey(record.status);
+  return [
+    'forbidden claim present',
+    'claim present',
+    'present',
+    'detected',
+    'found'
+  ].includes(status);
+}
+
+function benchmarkForbiddenClaimAbsenceConfirmed(record) {
+  if (!record || typeof record !== 'object') {
+    return false;
+  }
+  if (
+    record.present === false
+    || record.claim_present === false
+    || record.detected === false
+    || record.found === false
+    || record.forbidden_claim_absence_confirmed === true
+  ) {
+    return true;
+  }
+  const status = normalizeCoverageKey(record.status);
+  if ([
+    'absent',
+    'not present',
+    'not detected',
+    'not found',
+    'not claimed',
+    'none'
+  ].includes(status)) {
+    return true;
+  }
+  const evidence = `${record.evidence ?? ''} ${record.reason ?? ''} ${record.rationale ?? ''}`;
+  return /\b(no|not|without|absent|absence|none|avoids|omits|omitted|does not claim|did not claim|not claimed)\b/i.test(evidence);
 }
 
 function benchmarkDimensionReaderExperiencePresent({ dimension, readerExperienceReview, input }) {
@@ -4936,6 +5503,139 @@ function buildHumanBaselineValidation({ input, inputPath, inputHash, now }) {
   });
 }
 
+async function readOwnerBaselineRequirementContract({
+  cwd,
+  options,
+  maxBytes,
+  now,
+  benchmarkCase = null
+} = {}) {
+  const inputPath = options?.['human-baseline'];
+  if (!inputPath) {
+    return { ok: true, contract: null, relativePath: null, warnings: [] };
+  }
+  const baselineRead = await readWorkspaceJson({
+    cwd,
+    inputPath,
+    label: 'agentic human review owner-approved human baseline',
+    maxBytes
+  });
+  if (!baselineRead.ok) {
+    return baselineRead;
+  }
+  const humanBaseline = buildHumanBaselineValidation({
+    input: baselineRead.value,
+    inputPath: baselineRead.relativePath,
+    inputHash: hashText(baselineRead.text),
+    now: materializeNow(now)
+  });
+  if (humanBaseline.validation.owner_labeled_baseline_verified !== true) {
+    return {
+      ok: false,
+      error: {
+        code: 'AHR_HUMAN_BASELINE_OWNER_LABEL_NOT_VERIFIED',
+        message: 'agentic review planning requires an owner-approved human baseline before it can become a provider requirement contract.',
+        details: {
+          input: baselineRead.relativePath,
+          status: humanBaseline.validation.status,
+          warning_codes: humanBaseline.warnings.map((warning) => warning.code),
+          advisory_only: true,
+          gate_effect: 'none'
+        }
+      }
+    };
+  }
+  if (benchmarkCase && humanBaseline.baseline.case_id && benchmarkCase.case_id !== humanBaseline.baseline.case_id) {
+    return {
+      ok: false,
+      error: {
+        code: 'AHR_HUMAN_BASELINE_CASE_MISMATCH',
+        message: 'The requested benchmark case does not match the owner-approved human baseline case.',
+        details: {
+          requested_case_id: benchmarkCase.case_id,
+          human_baseline_case_id: humanBaseline.baseline.case_id,
+          input: baselineRead.relativePath
+        }
+      }
+    };
+  }
+  return {
+    ok: true,
+    contract: buildOwnerBaselineRequirementContract({
+      humanBaseline,
+      inputHash: hashText(baselineRead.text)
+    }),
+    relativePath: baselineRead.relativePath,
+    warnings: []
+  };
+}
+
+function buildOwnerBaselineRequirementContract({ humanBaseline, inputHash }) {
+  const baseline = humanBaseline?.baseline ?? {};
+  const approval = baseline.approval ?? {};
+  const targetCriteria = normalizeHumanBaselineMustNotMissCriteria(baseline.must_not_miss_criteria)
+    .filter(isTargetSpecificMustNotMissCriterion);
+  const ownerLabels = normalizeHumanBaselineLabels(baseline.owner_label_set?.labels)
+    .filter((label) => label.required !== false);
+  return redact({
+    schema_version: SCHEMA_VERSION,
+    contract_version: HUMAN_REVIEW_HUMAN_BASELINE_VERSION,
+    type: 'agentic_human_review_owner_baseline_requirement_contract',
+    baseline_id: baseline.baseline_id ?? null,
+    case_id: baseline.case_id ?? null,
+    fixture_type: baseline.fixture_type ?? null,
+    rubric_profile_id: baseline.rubric_profile_id ?? null,
+    input_hash: inputHash,
+    input_path_included: false,
+    local_evidence_paths_included: false,
+    approval: {
+      decision: approval.decision ?? null,
+      approved_at: approval.approved_at ?? null,
+      rubric_version: approval.rubric_version ?? null,
+      template_version: approval.template_version ?? null,
+      overlay_hash: approval.overlay_hash ?? null,
+      draft_hash: approval.draft_hash ?? null,
+      edit_diff_present: Boolean(approval.edit_diff),
+      advisory_only: approval.advisory_only !== false,
+      gate_effect: approval.gate_effect ?? 'none'
+    },
+    required_dimensions: normalizeStringArray(baseline.required_dimensions),
+    required_mentions: normalizeStringArray(baseline.required_mentions),
+    forbidden_claims: normalizeStringArray(baseline.forbidden_claims),
+    must_not_miss_criteria: targetCriteria.map((criterion) => ({
+      id: criterion.id,
+      dimension: criterion.dimension,
+      summary: criterion.summary,
+      severity: criterion.severity,
+      match_terms: criterion.match_terms,
+      target_specific: true
+    })),
+    owner_labels: ownerLabels.map((label) => ({
+      id: label.id,
+      dimension: label.dimension,
+      summary: label.summary,
+      severity: label.severity,
+      match_terms: label.match_terms,
+      must_not_miss_criterion_id: label.must_not_miss_criterion_id,
+      criteria_refs: label.criteria_refs,
+      target_specific: label.target_specific,
+      evidence_ref_count: label.evidence_refs.length
+    })),
+    required_structured_finding_fields: [
+      'id',
+      'message',
+      'recommendation',
+      'evidence_refs',
+      'must_not_miss_criterion_id or criteria_refs',
+      'owner_label_ids'
+    ],
+    target_specific_must_not_miss_required: targetCriteria.length > 0,
+    owner_labeled_baseline_verified: humanBaseline?.validation?.owner_labeled_baseline_verified === true,
+    advisory_only: true,
+    gate_effect: 'none'
+  });
+}
+
 function buildHumanBaselineComparison({ baseline, result, resultPath, resultHash, requestedCaseId, now }) {
   const baselineCaseId = baseline.baseline.case_id;
   const resultCaseId = result.calibration_metadata?.benchmark_case_id
@@ -5173,6 +5873,19 @@ function buildDirectVsTraceCueAnalysis({ baseline, candidate, deltas, comparison
 function normalizeHumanBaselineSource(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return {};
+  }
+  const validatedBaseline = input.data?.agentic_human_review_human_baseline
+    ?? input.agentic_human_review_human_baseline
+    ?? null;
+  if (validatedBaseline?.baseline && typeof validatedBaseline.baseline === 'object' && !Array.isArray(validatedBaseline.baseline)) {
+    return {
+      ...input,
+      ...validatedBaseline.baseline,
+      validation: validatedBaseline.validation ?? input.validation,
+      approval: validatedBaseline.baseline.approval ?? input.approval,
+      advisory_only: validatedBaseline.advisory_only ?? input.advisory_only,
+      gate_effect: validatedBaseline.gate_effect ?? input.gate_effect
+    };
   }
   const packet = input.data?.agentic_human_review_human_baseline_approval_packet
     ?? input.agentic_human_review_human_baseline_approval_packet
@@ -5516,8 +6229,8 @@ function compareHumanBaselineLabels({ labels, result }) {
   return labels.map((label) => {
     const terms = label.match_terms.length > 0 ? label.match_terms : [label.summary].filter(Boolean);
     const matchedTerms = terms.filter((term) => textIncludesLoose(searchText, term));
-    const finding = findMatchingCandidateFinding({ label, findings });
-    const evidenceBacked = Boolean(finding && finding.evidence_refs.length > 0);
+    const match = findEvidenceBackedOwnerLabelMatch({ label, findings, result });
+    const evidenceBacked = Boolean(match.evidence_refs.length > 0);
     return {
       id: label.id,
       dimension: label.dimension,
@@ -5529,9 +6242,13 @@ function compareHumanBaselineLabels({ labels, result }) {
       match_strategy: label.match_terms.length > 0 ? 'owner_declared_match_terms' : 'owner_label_summary_text',
       matched_term_count: matchedTerms.length,
       diagnostic_text_present: matchedTerms.length > 0,
-      structured_finding_present: Boolean(finding),
-      candidate_finding_id: finding?.id ?? null,
+      structured_finding_present: Boolean(match.finding),
+      structured_coverage_record_present: Boolean(match.coverage_record),
+      candidate_finding_id: match.finding?.id ?? null,
+      candidate_coverage_record_id: match.coverage_record?.id ?? null,
+      match_source: match.source,
       evidence_backed: evidenceBacked,
+      candidate_evidence_ref_count: match.evidence_refs.length,
       evidence_ref_count: label.evidence_refs.length,
       severity: label.severity
     };
@@ -5599,8 +6316,9 @@ function classifyHumanBaselineComparison({ labels, result }) {
   const insufficientEvidence = [];
   const matchedFindingIds = new Set();
   for (const label of labels) {
-    const finding = findMatchingCandidateFinding({ label, findings });
-    if (!finding) {
+    const match = findEvidenceBackedOwnerLabelMatch({ label, findings, result });
+    const finding = match.finding;
+    if (!match.found) {
       const terms = label.match_terms.length > 0 ? label.match_terms : [label.summary].filter(Boolean);
       const textMatched = terms.some((term) => textIncludesLoose(searchText, term));
       if (textMatched) {
@@ -5628,15 +6346,19 @@ function classifyHumanBaselineComparison({ labels, result }) {
       });
       continue;
     }
-    matchedFindingIds.add(finding.id);
+    if (finding?.id) {
+      matchedFindingIds.add(finding.id);
+    }
     matches.push({
       owner_label_id: label.id,
-      candidate_finding_id: finding.id,
+      candidate_finding_id: finding?.id ?? null,
+      candidate_coverage_record_id: match.coverage_record?.id ?? null,
+      match_source: match.source,
       dimension: label.dimension,
       severity: label.severity,
-      candidate_severity: finding.severity
+      candidate_severity: finding?.severity ?? null
     });
-    if (severityDistance(label.severity, finding.severity) >= 2) {
+    if (finding && severityDistance(label.severity, finding.severity) >= 2) {
       severityMismatches.push({
         owner_label_id: label.id,
         candidate_finding_id: finding.id,
@@ -5644,10 +6366,11 @@ function classifyHumanBaselineComparison({ labels, result }) {
         candidate_severity: finding.severity
       });
     }
-    if (finding.evidence_refs.length === 0) {
+    if (match.evidence_refs.length === 0) {
       insufficientEvidence.push({
         owner_label_id: label.id,
-        candidate_finding_id: finding.id,
+        candidate_finding_id: finding?.id ?? null,
+        candidate_coverage_record_id: match.coverage_record?.id ?? null,
         reason: 'The candidate matched the owner label but did not carry local evidence references.'
       });
     }
@@ -5669,12 +6392,79 @@ function classifyHumanBaselineComparison({ labels, result }) {
   };
 }
 
+function findEvidenceBackedOwnerLabelMatch({ label, findings, result }) {
+  const finding = findMatchingCandidateFinding({ label, findings });
+  if (finding) {
+    return {
+      found: true,
+      source: 'agentic_human_review_findings',
+      finding,
+      coverage_record: null,
+      evidence_refs: finding.evidence_refs
+    };
+  }
+  const coverageRecord = findMatchingStructuredCoverageRecord({ label, result });
+  if (coverageRecord) {
+    return {
+      found: true,
+      source: coverageRecord.source,
+      finding: null,
+      coverage_record: coverageRecord,
+      evidence_refs: coverageRecord.evidence_refs
+    };
+  }
+  return { found: false, source: 'none', finding: null, coverage_record: null, evidence_refs: [] };
+}
+
 function findMatchingCandidateFinding({ label, findings }) {
   const terms = label.match_terms.length > 0 ? label.match_terms : [label.summary].filter(Boolean);
   return findings.find((finding) => {
+    if (label.id && finding.owner_label_ids.includes(label.id)) {
+      return true;
+    }
+    if (label.must_not_miss_criterion_id && finding.must_not_miss_criterion_id === label.must_not_miss_criterion_id) {
+      return true;
+    }
+    if (label.must_not_miss_criterion_id && finding.criteria_refs.includes(label.must_not_miss_criterion_id)) {
+      return true;
+    }
+    if (label.criteria_refs.some((criterionId) => finding.criteria_refs.includes(criterionId) || finding.must_not_miss_criterion_id === criterionId)) {
+      return true;
+    }
     const text = `${finding.message} ${finding.recommendation} ${finding.category}`.toLowerCase();
     return terms.some((term) => textIncludesLoose(text, term));
   }) ?? null;
+}
+
+function findMatchingStructuredCoverageRecord({ label, result }) {
+  const terms = label.match_terms.length > 0 ? label.match_terms : [label.summary].filter(Boolean);
+  const normalizedTerms = terms.map((term) => String(term ?? '').trim()).filter(Boolean);
+  if (normalizedTerms.length === 0) {
+    return null;
+  }
+  const sections = [
+    ['benchmark_requirement_coverage.required_mentions', result.benchmark_requirement_coverage?.required_mentions, ['mention', 'label', 'id', 'name']],
+    ['benchmark_requirement_coverage.required_dimensions', result.benchmark_requirement_coverage?.required_dimensions, ['dimension', 'label', 'id', 'name']],
+    ['benchmark_requirement_coverage.forbidden_claims', result.benchmark_requirement_coverage?.forbidden_claims, ['claim', 'label', 'id', 'name']]
+  ];
+  for (const [source, records, keys] of sections) {
+    for (const record of Array.isArray(records) ? records : []) {
+      const labelText = keys.map((key) => record?.[key]).filter(Boolean).join(' ');
+      if (!normalizedTerms.some((term) => textIncludesLoose(labelText, term))) {
+        continue;
+      }
+      const evidenceRefs = normalizeArtifactReferences(record?.evidence_refs ?? record?.artifacts);
+      if (record?.evidence_ref_backed === false || record?.evidence_backed !== true || evidenceRefs.length === 0) {
+        continue;
+      }
+      return {
+        id: truncateText(record?.id ?? record?.mention ?? record?.dimension ?? record?.claim ?? source, 120),
+        source,
+        evidence_refs: evidenceRefs
+      };
+    }
+  }
+  return null;
 }
 
 function severityDistance(left, right) {
@@ -7653,6 +8443,7 @@ function applyProposalDefaults(options, proposal) {
     'target-audience': options['target-audience'] ?? candidate.target_audience,
     'expected-impression': options['expected-impression'] ?? candidate.expected_impression,
     'benchmark-case': options['benchmark-case'] ?? candidate.benchmark_case_id,
+    'human-baseline': options['human-baseline'] ?? candidate.human_baseline_path,
     'rubric-profile': options['rubric-profile'] ?? candidate.rubric_profile_id,
     'evidence-plan-mode': options['evidence-plan-mode'] ?? candidate.evidence_plan_mode,
     'case-id': options['case-id'] ?? candidate.dogfood_metadata?.case_id,
@@ -7871,6 +8662,8 @@ function normalizeArtifactReferences(values) {
     return [];
   }
   return values.slice(0, MAX_EVIDENCE_REFS).map((artifact) => ({
+    id: truncateText(artifact?.id ?? artifact?.ref_id ?? artifact?.reference_id ?? artifact?.evidence_id, 120),
+    ref_id: truncateText(artifact?.ref_id ?? artifact?.id ?? artifact?.reference_id ?? artifact?.evidence_id, 120),
     type: stringOrNull(artifact?.type),
     path: safeArtifactReferencePath(artifact?.path),
     description: stringOrNull(artifact?.description),
@@ -8075,7 +8868,16 @@ function humanReviewRubric() {
   };
 }
 
-function buildProviderInstructionContract({ intent, reviewPackage, orchestration, rubricProfile = null, evidencePlan = null, roleInstructionContracts = [], benchmarkCase = null }) {
+function buildProviderInstructionContract({
+  intent,
+  reviewPackage,
+  orchestration,
+  rubricProfile = null,
+  evidencePlan = null,
+  roleInstructionContracts = [],
+  benchmarkCase = null,
+  ownerBaselineRequirementContract = null
+}) {
   const benchmarkRequirements = benchmarkCase ? {
     case_id: benchmarkCase.case_id,
     rubric_profile_id: rubricProfile?.id ?? benchmarkCase.rubric_profile_id ?? null,
@@ -8083,6 +8885,17 @@ function buildProviderInstructionContract({ intent, reviewPackage, orchestration
     required_mentions: [...benchmarkCase.required_mentions],
     forbidden_claims: [...benchmarkCase.forbidden_claims],
     thresholds: { ...benchmarkCase.thresholds }
+  } : null;
+  const ownerBaselineRequirements = ownerBaselineRequirementContract ? {
+    baseline_id: ownerBaselineRequirementContract.baseline_id ?? null,
+    case_id: ownerBaselineRequirementContract.case_id ?? null,
+    required_dimensions: ownerBaselineRequirementContract.required_dimensions ?? [],
+    required_mentions: ownerBaselineRequirementContract.required_mentions ?? [],
+    forbidden_claims: ownerBaselineRequirementContract.forbidden_claims ?? [],
+    must_not_miss_criteria: ownerBaselineRequirementContract.must_not_miss_criteria ?? [],
+    owner_labels: ownerBaselineRequirementContract.owner_labels ?? [],
+    target_specific_must_not_miss_required: ownerBaselineRequirementContract.target_specific_must_not_miss_required === true,
+    required_structured_finding_fields: ownerBaselineRequirementContract.required_structured_finding_fields ?? []
   } : null;
   return {
     schema_version: SCHEMA_VERSION,
@@ -8098,11 +8911,13 @@ function buildProviderInstructionContract({ intent, reviewPackage, orchestration
       'compare deterministic technical issues with content value and reader impact',
       'preserve evidence, uncertainty, dissent, and owner-decision needs',
       'when review_quality_benchmark is enabled, return benchmark_requirement_coverage with one evidence-backed record for every required mention, required dimension, and forbidden claim',
+      'when owner_baseline_requirement_contract is present, return structured agentic_human_review_findings for every target-specific must-not-miss criterion, using criterion ids and owner label ids from the contract',
       'return findings or agentic_human_review_findings with local evidence_refs for material owner-label and benchmark matches instead of relying only on advisory text search',
       'return normalized JSON matching agentic_human_review_advisory'
     ],
     input_summary: buildSourceEvidenceSummary(reviewPackage),
     benchmark_requirement_contract: benchmarkRequirements,
+    owner_baseline_requirement_contract: ownerBaselineRequirements,
     evidence_plan_hash: evidencePlan ? hashJson(evidencePlan) : null,
     role_instruction_contract_count: Array.isArray(roleInstructionContracts) ? roleInstructionContracts.length : 0,
     output_sections: [
@@ -8131,7 +8946,12 @@ function buildProviderInstructionContract({ intent, reviewPackage, orchestration
   };
 }
 
-function buildReviewQualityBenchmarkContract({ dogfoodMetadata = null, benchmarkCase = null, rubricProfile = null } = {}) {
+function buildReviewQualityBenchmarkContract({
+  dogfoodMetadata = null,
+  benchmarkCase = null,
+  rubricProfile = null,
+  ownerBaselineRequirementContract = null
+} = {}) {
   const caseId = benchmarkCase?.case_id ?? dogfoodMetadata?.case_id ?? null;
   return {
     schema_version: SCHEMA_VERSION,
@@ -8154,6 +8974,14 @@ function buildReviewQualityBenchmarkContract({ dogfoodMetadata = null, benchmark
     required_dimensions: benchmarkCase?.required_dimensions ?? [],
     required_mentions: benchmarkCase?.required_mentions ?? [],
     forbidden_claims: benchmarkCase?.forbidden_claims ?? [],
+    owner_baseline_requirement_contract: ownerBaselineRequirementContract ? {
+      baseline_id: ownerBaselineRequirementContract.baseline_id ?? null,
+      case_id: ownerBaselineRequirementContract.case_id ?? null,
+      must_not_miss_criteria: ownerBaselineRequirementContract.must_not_miss_criteria ?? [],
+      owner_labels: ownerBaselineRequirementContract.owner_labels ?? [],
+      required_structured_finding_fields: ownerBaselineRequirementContract.required_structured_finding_fields ?? []
+    } : null,
+    target_specific_must_not_miss_required: Boolean(ownerBaselineRequirementContract?.must_not_miss_criteria?.length),
     thresholds: benchmarkCase?.thresholds ?? { coverage_score: 0.75, actionability_score: 0.6, forbidden_claim_score: 1 },
     allowed_evidence_classes: benchmarkCase?.allowed_evidence_classes ?? [],
     required_output_section: caseId ? 'benchmark_requirement_coverage' : null,
@@ -8318,6 +9146,10 @@ function normalizeFindings(values, resultId) {
     message: secretSafeText(finding?.message ?? finding?.summary ?? 'Agentic human review advisory finding.', 700),
     recommendation: secretSafeText(finding?.recommendation ?? 'Review this advisory item with the owner before implementation.', 900),
     evidence_refs: normalizeArtifactReferences(finding?.evidence_refs ?? finding?.artifacts),
+    must_not_miss_criterion_id: truncateText(finding?.must_not_miss_criterion_id ?? finding?.criterion_id ?? finding?.must_not_miss_id, 120),
+    criteria_refs: normalizeStringArray(finding?.criteria_refs ?? finding?.criterion_refs ?? finding?.must_not_miss_criteria_refs).slice(0, 12),
+    owner_label_ids: normalizeStringArray(finding?.owner_label_ids ?? finding?.owner_labels ?? finding?.label_ids).slice(0, 12),
+    target_specific: finding?.target_specific === true,
     subjective_judgment: finding?.subjective_judgment !== false,
     owner_decision_required: finding?.owner_decision_required !== false,
     origin_kind: finding?.synthetic_fixture === true ? 'deterministic_fake_provider' : truncateText(finding?.origin_kind ?? 'provider_output', 120),

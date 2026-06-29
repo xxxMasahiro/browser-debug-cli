@@ -255,12 +255,14 @@ test('agentic human review stays approval-gated, local-first, and outside MCP pr
   assert.match(parser, /agentic review compare/);
   assert.match(parser, /agentic review human-baseline registry/);
   assert.match(parser, /agentic review human-baseline claim-readiness/);
+  assert.match(parser, /agentic review claim standard-gate/);
   assert.match(api, /runAgenticHumanReviewPlan/);
   assert.match(api, /runAgenticHumanReviewPropose/);
   assert.match(api, /runAgenticHumanReviewDogfoodReadiness/);
   assert.match(api, /runAgenticHumanReviewCalibrate/);
   assert.match(api, /runAgenticHumanReviewHumanBaselineRegistry/);
   assert.match(api, /runAgenticHumanReviewHumanBaselineClaimReadiness/);
+  assert.match(api, /runAgenticHumanReviewClaimStandardGate/);
   assert.match(api, /agenticProviderCapabilityHash/);
   assert.match(api, /resolveAgenticHumanReviewProvider/);
   assert.equal(schemaFile.title, 'TraceCue Agentic Human Review Advisory');

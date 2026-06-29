@@ -1055,6 +1055,7 @@ function buildAgenticApiPayload({ plan, planPath, reviewPackage, transferFlags, 
       repair_retry_contract: plan.repair_retry_contract ?? null,
       xhigh_multi_step_contract: plan.xhigh_multi_step_contract ?? null,
       review_quality_benchmark: plan.review_quality_benchmark ?? null,
+      owner_baseline_requirement_contract: plan.owner_baseline_requirement_contract ?? null,
       provider_capability_contract: plan.provider_capability_contract ?? null,
       provider_capability_hash: plan.provider_capability_hash ?? null,
       dogfood_metadata: plan.dogfood_metadata ?? null

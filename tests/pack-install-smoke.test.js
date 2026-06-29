@@ -111,6 +111,7 @@ async function main() {
     await assertFile(packageDir, 'schemas/agentic-human-review-xhigh-completion.schema.json');
     await assertFile(packageDir, 'schemas/agentic-human-review-longitudinal-quality.schema.json');
     await assertFile(packageDir, 'schemas/agentic-human-review-claim-policy.schema.json');
+    await assertFile(packageDir, 'schemas/agentic-human-review-claim-standard-gate.schema.json');
     await assertFile(packageDir, 'schemas/agentic-human-review-claim-audit.schema.json');
     await assertFile(packageDir, 'schemas/agentic-human-review-dogfood-readiness.schema.json');
     await assertFile(packageDir, 'schemas/agentic-human-review-dogfood-plan.schema.json');
@@ -233,6 +234,7 @@ async function main() {
     const agenticHumanReviewXhighCompletionSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-xhigh-completion'));
     const agenticHumanReviewLongitudinalQualitySchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-longitudinal-quality'));
     const agenticHumanReviewClaimPolicySchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-claim-policy'));
+    const agenticHumanReviewClaimStandardGateSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-claim-standard-gate'));
     const agenticHumanReviewClaimAuditSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-claim-audit'));
     const agenticHumanReviewDogfoodReadinessSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-dogfood-readiness'));
     const agenticHumanReviewDogfoodPlanSchemaPath = requireFromInstall.resolve(packageSchemaSpecifier('agentic-human-review-dogfood-plan'));
@@ -292,6 +294,7 @@ async function main() {
     assert.equal(path.normalize(agenticHumanReviewXhighCompletionSchemaPath), path.join(packageDir, 'schemas/agentic-human-review-xhigh-completion.schema.json'));
     assert.equal(path.normalize(agenticHumanReviewLongitudinalQualitySchemaPath), path.join(packageDir, 'schemas/agentic-human-review-longitudinal-quality.schema.json'));
     assert.equal(path.normalize(agenticHumanReviewClaimPolicySchemaPath), path.join(packageDir, 'schemas/agentic-human-review-claim-policy.schema.json'));
+    assert.equal(path.normalize(agenticHumanReviewClaimStandardGateSchemaPath), path.join(packageDir, 'schemas/agentic-human-review-claim-standard-gate.schema.json'));
     assert.equal(path.normalize(agenticHumanReviewClaimAuditSchemaPath), path.join(packageDir, 'schemas/agentic-human-review-claim-audit.schema.json'));
     assert.equal(path.normalize(agenticHumanReviewDogfoodReadinessSchemaPath), path.join(packageDir, 'schemas/agentic-human-review-dogfood-readiness.schema.json'));
     assert.equal(path.normalize(agenticHumanReviewDogfoodPlanSchemaPath), path.join(packageDir, 'schemas/agentic-human-review-dogfood-plan.schema.json'));
@@ -487,7 +490,9 @@ async function main() {
     assert.equal(api.schemaNames().includes('agentic_human_review_xhigh_completion'), true);
     assert.equal(api.schemaNames().includes('agentic_human_review_longitudinal_quality'), true);
     assert.equal(api.schemaNames().includes('agentic_human_review_claim_policy'), true);
+    assert.equal(api.schemaNames().includes('agentic_human_review_claim_standard_gate'), true);
     assert.equal(api.schemaNames().includes('agentic_human_review_claim_audit'), true);
+    assert.equal(typeof api.runAgenticHumanReviewClaimStandardGate, 'function');
     assert.equal(api.MCP_TOOLS.some((tool) => tool.name === 'browser_debug_visual_review_dashboard'), true);
     assert.equal(api.MCP_TOOLS.some((tool) => tool.name === 'browser_debug_language_settings'), true);
     assert.equal(api.MCP_TOOLS.some((tool) => tool.name === 'browser_debug_localization_resources'), true);
@@ -722,6 +727,7 @@ async function main() {
     assert.ok(schemaNames.includes('agentic_human_review_xhigh_completion'));
     assert.ok(schemaNames.includes('agentic_human_review_longitudinal_quality'));
     assert.ok(schemaNames.includes('agentic_human_review_claim_policy'));
+    assert.ok(schemaNames.includes('agentic_human_review_claim_standard_gate'));
     assert.ok(schemaNames.includes('agentic_human_review_claim_audit'));
 
     const targetPath = path.join(installRoot, 'target.json');
