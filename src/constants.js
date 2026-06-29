@@ -52,6 +52,7 @@ export const PLANNED_COMMANDS = Object.freeze([
   'agentic review dogfood plan',
   'agentic review calibrate',
   'agentic review compare',
+  'agentic review evidence-set regenerate plan',
   'visual review plan',
   'visual review prepare',
   'visual review run',

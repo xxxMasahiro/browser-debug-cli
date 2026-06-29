@@ -2095,6 +2095,7 @@ test('schema commands expose machine-readable contracts', async () => {
     ['agentic_human_review_longitudinal_quality', '../schemas/agentic-human-review-longitudinal-quality.schema.json'],
     ['agentic_human_review_claim_policy', '../schemas/agentic-human-review-claim-policy.schema.json'],
     ['agentic_human_review_claim_standard_gate', '../schemas/agentic-human-review-claim-standard-gate.schema.json'],
+    ['agentic_human_review_evidence_regeneration_plan', '../schemas/agentic-human-review-evidence-regeneration-plan.schema.json'],
     ['agentic_human_review_claim_audit', '../schemas/agentic-human-review-claim-audit.schema.json'],
     ['agentic_human_review_dogfood_readiness', '../schemas/agentic-human-review-dogfood-readiness.schema.json'],
     ['agentic_human_review_dogfood_plan', '../schemas/agentic-human-review-dogfood-plan.schema.json'],
@@ -5527,6 +5528,51 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(incompleteClaimStandardGateData.rerun_plan.status, 'minimal_rerun_targets_identified');
   assert.equal(incompleteClaimStandardGateData.rerun_plan.evidence_set_regeneration_required, true);
   assert.equal(incompleteClaimStandardGateData.rerun_plan.targets.some((target) => target.target_type === 'calibration'), true);
+  assert.equal(incompleteClaimStandardGateData.rerun_plan.targets.some((target) => target.target_type === 'calibration' && target.reason_code === 'calibration_failed'), true);
+
+  await writeFile(path.join(cwd, 'incomplete-claim-standard-gate.json'), incompleteClaimStandardGate.stdout, 'utf8');
+  const regenerationPlan = await executeCli([
+    'agentic',
+    'review',
+    'evidence-set',
+    'regenerate',
+    'plan',
+    '--evidence-set',
+    'agentic-real-provider-matrix-evidence-set.json',
+    '--claim-gate',
+    'incomplete-claim-standard-gate.json',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(regenerationPlan.exitCode, 0);
+  const regenerationPlanBody = JSON.parse(regenerationPlan.stdout);
+  const regenerationPlanData = regenerationPlanBody.data.agentic_human_review_evidence_regeneration_plan;
+  assert.equal(regenerationPlanBody.command, 'agentic review evidence-set regenerate plan');
+  assert.equal(regenerationPlanData.type, 'agentic_human_review_evidence_regeneration_plan');
+  assert.equal(regenerationPlanData.status, 'regeneration_targets_identified');
+  assert.equal(regenerationPlanData.boundary.read_only, true);
+  assert.equal(regenerationPlanData.execution_boundary.provider_execution_performed, false);
+  assert.equal(regenerationPlanData.execution_boundary.artifact_write_performed, false);
+  assert.equal(regenerationPlanData.execution_boundary.automatic_rerun_performed, false);
+  assert.equal(regenerationPlanData.targets.some((target) => target.target_type === 'calibration'), true);
+  assert.equal(regenerationPlanData.dependency_plan.stages.some((stage) => stage.stage === 'local_calibration'), true);
+  assert.equal(regenerationPlanData.downstream_regeneration.commands.some((command) => command.intent === 'claim_standard_gate'), true);
+  assert.equal(regenerationPlanData.provider_execution_approval_required, false);
+
+  const regenerationPlanExecuteRejected = await executeCli([
+    'agentic',
+    'review',
+    'evidence-set',
+    'regenerate',
+    'plan',
+    '--evidence-set',
+    'agentic-real-provider-matrix-evidence-set.json',
+    '--claim-gate',
+    'incomplete-claim-standard-gate.json',
+    '--execute',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(regenerationPlanExecuteRejected.exitCode, 2);
+  assert.equal(JSON.parse(regenerationPlanExecuteRejected.stdout).errors[0].code, 'CONFLICTING_OPTIONS');
 
   const completeClaimComparisons = benchmarkCaseIds.flatMap((caseId) => [
     {
@@ -5756,6 +5802,39 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   const invalidClaimStandardGateData = JSON.parse(invalidClaimStandardGate.stdout).data.agentic_human_review_claim_standard_gate;
   assert.equal(invalidClaimStandardGateData.blockers.some((blocker) => blocker.code === 'AHR_CLAIM_STANDARD_GATE_RESULT_CLAIM_AUDIT_FAILED'), true);
   assert.equal(invalidClaimStandardGateData.rerun_plan.targets.some((target) => target.target_type === 'claim_audit'), true);
+
+  await writeFile(path.join(cwd, 'invalid-claim-standard-gate.json'), invalidClaimStandardGate.stdout, 'utf8');
+  await writeFile(path.join(cwd, 'regeneration-target-registry.json'), JSON.stringify({
+    results: [{
+      case_id: benchmarkCaseIds[0],
+      effort: requiredEfforts[0],
+      result_path: 'invalid-claim-result.json',
+      plan_path: 'approved-plan.json',
+      plan_hash: 'approved-plan-hash',
+      required_flags: ['allow-page-text', 'allow-url']
+    }]
+  }, null, 2), 'utf8');
+  const providerRegenerationPlan = await executeCli([
+    'agentic',
+    'review',
+    'evidence-set',
+    'regenerate',
+    'plan',
+    '--evidence-set',
+    'invalid-claim-standard-gate-evidence-set.json',
+    '--claim-gate',
+    'invalid-claim-standard-gate.json',
+    '--target-registry',
+    'regeneration-target-registry.json',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(providerRegenerationPlan.exitCode, 0);
+  const providerRegenerationPlanData = JSON.parse(providerRegenerationPlan.stdout).data.agentic_human_review_evidence_regeneration_plan;
+  assert.equal(providerRegenerationPlanData.provider_execution_approval_required, true);
+  assert.equal(providerRegenerationPlanData.targets.some((target) => target.target_type === 'claim_audit'), true);
+  assert.equal(providerRegenerationPlanData.targets.some((target) => target.command_templates.some((command) => command.intent === 'result_repair_or_rerun_for_claim_audit' && command.requires_provider_execution_approval === true)), true);
+  assert.equal(providerRegenerationPlanData.targets.some((target) => target.command_templates.some((command) => command.command.includes('approved-plan.json') && command.command.includes('--execute'))), true);
+  assert.equal(providerRegenerationPlanData.execution_boundary.provider_execution_performed, false);
 
   await writeFile(path.join(cwd, 'permissive-claim-policy.json'), JSON.stringify({
     equality_or_superiority_claims_allowed: true,

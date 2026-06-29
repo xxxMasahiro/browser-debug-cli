@@ -17,6 +17,7 @@ import {
   runAgenticHumanReviewDogfoodPlan,
   runAgenticHumanReviewDogfoodReadiness,
   runAgenticHumanReviewEvaluatorPolicy,
+  runAgenticHumanReviewEvidenceSetRegeneratePlan,
   runAgenticHumanReviewEvidenceSetSummarize,
   runAgenticHumanReviewEvidenceSetValidate,
   runAgenticHumanReviewHumanBaselineApproval,
@@ -339,6 +340,10 @@ export async function executeCli(argv, context = {}) {
 
     if (parsed.command === 'agentic review evidence-set summarize') {
       return runtimeResult(parsed.command, await (context.agenticHumanReviewEvidenceSetSummarizeRunner ?? runAgenticHumanReviewEvidenceSetSummarize)(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'agentic review evidence-set regenerate plan') {
+      return runtimeResult(parsed.command, await (context.agenticHumanReviewEvidenceSetRegeneratePlanRunner ?? runAgenticHumanReviewEvidenceSetRegeneratePlan)(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'agentic review human-baseline registry') {
@@ -914,6 +919,7 @@ function usageText(topic) {
       `       ${CLI_NAME} agentic review compare batch --dataset <workspace-json> [--json]`,
       `       ${CLI_NAME} agentic review evidence-set validate --input <workspace-json> [--json]`,
       `       ${CLI_NAME} agentic review evidence-set summarize --input <workspace-json> [--json]`,
+      `       ${CLI_NAME} agentic review evidence-set regenerate plan --evidence-set <workspace-json> --claim-gate <workspace-json> [--target-registry <workspace-json>] [--json]`,
       `       ${CLI_NAME} agentic review human-baseline registry [--input <workspace-json>] [--json]`,
       `       ${CLI_NAME} agentic review human-baseline overlay --case <benchmark-case-id> [--registry <workspace-json>] [--input <workspace-json>] [--json]`,
       `       ${CLI_NAME} agentic review human-baseline draft --overlay <case-overlay-json> [--registry <workspace-json>] [--json]`,
@@ -931,7 +937,7 @@ function usageText(topic) {
       `       ${CLI_NAME} agentic review status --execution <agentic-human-review-execution> [--json]`,
       `       ${CLI_NAME} agentic review list [--json]`,
       '',
-      'Plans and runs CLI-only agentic human review. Proposals turn conversational requests into non-executing review intent; planning creates the fresh approval hash and exact transfer flags; provider and dogfood readiness perform no provider call; running requires matching hash, explicit --execute, and exact flags; report quality, benchmark, dogfood planning, calibration, comparison, evidence-set, human-baseline, xhigh, longitudinal, evaluator, and claim-policy commands are read-only advisory checks. MCP execution remains excluded.'
+      'Plans and runs CLI-only agentic human review. Proposals turn conversational requests into non-executing review intent; planning creates the fresh approval hash and exact transfer flags; provider and dogfood readiness perform no provider call; running requires matching hash, explicit --execute, and exact flags; report quality, benchmark, dogfood planning, calibration, comparison, evidence-set, evidence-set regeneration planning, human-baseline, xhigh, longitudinal, evaluator, and claim-policy commands are read-only advisory checks. MCP execution remains excluded.'
     ].join('\n');
   }
 

@@ -45,6 +45,7 @@ export const HUMAN_REVIEW_XHIGH_ROUND_PLAN_VERSION = '1.0.0';
 export const HUMAN_REVIEW_LONGITUDINAL_QUALITY_VERSION = '1.0.0';
 export const HUMAN_REVIEW_CLAIM_POLICY_VERSION = '1.0.0';
 export const HUMAN_REVIEW_CLAIM_STANDARD_VERSION = '1.0.0';
+export const HUMAN_REVIEW_EVIDENCE_REGENERATION_VERSION = '1.0.0';
 export const HUMAN_REVIEW_HUMAN_BASELINE_VERSION = '1.0.0';
 export const HUMAN_REVIEW_HUMAN_BASELINE_COMPARISON_VERSION = '1.0.0';
 export const HUMAN_REVIEW_HUMAN_BASELINE_OPERATIONS_VERSION = '1.0.0';
@@ -1628,6 +1629,85 @@ export async function runAgenticHumanReviewEvidenceSetValidate(options = {}, con
 
 export async function runAgenticHumanReviewEvidenceSetSummarize(options = {}, context = {}) {
   return runAgenticHumanReviewEvidenceSet(options, context, 'summarize');
+}
+
+export async function runAgenticHumanReviewEvidenceSetRegeneratePlan(options = {}, context = {}) {
+  const cwd = context.cwd ?? process.cwd();
+  const now = materializeNow(context.now);
+  const maxBytes = parseMaxBytes(options['max-bytes']);
+  if (!maxBytes.ok) {
+    return errorResult('AGENTIC_REVIEW_INVALID_MAX_BYTES', maxBytes.message, { max_bytes: options['max-bytes'] });
+  }
+  const evidenceSetRead = await readWorkspaceJson({
+    cwd,
+    inputPath: options['evidence-set'],
+    label: 'agentic human review evidence set regeneration evidence set',
+    maxBytes: maxBytes.value
+  });
+  if (!evidenceSetRead.ok) {
+    return errorResult(evidenceSetRead.error.code, evidenceSetRead.error.message, evidenceSetRead.error.details);
+  }
+  const claimGateRead = await readWorkspaceJson({
+    cwd,
+    inputPath: options['claim-gate'],
+    label: 'agentic human review evidence set regeneration claim gate',
+    maxBytes: maxBytes.value
+  });
+  if (!claimGateRead.ok) {
+    return errorResult(claimGateRead.error.code, claimGateRead.error.message, claimGateRead.error.details);
+  }
+  const targetRegistryRead = options['target-registry']
+    ? await readWorkspaceJson({
+        cwd,
+        inputPath: options['target-registry'],
+        label: 'agentic human review evidence set regeneration target registry',
+        maxBytes: maxBytes.value
+      })
+    : null;
+  if (targetRegistryRead && !targetRegistryRead.ok) {
+    return errorResult(targetRegistryRead.error.code, targetRegistryRead.error.message, targetRegistryRead.error.details);
+  }
+  const evidenceSet = isEvidenceSetOutput(evidenceSetRead.value)
+    ? normalizeEvidenceSetOutput(evidenceSetRead.value)
+    : await buildEvidenceSetSummary({
+        cwd,
+        manifest: evidenceSetRead.value,
+        manifestPath: evidenceSetRead.relativePath,
+        manifestHash: hashText(evidenceSetRead.text),
+        now,
+        maxBytes: maxBytes.value,
+        mode: 'regeneration-plan'
+      });
+  const claimGate = normalizeClaimStandardGateInput(claimGateRead.value);
+  if (claimGate?.type !== 'agentic_human_review_claim_standard_gate') {
+    return errorResult('AHR_EVIDENCE_REGENERATION_CLAIM_GATE_INVALID', 'The claim gate input must be an Agentic Human Review claim-standard-gate artifact or runtime envelope.', {
+      input: claimGateRead.relativePath
+    });
+  }
+  const regenerationPlan = await buildEvidenceRegenerationPlan({
+    cwd,
+    evidenceSet,
+    evidenceSetPath: evidenceSetRead.relativePath,
+    evidenceSetHash: hashText(evidenceSetRead.text),
+    claimGate,
+    claimGatePath: claimGateRead.relativePath,
+    claimGateHash: hashText(claimGateRead.text),
+    targetRegistry: targetRegistryRead?.value ?? null,
+    targetRegistryPath: targetRegistryRead?.relativePath ?? null,
+    targetRegistryHash: targetRegistryRead ? hashText(targetRegistryRead.text) : null,
+    maxBytes: maxBytes.value,
+    now
+  });
+  return {
+    status: 'ok',
+    data: {
+      agentic_human_review_evidence_regeneration_plan: regenerationPlan,
+      boundary: regenerationPlan.boundary
+    },
+    warnings: regenerationPlan.warnings,
+    errors: [],
+    artifacts: []
+  };
 }
 
 export async function runAgenticHumanReviewHumanBaselineValidate(options = {}, context = {}) {
@@ -3840,6 +3920,567 @@ function claimStandardConditionBlockers(readiness) {
     : [claimStandardBlocker(code, message, details)]);
 }
 
+function normalizeClaimStandardGateInput(value) {
+  return value?.data?.agentic_human_review_claim_standard_gate ?? value;
+}
+
+async function buildEvidenceRegenerationPlan({
+  cwd,
+  evidenceSet,
+  evidenceSetPath,
+  evidenceSetHash,
+  claimGate,
+  claimGatePath,
+  claimGateHash,
+  targetRegistry,
+  targetRegistryPath,
+  targetRegistryHash,
+  maxBytes,
+  now
+}) {
+  const normalizedEvidenceSet = normalizeEvidenceSetOutput(evidenceSet);
+  const registry = normalizeEvidenceRegenerationTargetRegistry(targetRegistry);
+  const rawTargets = Array.isArray(claimGate?.rerun_plan?.targets) ? claimGate.rerun_plan.targets : [];
+  const targets = [];
+  const warnings = [];
+  for (const [index, rawTarget] of rawTargets.entries()) {
+    const planned = await buildEvidenceRegenerationTarget({
+      cwd,
+      evidenceSet: normalizedEvidenceSet,
+      registry,
+      rawTarget,
+      index,
+      maxBytes
+    });
+    targets.push(planned.target);
+    warnings.push(...planned.warnings);
+  }
+  const providerExecutionApprovalRequired = targets.some((target) => target.requires_provider_execution_approval === true);
+  const stages = buildEvidenceRegenerationStages(targets, {
+    evidenceSetPath,
+    claimGatePath,
+    targetRegistryPath,
+    providerExecutionApprovalRequired
+  });
+  return redact({
+    schema_version: SCHEMA_VERSION,
+    type: 'agentic_human_review_evidence_regeneration_plan',
+    regeneration_plan_version: HUMAN_REVIEW_EVIDENCE_REGENERATION_VERSION,
+    generated_at: now.toISOString(),
+    status: targets.length === 0 ? 'no_regeneration_required' : 'regeneration_targets_identified',
+    evidence_set: {
+      path: evidenceSetPath,
+      hash: evidenceSetHash,
+      type: normalizedEvidenceSet?.type ?? null,
+      generated_at: normalizedEvidenceSet?.generated_at ?? null
+    },
+    claim_gate: {
+      path: claimGatePath,
+      hash: claimGateHash,
+      status: claimGate?.status ?? null,
+      passed: claimGate?.passed === true,
+      rerun_plan_status: claimGate?.rerun_plan?.status ?? null,
+      rerun_plan_target_count: Number(claimGate?.rerun_plan?.target_count ?? rawTargets.length)
+    },
+    target_registry: {
+      path: targetRegistryPath,
+      hash: targetRegistryHash,
+      provided: targetRegistryPath !== null,
+      result_count: registry.results.length,
+      comparison_count: registry.comparisons.length,
+      human_baseline_comparison_count: registry.humanBaselineComparisons.length
+    },
+    target_count: targets.length,
+    provider_execution_approval_required: providerExecutionApprovalRequired,
+    targets,
+    dependency_plan: {
+      stage_count: stages.length,
+      stages
+    },
+    downstream_regeneration: buildEvidenceRegenerationDownstreamCommands({
+      evidenceSetPath,
+      claimGatePath,
+      targetRegistryPath,
+      required: targets.length > 0
+    }),
+    execution_boundary: {
+      provider_execution_performed: false,
+      artifact_write_performed: false,
+      browser_launched: false,
+      claim_gate_mutated: false,
+      automatic_rerun_performed: false,
+      mcp_execution_exposed: false
+    },
+    warnings,
+    boundary: agenticHumanReviewBoundary({ read_only: true }),
+    advisory_only: true,
+    gate_effect: 'none'
+  });
+}
+
+async function buildEvidenceRegenerationTarget({ cwd, evidenceSet, registry, rawTarget, index, maxBytes }) {
+  const targetType = secretSafeText(rawTarget?.target_type ?? 'unknown', 80);
+  const reasonCode = secretSafeText(rawTarget?.reason_code ?? 'unspecified', 160);
+  const caseId = rawTarget?.case_id ? secretSafeText(rawTarget.case_id, 160) : null;
+  const effort = rawTarget?.effort ? secretSafeText(rawTarget.effort, 80) : null;
+  const comparisonKind = rawTarget?.comparison_kind ? secretSafeText(rawTarget.comparison_kind, 120) : null;
+  const sourcePath = rawTarget?.source_path ? secretSafeText(rawTarget.source_path, 600) : null;
+  const warnings = [];
+  const resultRecord = findRegenerationResultRecord({ evidenceSet, registry, caseId, effort, resultId: rawTarget?.result_id, sourcePath });
+  const comparisonRecord = findRegenerationComparisonRecord({ evidenceSet, registry, caseId, comparisonKind, sourcePath });
+  const humanBaselineComparisonRecord = findRegenerationHumanBaselineComparisonRecord({ registry, caseId, effort, sourcePath });
+  const sourceArtifact = sourcePath
+    ? await readOptionalEvidenceRegenerationArtifact({ cwd, sourcePath, maxBytes })
+    : { value: null, warnings: [] };
+  warnings.push(...sourceArtifact.warnings);
+  const sourceValue = sourceArtifact.value;
+  const commandTemplates = buildEvidenceRegenerationCommandTemplates({
+    targetType,
+    reasonCode,
+    caseId,
+    effort,
+    comparisonKind,
+    sourcePath,
+    rawTarget,
+    resultRecord,
+    comparisonRecord,
+    humanBaselineComparisonRecord,
+    sourceValue,
+    registry
+  });
+  const unresolvedInputs = commandTemplates.flatMap((command) => command.unresolved_inputs ?? []);
+  if (unresolvedInputs.length > 0) {
+    warnings.push({
+      code: 'AHR_EVIDENCE_REGENERATION_INPUT_UNRESOLVED',
+      message: 'A regeneration target could not resolve every command input from the evidence set or target registry.',
+      details: { target_type: targetType, case_id: caseId, effort, comparison_kind: comparisonKind, unresolved_inputs: unresolvedInputs }
+    });
+  }
+  return {
+    target: {
+      target_id: `regeneration-target-${String(index + 1).padStart(3, '0')}`,
+      target_type: targetType,
+      reason_code: reasonCode,
+      case_id: caseId,
+      effort,
+      comparison_kind: comparisonKind,
+      source_path: sourcePath,
+      action: secretSafeText(rawTarget?.action ?? evidenceRegenerationDefaultAction(targetType), 600),
+      requires_provider_execution_approval: rawTarget?.requires_provider_execution_approval === true || ['result', 'claim_audit'].includes(targetType),
+      dependency_group: evidenceRegenerationDependencyGroup(targetType),
+      resolved_inputs: {
+        result_path: resultRecord?.path ?? resultRecord?.result_path ?? null,
+        result_id: resultRecord?.result_id ?? null,
+        baseline_path: commandTemplates.find((command) => command.intent === 'comparison')?.inputs?.baseline ?? null,
+        candidate_path: commandTemplates.find((command) => command.intent === 'comparison')?.inputs?.candidate ?? null,
+        human_baseline_path: commandTemplates.find((command) => command.intent === 'human_baseline_comparison')?.inputs?.baseline ?? null
+      },
+      unresolved_inputs: [...new Set(unresolvedInputs)],
+      command_templates: commandTemplates,
+      invalidates: evidenceRegenerationInvalidations({ targetType, caseId, effort, comparisonKind }),
+      advisory_only: true,
+      gate_effect: 'none'
+    },
+    warnings
+  };
+}
+
+async function readOptionalEvidenceRegenerationArtifact({ cwd, sourcePath, maxBytes }) {
+  const read = await readWorkspaceJson({
+    cwd,
+    inputPath: sourcePath,
+    label: 'agentic human review evidence regeneration source artifact',
+    maxBytes
+  });
+  if (!read.ok) {
+    return {
+      value: null,
+      warnings: [{
+        code: 'AHR_EVIDENCE_REGENERATION_SOURCE_ARTIFACT_UNREADABLE',
+        message: 'A regeneration source artifact could not be read; the plan will keep generic placeholders for any inputs that depend on it.',
+        details: { source_path: sourcePath, error_code: read.error.code }
+      }]
+    };
+  }
+  return { value: read.value?.data ? unwrapEvidenceRegenerationEnvelope(read.value) : read.value, warnings: [] };
+}
+
+function unwrapEvidenceRegenerationEnvelope(value) {
+  return value.data?.agentic_human_review_comparison
+    ?? value.data?.agentic_human_review_human_baseline_comparison
+    ?? value.data?.agentic_human_review_calibration
+    ?? value.data?.agentic_human_review_claim_audit
+    ?? value.data?.agentic_human_review_claim_standard_gate
+    ?? value;
+}
+
+function normalizeEvidenceRegenerationTargetRegistry(input) {
+  const value = input?.data?.agentic_human_review_evidence_regeneration_registry ?? input ?? {};
+  const results = normalizeRegistryRows(value.results ?? value.result_targets ?? value.result_registry);
+  const comparisons = normalizeRegistryRows(value.comparisons ?? value.comparison_targets ?? value.comparison_registry);
+  const humanBaselineComparisons = normalizeRegistryRows(value.human_baseline_comparisons ?? value.humanBaselineComparisons ?? value.owner_baseline_comparisons);
+  return { value, results, comparisons, humanBaselineComparisons };
+}
+
+function normalizeRegistryRows(value) {
+  if (Array.isArray(value)) {
+    return value.filter((item) => item && typeof item === 'object');
+  }
+  if (value && typeof value === 'object') {
+    return Object.values(value).filter((item) => item && typeof item === 'object');
+  }
+  return [];
+}
+
+function findRegenerationResultRecord({ evidenceSet, registry, caseId, effort, resultId, sourcePath }) {
+  const evidenceCandidates = Array.isArray(evidenceSet?.results) ? evidenceSet.results : [];
+  const matchRecord = (candidates) => candidates.find((item) => sourcePath && [item.path, item.result_path].includes(sourcePath))
+    ?? candidates.find((item) => resultId && item.result_id === resultId)
+    ?? candidates.find((item) => caseId && effort && item.case_id === caseId && item.effort === effort)
+    ?? null;
+  const evidenceRecord = matchRecord(evidenceCandidates);
+  const registryRecord = matchRecord(registry.results);
+  if (evidenceRecord || registryRecord) {
+    return { ...(evidenceRecord ?? {}), ...(registryRecord ?? {}) };
+  }
+  return null;
+}
+
+function findRegenerationComparisonRecord({ evidenceSet, registry, caseId, comparisonKind, sourcePath }) {
+  const candidates = [
+    ...(Array.isArray(evidenceSet?.comparisons) ? evidenceSet.comparisons : []),
+    ...registry.comparisons
+  ];
+  return candidates.find((item) => sourcePath && [item.path, item.comparison_path].includes(sourcePath))
+    ?? candidates.find((item) => caseId && comparisonKind && (item.case_id ?? item.baseline_case_id ?? item.candidate_case_id) === caseId && item.comparison_kind === comparisonKind)
+    ?? null;
+}
+
+function findRegenerationHumanBaselineComparisonRecord({ registry, caseId, effort, sourcePath }) {
+  return registry.humanBaselineComparisons.find((item) => sourcePath && [item.path, item.comparison_path].includes(sourcePath))
+    ?? registry.humanBaselineComparisons.find((item) => caseId && (item.case_id ?? item.candidate_case_id) === caseId && (!effort || item.effort === effort || item.candidate_effort === effort))
+    ?? null;
+}
+
+function buildEvidenceRegenerationCommandTemplates({
+  targetType,
+  caseId,
+  effort,
+  comparisonKind,
+  sourcePath,
+  rawTarget,
+  resultRecord,
+  comparisonRecord,
+  humanBaselineComparisonRecord,
+  sourceValue,
+  registry
+}) {
+  if (targetType === 'result') {
+    return [buildResultRegenerationCommand({ caseId, effort, rawTarget, resultRecord, registry })];
+  }
+  if (targetType === 'claim_audit') {
+    const resultPath = sourcePath ?? resultRecord?.path ?? resultRecord?.result_path ?? '<agentic-review-result.json>';
+    return [
+      buildResultRegenerationCommand({ caseId, effort, rawTarget, resultRecord, registry }),
+      buildTraceCueCommand({
+        intent: 'claim_audit_after_result_repair',
+        args: ['agentic', 'review', 'claim', 'audit', '--result', resultPath, '--json'],
+        inputs: { result: resultPath },
+        unresolvedInputs: resultPath.includes('<') ? ['result'] : [],
+        requiresProviderExecutionApproval: false,
+        sideEffectIfRun: 'read_only'
+      })
+    ];
+  }
+  if (targetType === 'calibration') {
+    const resultPath = resultRecord?.path ?? resultRecord?.result_path ?? '<agentic-review-result.json>';
+    return [buildTraceCueCommand({
+      intent: 'calibration',
+      args: ['agentic', 'review', 'calibrate', '--result', resultPath, '--case', caseId ?? '<benchmark-case-id>', '--json'],
+      inputs: { result: resultPath, case: caseId },
+      unresolvedInputs: [
+        ...(resultPath.includes('<') ? ['result'] : []),
+        ...(caseId ? [] : ['case'])
+      ],
+      requiresProviderExecutionApproval: false,
+      sideEffectIfRun: 'read_only'
+    })];
+  }
+  if (targetType === 'comparison') {
+    const comparisonInputs = resolveComparisonCommandInputs({ comparisonRecord, sourceValue, registry, caseId, comparisonKind });
+    return [buildTraceCueCommand({
+      intent: 'comparison',
+      args: [
+        'agentic', 'review', 'compare',
+        '--baseline', comparisonInputs.baseline,
+        '--candidate', comparisonInputs.candidate,
+        '--comparison-kind', comparisonKind ?? comparisonInputs.comparisonKind ?? '<comparison-kind>',
+        '--json'
+      ],
+      inputs: { baseline: comparisonInputs.baseline, candidate: comparisonInputs.candidate, comparison_kind: comparisonKind ?? comparisonInputs.comparisonKind ?? null },
+      unresolvedInputs: comparisonInputs.unresolved,
+      requiresProviderExecutionApproval: false,
+      sideEffectIfRun: 'read_only'
+    })];
+  }
+  if (targetType === 'human_baseline_comparison') {
+    const humanInputs = resolveHumanBaselineComparisonCommandInputs({ humanBaselineComparisonRecord, sourceValue, registry, caseId, effort });
+    return [buildTraceCueCommand({
+      intent: 'human_baseline_comparison',
+      args: [
+        'agentic', 'review', 'human-baseline', 'compare',
+        '--baseline', humanInputs.baseline,
+        '--result', humanInputs.result,
+        '--case', caseId ?? humanInputs.caseId ?? '<benchmark-case-id>',
+        '--json'
+      ],
+      inputs: { baseline: humanInputs.baseline, result: humanInputs.result, case: caseId ?? humanInputs.caseId ?? null },
+      unresolvedInputs: humanInputs.unresolved,
+      requiresProviderExecutionApproval: false,
+      sideEffectIfRun: 'read_only'
+    })];
+  }
+  return [buildTraceCueCommand({
+    intent: 'manual_review',
+    args: ['agentic', 'review', 'claim', 'standard-gate', '--evidence-set', '<updated-evidence-set.json>', '--json'],
+    inputs: {},
+    unresolvedInputs: ['target_type'],
+    requiresProviderExecutionApproval: rawTarget?.requires_provider_execution_approval === true,
+    sideEffectIfRun: 'read_only'
+  })];
+}
+
+function buildResultRegenerationCommand({ caseId, effort, rawTarget, resultRecord, registry }) {
+  const planRecord = resultRecord ?? registry.results.find((item) => item.case_id === caseId && item.effort === effort) ?? {};
+  const planPath = planRecord.plan_path ?? planRecord.plan ?? '<approved-agentic-review-plan.json>';
+  const planHash = planRecord.plan_hash ?? '<approved-plan-hash>';
+  const requiredFlags = Array.isArray(planRecord.required_flags)
+    ? planRecord.required_flags
+    : Array.isArray(planRecord.transfer_flags)
+      ? planRecord.transfer_flags
+      : [];
+  const normalizedFlags = requiredFlags.map((flag) => String(flag).replace(/^--/, '')).filter(Boolean).sort();
+  const args = [
+    'agentic', 'review', 'run',
+    '--plan', planPath,
+    '--plan-hash', planHash,
+    ...normalizedFlags.map((flag) => `--${flag}`),
+    '--execute',
+    '--json'
+  ];
+  return buildTraceCueCommand({
+    intent: rawTarget?.target_type === 'claim_audit' ? 'result_repair_or_rerun_for_claim_audit' : 'result_rerun',
+    args,
+    inputs: { plan: planPath, plan_hash: planHash, case: caseId, effort },
+    unresolvedInputs: [
+      ...(planPath.includes('<') ? ['plan'] : []),
+      ...(planHash.includes('<') ? ['plan_hash'] : [])
+    ],
+    requiresProviderExecutionApproval: true,
+    sideEffectIfRun: 'provider_execution_and_artifact_write'
+  });
+}
+
+function resolveComparisonCommandInputs({ comparisonRecord, sourceValue, registry, caseId, comparisonKind }) {
+  const rawComparison = sourceValue?.type === 'agentic_human_review_comparison' ? sourceValue : {};
+  const registryRecord = comparisonRecord ?? {};
+  const baseline = registryRecord.baseline_path
+    ?? registryRecord.baseline
+    ?? rawComparison.baseline?.result_path
+    ?? resultPathByIdOrCase(registry.results, rawComparison.baseline?.result_id, caseId, registryRecord.baseline_effort)
+    ?? '<baseline-agentic-review-result.json>';
+  const candidate = registryRecord.candidate_path
+    ?? registryRecord.candidate
+    ?? rawComparison.candidate?.result_path
+    ?? resultPathByIdOrCase(registry.results, rawComparison.candidate?.result_id, caseId, registryRecord.candidate_effort)
+    ?? '<candidate-agentic-review-result.json>';
+  return {
+    baseline,
+    candidate,
+    comparisonKind: rawComparison.comparison_kind ?? registryRecord.comparison_kind ?? comparisonKind,
+    unresolved: [
+      ...(String(baseline).includes('<') ? ['baseline'] : []),
+      ...(String(candidate).includes('<') ? ['candidate'] : []),
+      ...(comparisonKind || rawComparison.comparison_kind || registryRecord.comparison_kind ? [] : ['comparison_kind'])
+    ]
+  };
+}
+
+function resolveHumanBaselineComparisonCommandInputs({ humanBaselineComparisonRecord, sourceValue, registry, caseId, effort }) {
+  const rawComparison = sourceValue?.type === 'agentic_human_review_human_baseline_comparison' ? sourceValue : {};
+  const registryRecord = humanBaselineComparisonRecord ?? {};
+  const baseline = registryRecord.baseline_path
+    ?? registryRecord.human_baseline_path
+    ?? rawComparison.baseline?.input_path
+    ?? '<owner-labeled-human-baseline.json>';
+  const result = registryRecord.result_path
+    ?? registryRecord.candidate_path
+    ?? rawComparison.candidate?.result_path
+    ?? resultPathByIdOrCase(registry.results, rawComparison.candidate?.result_id, caseId, effort)
+    ?? '<agentic-review-result.json>';
+  const resolvedCaseId = caseId ?? registryRecord.case_id ?? rawComparison.baseline?.case_id ?? rawComparison.candidate?.case_id ?? null;
+  return {
+    baseline,
+    result,
+    caseId: resolvedCaseId,
+    unresolved: [
+      ...(String(baseline).includes('<') ? ['baseline'] : []),
+      ...(String(result).includes('<') ? ['result'] : []),
+      ...(resolvedCaseId ? [] : ['case'])
+    ]
+  };
+}
+
+function resultPathByIdOrCase(results, resultId, caseId, effort) {
+  const record = results.find((item) => resultId && item.result_id === resultId)
+    ?? results.find((item) => caseId && effort && item.case_id === caseId && item.effort === effort)
+    ?? null;
+  return record?.path ?? record?.result_path ?? null;
+}
+
+function buildTraceCueCommand({ intent, args, inputs, unresolvedInputs, requiresProviderExecutionApproval, sideEffectIfRun }) {
+  const commandArgs = [CLI_NAME, ...args];
+  return {
+    intent,
+    command: commandArgs.join(' '),
+    argv: commandArgs,
+    inputs,
+    unresolved_inputs: unresolvedInputs,
+    requires_provider_execution_approval: requiresProviderExecutionApproval === true,
+    side_effect_if_run: sideEffectIfRun,
+    executed: false,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+}
+
+function evidenceRegenerationDefaultAction(targetType) {
+  const actions = {
+    result: 'rerun the affected approved Agentic Human Review result through the normal plan-hash and exact-transfer-flag path',
+    claim_audit: 'repair or rerun the affected result and rerun claim audit diagnostics',
+    calibration: 'regenerate calibration after the affected result is repaired',
+    comparison: 'regenerate comparison after affected result quality or evaluator diagnostics are repaired',
+    human_baseline_comparison: 'regenerate owner-baseline comparison after candidate result covers missing owner labels and criteria'
+  };
+  return actions[targetType] ?? 'inspect and regenerate the affected evidence artifact';
+}
+
+function evidenceRegenerationDependencyGroup(targetType) {
+  if (['result', 'claim_audit'].includes(targetType)) {
+    return 'provider_result_repair';
+  }
+  if (targetType === 'calibration') {
+    return 'local_calibration';
+  }
+  if (targetType === 'comparison') {
+    return 'local_comparison';
+  }
+  if (targetType === 'human_baseline_comparison') {
+    return 'local_human_baseline_comparison';
+  }
+  return 'manual_diagnostic';
+}
+
+function evidenceRegenerationInvalidations({ targetType, caseId, effort, comparisonKind }) {
+  const common = ['evidence-set-summary', 'claim-readiness', 'longitudinal-quality', 'claim-standard-gate'];
+  if (['result', 'claim_audit'].includes(targetType)) {
+    return [
+      { artifact_family: 'calibration', case_id: caseId, effort },
+      { artifact_family: 'comparison', case_id: caseId, comparison_kind: 'direct-vs-tracecue' },
+      { artifact_family: 'comparison', case_id: caseId, comparison_kind: 'provider-dogfood' },
+      { artifact_family: 'comparison', case_id: caseId, comparison_kind: 'benchmark-regression' },
+      { artifact_family: 'human_baseline_comparison', case_id: caseId, effort },
+      ...common.map((artifact_family) => ({ artifact_family }))
+    ];
+  }
+  if (targetType === 'calibration') {
+    return [{ artifact_family: 'evidence-set-summary' }, { artifact_family: 'claim-readiness' }, { artifact_family: 'longitudinal-quality' }, { artifact_family: 'claim-standard-gate' }];
+  }
+  if (targetType === 'comparison' || targetType === 'human_baseline_comparison') {
+    return [{ artifact_family: targetType, case_id: caseId, effort, comparison_kind: comparisonKind }, ...common.map((artifact_family) => ({ artifact_family }))];
+  }
+  return common.map((artifact_family) => ({ artifact_family }));
+}
+
+function buildEvidenceRegenerationStages(targets, { evidenceSetPath, claimGatePath, targetRegistryPath, providerExecutionApprovalRequired }) {
+  const stageDefinitions = [
+    ['provider_result_repair', 'Approved provider result reruns or result repairs. These commands are not executed by this plan.'],
+    ['local_calibration', 'Provider-free calibration diagnostics after affected results are available.'],
+    ['local_comparison', 'Provider-free direct/provider/benchmark comparison diagnostics after affected results are available.'],
+    ['local_human_baseline_comparison', 'Provider-free owner-baseline comparison diagnostics after affected results are available.'],
+    ['manual_diagnostic', 'Manual diagnostic targets that could not be classified more narrowly.']
+  ];
+  const stages = stageDefinitions
+    .map(([stage, description]) => {
+      const stageTargets = targets.filter((target) => target.dependency_group === stage);
+      return {
+        stage,
+        description,
+        target_count: stageTargets.length,
+        provider_execution_approval_required: stageTargets.some((target) => target.requires_provider_execution_approval === true),
+        commands: stageTargets.flatMap((target) => target.command_templates),
+        targets: stageTargets.map((target) => target.target_id),
+        executed: false
+      };
+    })
+    .filter((stage) => stage.target_count > 0);
+  if (targets.length > 0) {
+    stages.push({
+      stage: 'evidence_set_regeneration',
+      description: 'Regenerate evidence-set summary, claim-readiness, longitudinal quality, and final claim-standard-gate after all target artifacts are updated.',
+      target_count: 0,
+      provider_execution_approval_required: false,
+      commands: buildEvidenceRegenerationDownstreamCommands({ evidenceSetPath, claimGatePath, targetRegistryPath, required: true }).commands,
+      targets: [],
+      executed: false,
+      blocked_until_provider_targets_complete: providerExecutionApprovalRequired
+    });
+  }
+  return stages;
+}
+
+function buildEvidenceRegenerationDownstreamCommands({ evidenceSetPath, required }) {
+  const input = evidenceSetPath ?? '<updated-evidence-set-manifest.json>';
+  const commands = [
+    buildTraceCueCommand({
+      intent: 'evidence_set_summary',
+      args: ['agentic', 'review', 'evidence-set', 'summarize', '--input', input, '--json'],
+      inputs: { input },
+      unresolvedInputs: input.includes('<') ? ['input'] : [],
+      requiresProviderExecutionApproval: false,
+      sideEffectIfRun: 'read_only'
+    }),
+    buildTraceCueCommand({
+      intent: 'claim_readiness',
+      args: ['agentic', 'review', 'human-baseline', 'claim-readiness', '--evidence-set', input, '--json'],
+      inputs: { evidence_set: input },
+      unresolvedInputs: input.includes('<') ? ['evidence_set'] : [],
+      requiresProviderExecutionApproval: false,
+      sideEffectIfRun: 'read_only'
+    }),
+    buildTraceCueCommand({
+      intent: 'longitudinal_quality',
+      args: ['agentic', 'review', 'quality', 'longitudinal', '--evidence-set', input, '--json'],
+      inputs: { evidence_set: input },
+      unresolvedInputs: input.includes('<') ? ['evidence_set'] : [],
+      requiresProviderExecutionApproval: false,
+      sideEffectIfRun: 'read_only'
+    }),
+    buildTraceCueCommand({
+      intent: 'claim_standard_gate',
+      args: ['agentic', 'review', 'claim', 'standard-gate', '--evidence-set', input, '--json'],
+      inputs: { evidence_set: input },
+      unresolvedInputs: input.includes('<') ? ['evidence_set'] : [],
+      requiresProviderExecutionApproval: false,
+      sideEffectIfRun: 'read_only'
+    })
+  ];
+  return {
+    required_after_targets_complete: required === true,
+    commands
+  };
+}
+
 function buildClaimStandardRerunPlan({
   readiness,
   ineligibleResults,
@@ -3942,13 +4583,27 @@ function buildClaimStandardRerunPlan({
       requires_provider_execution_approval: true
     });
   }
-  for (const cell of readiness.blocker_summary?.calibration_failed_case_efforts ?? []) {
+  const calibrationFailedCells = readiness.blocker_summary?.calibration_failed_case_efforts ?? [];
+  for (const cell of calibrationFailedCells) {
     addTarget({
       target_type: 'calibration',
       reason_code: 'calibration_failed',
       case_id: cell.case_id,
       effort: cell.effort,
       action: 'regenerate calibration after the affected result is repaired',
+      requires_provider_execution_approval: false
+    });
+  }
+  for (const cell of readiness.missing?.calibration_case_efforts ?? []) {
+    if (calibrationFailedCells.some((failed) => failed.case_id === cell.case_id && failed.effort === cell.effort)) {
+      continue;
+    }
+    addTarget({
+      target_type: 'calibration',
+      reason_code: 'missing_calibration_case_effort',
+      case_id: cell.case_id,
+      effort: cell.effort,
+      action: 'generate missing calibration coverage before regenerating the evidence set',
       requires_provider_execution_approval: false
     });
   }

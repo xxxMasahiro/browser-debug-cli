@@ -16,6 +16,7 @@ const VALUE_OPTIONS = new Set([
   'candidate',
   'case-id',
   'client',
+  'claim-gate',
   'comparison-kind',
   'comparison-run-id',
   'daemon',
@@ -78,6 +79,7 @@ const VALUE_OPTIONS = new Set([
   'session',
   'surface',
   'target',
+  'target-registry',
   'threshold',
   'timeout',
   'token-env',
@@ -1454,10 +1456,34 @@ function parseAgentic(args, globals) {
       }
       return parsed;
     }
+    if (evidenceSetAction === 'regenerate') {
+      const regenerateAction = args[3];
+      if (regenerateAction === 'plan') {
+        const command = 'agentic review evidence-set regenerate plan';
+        const parsed = parseRequiredOptions(command, args.slice(4), globals, ['evidence-set', 'claim-gate']);
+        if (!parsed.ok) {
+          return parsed;
+        }
+        const unsupported = Object.keys(parsed.options).find((option) => !['evidence-set', 'claim-gate', 'target-registry', 'max-bytes'].includes(option));
+        if (unsupported) {
+          return parseError(command, globals.json, {
+            code: unsupported === 'execute' ? 'CONFLICTING_OPTIONS' : 'UNSUPPORTED_AGENTIC_REVIEW_EVIDENCE_SET_REGENERATE_PLAN_OPTION',
+            message: `${command} does not accept --${unsupported} because it is read-only.`,
+            details: { option: unsupported }
+          });
+        }
+        return parsed;
+      }
+      return parseError('agentic review evidence-set regenerate', globals.json, {
+        code: regenerateAction ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
+        message: regenerateAction ? `Unknown agentic review evidence-set regenerate subcommand: ${regenerateAction}` : 'agentic review evidence-set regenerate requires plan.',
+        details: { subcommands: ['plan'] }
+      });
+    }
     return parseError('agentic review evidence-set', globals.json, {
       code: evidenceSetAction ? 'UNKNOWN_SUBCOMMAND' : 'MISSING_SUBCOMMAND',
-      message: evidenceSetAction ? `Unknown agentic review evidence-set subcommand: ${evidenceSetAction}` : 'agentic review evidence-set requires validate or summarize.',
-      details: { subcommands: ['validate', 'summarize'] }
+      message: evidenceSetAction ? `Unknown agentic review evidence-set subcommand: ${evidenceSetAction}` : 'agentic review evidence-set requires validate, summarize, or regenerate.',
+      details: { subcommands: ['validate', 'summarize', 'regenerate'] }
     });
   }
   if (action === 'human-baseline') {
