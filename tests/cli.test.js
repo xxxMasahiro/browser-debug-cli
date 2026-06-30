@@ -6436,6 +6436,13 @@ test('agentic human review responses adapter converts requests without leaking c
   assert.match(observedFetch.body.input, /evidence_reference_catalog/);
   assert.match(observedFetch.body.input, /text-snippet-1/);
   assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value|output_text/);
+  const observedInput = JSON.parse(observedFetch.body.input);
+  assert.equal(observedInput.required_benchmark_coverage.required_mentions[0].mention, 'content value');
+  assert.equal(observedInput.required_benchmark_coverage.required_dimensions[0].dimension, 'content_comprehension');
+  assert.equal(observedInput.required_benchmark_coverage.forbidden_claims[0].claim, 'release is approved');
+  assert.equal(observedInput.required_benchmark_coverage.forbidden_claims[0].required_present, false);
+  assert.equal(observedInput.required_benchmark_coverage.forbidden_claims[0].required_fields.includes('absence_confirmation'), true);
+  assert.equal(observedInput.required_benchmark_coverage.forbidden_claims[0].recommended_evidence_ref_ids.includes('benchmark-forbidden-claim-1'), true);
 
   const directRequest = buildOpenAiResponsesRequest({
     traceCueRequest: request,
@@ -6880,8 +6887,16 @@ test('agentic human review responses adapter retries repairable owner baseline c
   assert.equal(initialInput.required_owner_baseline_coverage.required_dimensions[0].dimension, 'risk_and_misleading_content');
   assert.equal(initialInput.required_owner_baseline_coverage.forbidden_claims[0].claim, 'definitive ending interpretation was proved');
   assert.equal(initialInput.required_owner_baseline_coverage.forbidden_claims[0].required_present, false);
+  assert.equal(initialInput.required_benchmark_coverage.required_mentions.some((record) => record.mention === 'content value'), true);
+  const ownerBenchmarkMentionTemplate = initialInput.required_benchmark_coverage.required_mentions.find((record) => record.mention === 'owner interpretive ambiguity');
+  assert.equal(ownerBenchmarkMentionTemplate.recommended_evidence_ref_ids.includes('owner-baseline-required-mention-1'), true);
+  const benchmarkForbiddenTemplate = initialInput.required_benchmark_coverage.forbidden_claims.find((record) => record.claim === 'release is approved');
+  assert.equal(benchmarkForbiddenTemplate.required_present, false);
   assert.equal(repairInput.contract_repair_request.required_owner_baseline_coverage.required_mentions[0].mention, 'owner interpretive ambiguity');
+  const repairBenchmarkForbiddenTemplate = repairInput.contract_repair_request.required_benchmark_coverage.forbidden_claims.find((record) => record.claim === 'release is approved');
+  assert.equal(repairBenchmarkForbiddenTemplate.required_fields.includes('absence_confirmation'), true);
   assert.match(observedRequests[0].instructions, /required_owner_baseline_coverage/);
+  assert.match(observedRequests[1].instructions, /Required benchmark coverage templates/);
   assert.match(observedRequests[1].instructions, /Required owner-baseline coverage templates/);
   assert.equal(result.body.benchmark_requirement_coverage.required_mentions.some((record) => record.mention === 'owner interpretive ambiguity'), true);
   assert.equal(result.body.benchmark_requirement_coverage.required_dimensions.some((record) => record.dimension === 'risk_and_misleading_content'), true);
@@ -7037,10 +7052,15 @@ test('agentic human review responses adapter compacts real-shaped owner-baseline
   assert.equal(input.required_owner_baseline_findings.length, ownerCriteria.length);
   assert.equal(input.required_owner_baseline_coverage.required_mentions.length, ownerMentions.length);
   assert.equal(input.required_owner_baseline_coverage.forbidden_claims.length, ownerForbiddenClaims.length);
+  assert.equal(input.required_benchmark_coverage.required_mentions.length, request.plan.review_quality_benchmark.required_mentions.length + ownerMentions.length);
+  assert.equal(input.required_benchmark_coverage.forbidden_claims.length, request.plan.review_quality_benchmark.forbidden_claims.length + ownerForbiddenClaims.length);
+  assert.equal(input.required_benchmark_coverage.forbidden_claims.find((record) => record.claim === 'release is approved').required_present, false);
+  assert.equal(input.required_benchmark_coverage.required_mentions.find((record) => record.mention === ownerMentions[0]).recommended_evidence_ref_ids.includes('owner-baseline-required-mention-1'), true);
   assert.equal(input.review_request.plan.owner_baseline_requirement_contract.must_not_miss_criteria.length, ownerCriteria.length);
   assert.equal(input.review_request.plan.review_quality_benchmark.owner_baseline_requirement_contract_present, true);
   assert.equal(input.review_request.plan.review_quality_benchmark.owner_baseline_requirement_contract, undefined);
   assert.equal(input.review_request.plan.provider_instruction_contract.owner_baseline_requirement_contract, undefined);
+  assert.match(providerRequest.instructions, /input\.required_benchmark_coverage/);
   assert.match(providerRequest.instructions, /input\.required_owner_baseline_coverage/);
   assert.match(serialized, /owner-specific-1/);
   assert.match(serialized, /owner-label-1/);
@@ -7298,13 +7318,19 @@ test('agentic human review responses adapter keeps xhigh repair retry compact un
   assert.equal(result.statusCode, 200);
   assert.equal(observedRequests.length, 2);
   const initialInput = JSON.parse(observedRequests[0].input);
+  const repairInput = JSON.parse(observedRequests[1].input);
   assert.ok(Buffer.byteLength(JSON.stringify(observedRequests[0]), 'utf8') <= 131072);
+  assert.equal(initialInput.required_benchmark_coverage.required_mentions.length, 2);
+  assert.equal(initialInput.required_benchmark_coverage.forbidden_claims[0].required_present, false);
+  assert.equal(initialInput.required_benchmark_coverage.forbidden_claims[0].required_fields.includes('absence_confirmation'), true);
   assert.equal(initialInput.required_owner_baseline_findings.length, 12);
   assert.equal(initialInput.review_request.plan.owner_baseline_requirement_contract.must_not_miss_criteria.length, 12);
+  assert.equal(repairInput.contract_repair_request.required_benchmark_coverage.required_mentions.length, 2);
   assert.equal(observedRequests[1].metadata.tracecue_review_effort, 'xhigh');
   assert.equal(observedRequests[1].store, false);
   assert.deepEqual(observedRequests[1].tools, []);
   assert.ok(Buffer.byteLength(JSON.stringify(observedRequests[1]), 'utf8') <= 131072);
+  assert.match(observedRequests[1].instructions, /Required benchmark coverage templates/);
   assert.match(observedRequests[1].input, /evidence_reference_ids/);
   assert.doesNotMatch(observedRequests[0].input, /long human wording/);
   assert.doesNotMatch(observedRequests[1].input, /long human wording/);
