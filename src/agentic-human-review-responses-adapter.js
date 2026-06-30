@@ -551,12 +551,16 @@ export function buildOpenAiResponsesRequest({ traceCueRequest, model, generatedA
   const requiredOwnerBaselineFindings = buildRequiredOwnerBaselineFindingRecords(traceCueRequest, evidenceCatalog);
   const requiredOwnerBaselineCoverage = buildRequiredOwnerBaselineCoverageRecords(traceCueRequest, evidenceCatalog);
   const providerEffortBinding = resolveResponsesProviderEffortBinding(traceCueRequest);
+  const stageExecution = safePayload.stage_execution ?? null;
   const input = {
     generated_at: generatedAt,
     review_request: safePayload,
     evidence_reference_catalog: evidenceCatalog,
     contract_repair_request: repairContext
   };
+  if (stageExecution) {
+    input.stage_execution = stageExecution;
+  }
   if (requiredOwnerBaselineFindings.length > 0) {
     input.required_owner_baseline_findings = requiredOwnerBaselineFindings;
   }
@@ -678,12 +682,33 @@ function buildAdapterInstructions(traceCueRequest, repairContext = null) {
     'Keep every claim tied to the evidence in the request. State uncertainty when evidence is incomplete.',
     'If you return review_claims, every claim must have non-placeholder claim text plus evidence_refs from evidence_reference_catalog or supported_by_roles from the planned role_opinions.',
     `Return role_opinions for these planned roles whenever possible: ${roles}.`,
+    buildAdapterStageExecutionInstruction(traceCueRequest),
     buildAdapterEffortContractInstruction(traceCueRequest),
     benchmark,
     ownerBaseline,
     buildAdapterContractRepairInstruction(repairContext),
     'Do not claim human-equivalent or human-superior quality, deterministic release-gate changes, existing-finding mutation, hidden credential access, or external tool use.'
   ].filter(Boolean).join('\n');
+}
+
+function buildAdapterStageExecutionInstruction(traceCueRequest) {
+  const stage = traceCueRequest?.stage_execution;
+  if (!stage || typeof stage !== 'object' || Array.isArray(stage)) {
+    return null;
+  }
+  const roles = normalizeStringArray(stage.required_roles).slice(0, 12);
+  const previous = Array.isArray(stage.previous_stage_summaries) ? stage.previous_stage_summaries.length : 0;
+  return [
+    'This is a staged xhigh provider call under an already approved TraceCue plan.',
+    `Stage id: ${truncateText(firstString(stage.stage_id, 'unknown-stage'), 120)}.`,
+    `Stage kind: ${truncateText(firstString(stage.stage_kind, 'staged_review'), 120)}.`,
+    `Required stage roles: ${JSON.stringify(roles)}.`,
+    `Required stage round: ${Number.isFinite(Number(stage.required_round)) ? Number(stage.required_round) : 'unknown'}.`,
+    stage.final_contract_stage === true
+      ? `This is the final contract stage. Use the ${previous} previous normalized stage summaries plus the evidence catalog to produce synthesis, benchmark coverage, owner-baseline findings when required, and final review_claims.`
+      : 'This is a non-final stage. Return only normalized advisory content for the required roles; do not claim this stage is final proof.',
+    'Stage outputs are not final evidence by themselves. Do not claim equality, superiority, release approval, or deterministic gate effects.'
+  ].join(' ');
 }
 
 function compactOwnerBaselineInstructionMap(traceCueRequest, ownerBaselineContract) {
@@ -2034,7 +2059,42 @@ function compactTraceCuePayloadForProvider(payload) {
       id: payload.execution?.id,
       execution_path_included: false
     }),
+    stage_execution: compactProviderStageExecution(payload.stage_execution),
     disclosure_policy: compactProviderDisclosurePolicy(payload.disclosure_policy)
+  });
+}
+
+function compactProviderStageExecution(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return compactAdapterObject({
+    schema_version: value.schema_version,
+    staged_xhigh_execution_version: value.staged_xhigh_execution_version,
+    mode: truncateText(firstString(value.mode, null), 80),
+    stage_id: truncateText(firstString(value.stage_id, null), 120),
+    stage_kind: truncateText(firstString(value.stage_kind, null), 120),
+    final_contract_stage: value.final_contract_stage === true,
+    original_plan_hash: truncateText(firstString(value.original_plan_hash, null), 160),
+    original_package_hash: truncateText(firstString(value.original_package_hash, null), 160),
+    required_roles: compactTextArray(value.required_roles, PROVIDER_CONTEXT_LIMITS.roleFocus, 120),
+    required_round: Number.isFinite(Number(value.required_round)) ? Number(value.required_round) : null,
+    depends_on_stages: compactTextArray(value.depends_on_stages, 12, 120),
+    previous_stage_summaries: arrayOrEmpty(value.previous_stage_summaries).slice(0, 12).map((stage) => compactAdapterObject({
+      stage_id: truncateText(firstString(stage?.stage_id, null), 120),
+      stage_output_hash: truncateText(firstString(stage?.stage_output_hash, null), 160),
+      roles: compactTextArray(stage?.roles, PROVIDER_CONTEXT_LIMITS.roleFocus, 120),
+      summary: truncateText(firstString(stage?.summary, null), PROVIDER_OUTPUT_LIMITS.text),
+      role_summaries: arrayOrEmpty(stage?.role_summaries).slice(0, 12).map((role) => compactAdapterObject({
+        role: truncateText(firstString(role?.role, null), 120),
+        round: Number.isFinite(Number(role?.round)) ? Number(role.round) : null,
+        summary: truncateText(firstString(role?.summary, null), PROVIDER_OUTPUT_LIMITS.shortText)
+      }))
+    })),
+    stage_outputs_are_final_evidence: false,
+    final_advisory_required: value.final_advisory_required === true,
+    advisory_only: true,
+    gate_effect: 'none'
   });
 }
 

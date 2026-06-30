@@ -67,6 +67,8 @@ const MAX_ROLE_OPINIONS = 12;
 const MAX_FINDINGS = 50;
 const MAX_HUMAN_BASELINE_LABELS = 100;
 const MAX_PROPOSAL_BRIEF_BYTES = 32 * 1024;
+const AGENTIC_REVIEW_EXECUTION_MODES = new Set(['one-shot', 'staged']);
+const STAGED_XHIGH_EXECUTION_VERSION = '1.0.0';
 
 const REVIEW_EFFORTS = new Set(['quick', 'standard', 'deep', 'xhigh']);
 const HUMAN_REVIEW_CLAIM_EFFORTS = Object.freeze(['standard', 'deep', 'xhigh']);
@@ -1015,6 +1017,7 @@ export async function runAgenticHumanReviewRun(options = {}, context = {}) {
       result_path: resultRel,
       report_path: reportRel
     },
+    executionMode: validation.executionMode,
     maxBytes: maxBytes.value,
     resultId,
     now,
@@ -1042,6 +1045,7 @@ export async function runAgenticHumanReviewRun(options = {}, context = {}) {
     surface,
     transferFlags: validation.transferFlags,
     providerResult,
+    executionMode: validation.executionMode,
     boundary
   });
   const approvalReceipt = buildApprovalReceipt({ execution, transferFlags: validation.transferFlags });
@@ -8913,7 +8917,22 @@ function role(id, displayName, purpose, defaultEffort = DEFAULT_SUBAGENT_EFFORT,
   return { id, display_name: displayName, purpose, default_effort: defaultEffort, round };
 }
 
-async function executeAgenticProvider({ provider, model, surface, plan, planPath, transferFlags, execution, maxBytes, resultId, now, context }) {
+async function executeAgenticProvider({ provider, model, surface, plan, planPath, transferFlags, execution, executionMode = 'one-shot', maxBytes, resultId, now, context }) {
+  if (executionMode === 'staged') {
+    return executeStagedAgenticProvider({
+      provider,
+      model,
+      surface,
+      plan,
+      planPath,
+      transferFlags,
+      execution,
+      maxBytes,
+      resultId,
+      now,
+      context
+    });
+  }
   if (provider.id === 'fake-agent') {
     return fakeAgenticReviewResult({ provider, model, surface, plan, planPath, transferFlags, execution, resultId, now });
   }
@@ -8977,6 +8996,599 @@ async function executeAgenticProvider({ provider, model, surface, plan, planPath
     details: { provider: provider.id },
     provider
   });
+}
+
+async function executeStagedAgenticProvider({ provider, model, surface, plan, planPath, transferFlags, execution, maxBytes, resultId, now, context }) {
+  const stagedContract = buildStagedXhighExecutionContract(plan);
+  if (!stagedContract.ok) {
+    return providerFailure({
+      status: 'blocked',
+      code: stagedContract.error.code,
+      message: stagedContract.error.message,
+      details: stagedContract.error.details,
+      provider
+    });
+  }
+
+  let reviewPackage = null;
+  if (provider.transport === 'provider_api' || provider.external_evidence_transfer === true) {
+    const reviewPackageRead = await readReviewPackageForExecution({
+      cwd: context.cwd ?? process.cwd(),
+      plan,
+      maxBytes: maxBytes ?? DEFAULT_MAX_BYTES
+    });
+    if (!reviewPackageRead.ok) {
+      return providerFailure({
+        status: 'blocked',
+        code: reviewPackageRead.error.code,
+        message: reviewPackageRead.error.message,
+        details: reviewPackageRead.error.details,
+        provider
+      });
+    }
+    reviewPackage = reviewPackageRead.value;
+  }
+
+  const stages = [];
+  for (const stage of stagedContract.contract.stages) {
+    const stageExecution = {
+      ...execution,
+      id: `${execution.id}-${stage.stage_id}`,
+      staged_parent_execution_id: execution.id,
+      stage_id: stage.stage_id
+    };
+    const stagePlan = buildProviderStagePlan({ plan, stage });
+    const stageContext = buildStageExecutionContext({
+      plan,
+      stage,
+      previousStages: stages,
+      execution
+    });
+    const stageResult = await executeProviderStage({
+      provider,
+      model,
+      surface,
+      plan: stagePlan,
+      originalPlan: plan,
+      planPath,
+      reviewPackage,
+      transferFlags,
+      execution: stageExecution,
+      stage,
+      stageContext,
+      now,
+      context
+    });
+    if (!stageResult.ok) {
+      return providerFailure({
+        status: stageResult.status ?? 'failed',
+        code: stageResult.error?.code ?? 'AGENTIC_REVIEW_STAGED_XHIGH_STAGE_FAILED',
+        message: stageResult.error?.message ?? 'A staged xhigh provider call failed before final aggregation.',
+        details: {
+          stage_id: stage.stage_id,
+          stage_round: stage.round,
+          stage_roles: stage.roles,
+          stage_error: stageResult.error?.details ?? null,
+          failure_diagnostics: stageResult.failure_diagnostics ?? null,
+          raw_provider_response_stored: false,
+          credential_values_recorded: false
+        },
+        provider,
+        providerCallPerformed: stageResult.boundary?.provider_call_performed === true,
+        apiCallPerformed: stageResult.boundary?.api_call_performed === true,
+        externalEvidenceTransfer: stageResult.boundary?.external_evidence_transfer === true
+      });
+    }
+    stages.push(buildStagedProviderStageRecord({ stage, stageResult }));
+  }
+
+  const aggregateInput = aggregateStagedXhighInputs({ plan, stages });
+  const boundary = stagedProviderBoundary({ provider, stages, transferFlags });
+  const stagedExecution = buildStagedExecutionSummary({ plan, contract: stagedContract.contract, stages, boundary });
+  aggregateInput.xhigh_staged_execution = stagedExecution;
+  return {
+    ok: true,
+    status: 'completed',
+    result: normalizeAgenticAdvisoryResult({
+      id: resultId,
+      now,
+      plan,
+      planPath,
+      input: aggregateInput,
+      provider,
+      model,
+      surface,
+      transferFlags,
+      execution,
+      boundary
+    }),
+    boundary,
+    staged_execution: stagedExecution,
+    warnings: stages.flatMap((stage) => stage.warnings ?? [])
+  };
+}
+
+function buildStagedXhighExecutionContract(plan) {
+  const reviewEffort = plan.review_effort?.mode ?? DEFAULT_REVIEW_EFFORT;
+  const plannedRounds = xhighPlannedRounds(plan);
+  const plannedRoles = (plan.sub_agents ?? []).map((agent) => agent.role);
+  const critiqueRoles = (plan.sub_agents ?? [])
+    .filter((agent) => ['critic_reviewer', 'verification_reviewer'].includes(agent.role))
+    .map((agent) => agent.role);
+  const missingConditions = [
+    ...(reviewEffort === 'xhigh' ? [] : ['review_effort is not xhigh']),
+    ...(plannedRounds.length >= 3 ? [] : ['xhigh staged execution requires at least three planned rounds']),
+    ...(plannedRoles.includes('synthesis_agent') ? [] : ['xhigh staged execution requires a synthesis role']),
+    ...(critiqueRoles.length >= 2 ? [] : ['xhigh staged execution requires dedicated critic and verification roles'])
+  ];
+  if (missingConditions.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'AGENTIC_REVIEW_STAGED_XHIGH_PLAN_INCOMPLETE',
+        message: 'The approved plan does not satisfy staged xhigh execution prerequisites.',
+        details: {
+          missing_conditions: missingConditions,
+          provider_call_performed: false,
+          api_call_performed: false,
+          raw_provider_response_stored: false
+        }
+      }
+    };
+  }
+  const lastRound = Math.max(...plannedRounds.map((round) => Number(round.round)));
+  const stages = plannedRounds.map((round) => ({
+    stage_id: `xhigh-round-${round.round}`,
+    stage_kind: Number(round.round) === lastRound ? 'synthesis_and_contract' : (Number(round.round) === 1 ? 'independent_role_review' : 'critique_and_verification'),
+    round: Number(round.round),
+    roles: round.roles.map((roleInfo) => roleInfo.role),
+    depends_on_stages: round.depends_on_rounds.map((dependency) => `xhigh-round-${dependency}`),
+    final_contract_stage: Number(round.round) === lastRound,
+    expected_output_sections: Number(round.round) === lastRound
+      ? ['role_opinions', 'agentic_human_review_findings', 'benchmark_requirement_coverage', 'review_claims', 'integration_record']
+      : ['role_opinions', 'agentic_human_review_findings', 'review_claims'],
+    provider_call_policy: 'staged_provider_call_under_approved_plan'
+  }));
+  return {
+    ok: true,
+    contract: {
+      schema_version: SCHEMA_VERSION,
+      staged_xhigh_execution_version: STAGED_XHIGH_EXECUTION_VERSION,
+      plan_id: plan.id ?? null,
+      plan_hash: plan.plan_hash ?? null,
+      package_hash: plan.package_hash ?? null,
+      provider_capability_hash: plan.provider_capability_hash ?? null,
+      required_original_effort: 'xhigh',
+      stage_count: stages.length,
+      stages,
+      stage_outputs_are_final_evidence: false,
+      final_advisory_required: true,
+      advisory_only: true,
+      gate_effect: 'none'
+    }
+  };
+}
+
+function buildProviderStagePlan({ plan, stage }) {
+  const stagePlan = structuredCloneSafe(plan);
+  const stageAgents = (plan.sub_agents ?? []).filter((agent) => stage.roles.includes(agent.role));
+  stagePlan.review_effort = {
+    ...(stagePlan.review_effort ?? {}),
+    mode: stage.final_contract_stage ? 'deep' : 'standard',
+    staged_parent_effort: 'xhigh'
+  };
+  stagePlan.sub_agents = stageAgents;
+  stagePlan.rounds = [stage.round];
+  stagePlan.orchestration_contract = {
+    ...(stagePlan.orchestration_contract ?? {}),
+    provider_round_execution_mode: 'staged_xhigh_provider_call',
+    staged_parent_plan_hash: plan.plan_hash ?? null,
+    stage_id: stage.stage_id,
+    stage_kind: stage.stage_kind,
+    required_outputs: stage.expected_output_sections
+  };
+  stagePlan.strict_output_contract = {
+    ...(stagePlan.strict_output_contract ?? {}),
+    required_output_sections: stage.expected_output_sections,
+    required_roles: stageAgents.map((agent) => ({
+      role: agent.role,
+      round: agent.round,
+      required_focus: []
+    })),
+    required_rounds: [stage.round],
+    required_critique_roles: stage.final_contract_stage ? [] : stageAgents.filter((agent) => ['critic_reviewer', 'verification_reviewer'].includes(agent.role)).map((agent) => agent.role),
+    synthesis_role: stage.roles.includes('synthesis_agent') ? 'synthesis_agent' : null,
+    benchmark_requirement_coverage_required: stage.final_contract_stage && Boolean(plan.review_quality_benchmark?.enabled)
+  };
+  stagePlan.xhigh_multi_step_contract = {
+    ...(stagePlan.xhigh_multi_step_contract ?? {}),
+    staged_execution_active: true,
+    staged_parent_plan_hash: plan.plan_hash ?? null,
+    current_stage: stage,
+    live_multi_call_execution_performed_by_plan: true,
+    automatic_live_multi_call_enabled: false
+  };
+  if (!stage.final_contract_stage) {
+    stagePlan.review_quality_benchmark = null;
+    stagePlan.owner_baseline_requirement_contract = null;
+  }
+  return stagePlan;
+}
+
+function buildStageExecutionContext({ plan, stage, previousStages, execution }) {
+  return {
+    schema_version: SCHEMA_VERSION,
+    staged_xhigh_execution_version: STAGED_XHIGH_EXECUTION_VERSION,
+    mode: 'staged_xhigh_provider_call',
+    stage_id: stage.stage_id,
+    stage_kind: stage.stage_kind,
+    final_contract_stage: stage.final_contract_stage,
+    parent_execution_id: execution.id,
+    original_plan_id: plan.id ?? null,
+    original_plan_hash: plan.plan_hash ?? null,
+    original_package_hash: plan.package_hash ?? null,
+    required_roles: stage.roles,
+    required_round: stage.round,
+    depends_on_stages: stage.depends_on_stages,
+    previous_stage_summaries: previousStages.map((record) => ({
+      stage_id: record.stage_id,
+      stage_output_hash: record.stage_output_hash,
+      roles: record.roles,
+      summary: record.summary,
+      role_summaries: record.role_summaries
+    })),
+    stage_outputs_are_final_evidence: false,
+    final_advisory_required: stage.final_contract_stage,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+}
+
+async function executeProviderStage({ provider, model, surface, plan, originalPlan, planPath, reviewPackage, transferFlags, execution, stage, stageContext, now, context }) {
+  if (provider.id === 'fake-agent') {
+    const input = fakeStagedXhighInput({ plan: originalPlan, stage });
+    const boundary = providerBoundary({
+      provider,
+      providerCallPerformed: true,
+      apiCallPerformed: false,
+      externalEvidenceTransfer: false
+    });
+    return { ok: true, status: 'completed', input, boundary, warnings: [] };
+  }
+  if (provider.id === 'injected-runner') {
+    const runner = runnerForContext(context, provider.id, model.id);
+    if (!runner) {
+      return providerFailure({
+        status: 'blocked',
+        code: 'AGENTIC_REVIEW_RUNNER_NOT_CONFIGURED',
+        message: 'The requested injected agentic review runner is not configured in the execution context.',
+        details: {
+          provider: provider.id,
+          model: model.id,
+          stage_id: stage.stage_id,
+          shell_used: false,
+          free_form_shell_input_accepted: false
+        },
+        provider
+      });
+    }
+    try {
+      const input = await runner({
+        schema_version: SCHEMA_VERSION,
+        type: 'agentic_human_review_stage_request',
+        stage_execution: stageContext,
+        plan: redact(plan),
+        original_plan: {
+          id: originalPlan.id ?? null,
+          plan_hash: originalPlan.plan_hash ?? null,
+          review_effort: originalPlan.review_effort ?? null
+        },
+        plan_path: planPath,
+        transfer_permissions: transferFlags,
+        provider,
+        model,
+        surface,
+        execution
+      });
+      const boundary = providerBoundary({
+        provider,
+        providerCallPerformed: true,
+        apiCallPerformed: false,
+        externalEvidenceTransfer: false
+      });
+      return {
+        ok: true,
+        status: 'completed',
+        input: input?.agentic_human_review_stage_result?.advisory ?? input?.agentic_human_review_advisory ?? input ?? {},
+        boundary,
+        warnings: []
+      };
+    } catch (error) {
+      return providerFailure({
+        status: 'failed',
+        code: 'AGENTIC_REVIEW_RUNNER_FAILED',
+        message: 'The configured staged agentic review runner failed before returning advisory JSON.',
+        details: {
+          provider: provider.id,
+          model: model.id,
+          stage_id: stage.stage_id,
+          reason: error.message,
+          shell_used: false,
+          raw_provider_response_stored: false
+        },
+        provider,
+        providerCallPerformed: true
+      });
+    }
+  }
+  if (provider.transport === 'provider_api' || provider.external_evidence_transfer === true) {
+    return executeAgenticHumanReviewApiProvider({
+      provider,
+      model,
+      surface,
+      plan,
+      planPath,
+      reviewPackage,
+      transferFlags,
+      execution,
+      stageExecution: stageContext,
+      context
+    });
+  }
+  return providerFailure({
+    status: 'blocked',
+    code: 'AGENTIC_REVIEW_PROVIDER_UNKNOWN',
+    message: 'No implemented staged agentic human review provider adapter is available for the requested provider.',
+    details: { provider: provider.id, stage_id: stage.stage_id },
+    provider
+  });
+}
+
+function fakeStagedXhighInput({ plan, stage }) {
+  const stageAgents = (plan.sub_agents ?? []).filter((agent) => stage.roles.includes(agent.role));
+  const input = {
+    summary: `Deterministic staged xhigh ${stage.stage_id} completed for the approved plan boundary.`,
+    subjective_perception: {
+      first_impression: ['The staged reviewer checked the visible hierarchy and likely first impression.'],
+      emotional_reception: ['The staged reviewer kept subjective reaction advisory-only.'],
+      trust_and_credibility: ['The staged reviewer checked whether trust depends on evidence-backed wording.'],
+      cognitive_load: ['The staged reviewer checked reading and decision load.'],
+      likely_user_questions: plan.review_scope?.likely_reader_questions ?? []
+    },
+    readability_comprehension: {
+      scanability: 'mixed',
+      reading_load: 'medium',
+      terminology_risk: [],
+      meaning_gaps: [],
+      next_action_clarity: []
+    },
+    reader_experience_review: {
+      first_impression: ['The staged review preserves first-impression judgment for final aggregation.'],
+      likely_viewer_feeling: ['The staged review records likely reader confidence and uncertainty.'],
+      content_takeaway: ['The staged review identifies what useful content value remains visible.'],
+      trust_assessment: ['The staged review keeps trust judgment tied to local evidence references.'],
+      visual_ux_assessment: ['The staged review distinguishes UI friction from content value.'],
+      accessibility_comprehension: ['The staged review translates accessibility concerns into comprehension risk.'],
+      risk_and_misleading_content: ['The staged review checks uncertainty and misleading-content risk.'],
+      lost_value_summary: ['The staged review explains what value may be lost through friction.'],
+      priority_recommendation: ['The staged review prioritizes evidence-backed improvements.']
+    },
+    role_opinions: stageAgents.map((agent) => ({
+      role: agent.role,
+      display_name: agent.display_name,
+      effort: agent.effort,
+      round: agent.round,
+      summary: `${agent.display_name} completed staged xhigh output for ${stage.stage_id}.`,
+      findings: [],
+      uncertainties: [],
+      confidence: { evidence: 'medium', judgment: 'medium', implementation: 'inconclusive' }
+    })),
+    findings: stage.final_contract_stage ? buildDeterministicFakeBenchmarkFindings({ plan }) : [],
+    agentic_human_review_findings: stage.final_contract_stage ? buildDeterministicFakeBenchmarkFindings({ plan }) : [],
+    strengths: ['Staged execution preserves the approved plan boundary.'],
+    improvement_suggestions: ['Use the final aggregated advisory for owner review, not individual stage output.'],
+    owner_decision_requests: [{
+      id: `agentic-owner-stage-${stage.stage_id}`,
+      question: 'Does the owner accept using the final aggregated staged advisory for review?',
+      reason: 'Stage output is advisory-only and non-final until aggregation completes.'
+    }],
+    review_claims: [{
+      id: `staged-claim-${stage.stage_id}`,
+      claim: 'The staged review remains advisory and evidence-bound.',
+      supported_by_roles: stage.roles
+    }],
+    integration_record: stage.final_contract_stage ? {
+      summary: 'The final staged synthesis integrates independent, critique, verification, and synthesis outputs.',
+      synthesis_integrated: true
+    } : null
+  };
+  if (stage.final_contract_stage) {
+    input.benchmark_requirement_coverage = buildProviderDeclaredBenchmarkRequirementCoverage({ plan, input });
+  }
+  return input;
+}
+
+function buildStagedProviderStageRecord({ stage, stageResult }) {
+  const input = redact(stageResult.input ?? {});
+  const roleSummaries = normalizeRoleOpinions(input.role_opinions, []).map((opinion) => ({
+    role: opinion.role,
+    round: opinion.round,
+    summary: opinion.summary,
+    reported_by_provider: opinion.reported_by_provider,
+    placeholder_generated: opinion.placeholder_generated
+  }));
+  const stageOutputHash = hashJson({
+    stage_id: stage.stage_id,
+    input
+  });
+  return {
+    schema_version: SCHEMA_VERSION,
+    type: 'agentic_human_review_stage_result',
+    staged_xhigh_execution_version: STAGED_XHIGH_EXECUTION_VERSION,
+    stage_id: stage.stage_id,
+    stage_kind: stage.stage_kind,
+    round: stage.round,
+    roles: stage.roles,
+    final_contract_stage: stage.final_contract_stage,
+    status: stageResult.status ?? 'completed',
+    summary: secretSafeText(input.summary ?? `Stage ${stage.stage_id} completed.`, 600),
+    role_summaries: roleSummaries,
+    advisory: input,
+    stage_output_hash: stageOutputHash,
+    provider_call_performed: stageResult.boundary?.provider_call_performed === true,
+    api_call_performed: stageResult.boundary?.api_call_performed === true,
+    external_evidence_transfer: stageResult.boundary?.external_evidence_transfer === true,
+    request_bytes: stageResult.boundary?.request_bytes ?? null,
+    response_bytes: stageResult.boundary?.response_bytes ?? null,
+    provider_status_code: stageResult.boundary?.provider_status_code ?? null,
+    model_resolution: stageResult.boundary?.model_resolution ?? null,
+    raw_provider_response_stored: false,
+    credential_values_recorded: false,
+    stage_outputs_are_final_evidence: false,
+    warnings: stageResult.warnings ?? [],
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+}
+
+function aggregateStagedXhighInputs({ plan, stages }) {
+  const finalStage = [...stages].reverse().find((stage) => stage.final_contract_stage) ?? stages[stages.length - 1] ?? {};
+  const finalInput = finalStage.advisory ?? {};
+  const stageInputs = stages.map((stage) => stage.advisory ?? {});
+  const roleOpinions = dedupeRoleOpinions(stageInputs.flatMap((input) => Array.isArray(input.role_opinions) ? input.role_opinions : []));
+  const findings = stageInputs.flatMap((input) => [
+    ...(Array.isArray(input.agentic_human_review_findings) ? input.agentic_human_review_findings : []),
+    ...(Array.isArray(input.findings) ? input.findings : [])
+  ]).slice(0, MAX_FINDINGS);
+  const ownerDecisionRequests = stageInputs.flatMap((input) => Array.isArray(input.owner_decision_requests) ? input.owner_decision_requests : []).slice(0, 25);
+  const reviewClaims = stageInputs.flatMap((input) => Array.isArray(input.review_claims) ? input.review_claims : []).slice(0, 25);
+  return {
+    summary: secretSafeText(finalInput.summary ?? stages.map((stage) => stage.summary).join(' '), 2000),
+    subjective_perception: mergeFirstObject(stageInputs.map((input) => input.subjective_perception)),
+    readability_comprehension: mergeFirstObject(stageInputs.map((input) => input.readability_comprehension)),
+    reader_experience_review: mergeFirstObject(stageInputs.map((input) => input.reader_experience_review)),
+    mechanical_vs_human_review: mergeFirstObject(stageInputs.map((input) => input.mechanical_vs_human_review)),
+    benchmark_requirement_coverage: finalInput.benchmark_requirement_coverage ?? null,
+    role_opinions: roleOpinions,
+    findings,
+    agentic_human_review_findings: findings,
+    strengths: stageInputs.flatMap((input) => normalizeStringArray(input.strengths)).slice(0, 12),
+    improvement_suggestions: stageInputs.flatMap((input) => normalizeStringArray(input.improvement_suggestions ?? input.suggested_fixes)).slice(0, 12),
+    suggested_fixes: stageInputs.flatMap((input) => normalizeStringArray(input.suggested_fixes ?? input.improvement_suggestions)).slice(0, 12),
+    owner_decision_requests: ownerDecisionRequests,
+    review_claims: reviewClaims,
+    critique_records: stageInputs.flatMap((input) => Array.isArray(input.critique_records) ? input.critique_records : []).slice(0, 12),
+    integration_record: finalInput.integration_record ?? {
+      summary: 'Staged xhigh outputs were aggregated deterministically into one final advisory result.',
+      synthesis_integrated: roleOpinions.some((opinion) => opinion.role === 'synthesis_agent')
+    },
+    agentic_human_review_action_plan: finalInput.agentic_human_review_action_plan ?? {
+      next_actions: stageInputs.flatMap((input) => normalizeStringArray(input.agentic_human_review_action_plan?.next_actions ?? input.improvement_suggestions)).slice(0, 12),
+      suggested_fixes: stageInputs.flatMap((input) => normalizeStringArray(input.agentic_human_review_action_plan?.suggested_fixes ?? input.suggested_fixes ?? input.improvement_suggestions)).slice(0, 12)
+    },
+    staged_xhigh_parent_plan_hash: plan.plan_hash ?? null
+  };
+}
+
+function dedupeRoleOpinions(values) {
+  const seen = new Set();
+  const output = [];
+  for (const value of values) {
+    const key = `${value?.role ?? ''}:${Number(value?.round ?? 1)}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(value);
+  }
+  return output.slice(0, MAX_ROLE_OPINIONS);
+}
+
+function mergeFirstObject(values) {
+  const output = {};
+  for (const value of values) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      continue;
+    }
+    for (const [key, item] of Object.entries(value)) {
+      if (output[key] === undefined && item !== undefined) {
+        output[key] = item;
+      }
+    }
+  }
+  return output;
+}
+
+function stagedProviderBoundary({ provider, stages, transferFlags }) {
+  const requestBytes = sumNullable(stages.map((stage) => stage.request_bytes));
+  const responseBytes = sumNullable(stages.map((stage) => stage.response_bytes));
+  const lastStatusCode = [...stages].reverse().find((stage) => stage.provider_status_code !== null)?.provider_status_code ?? null;
+  const modelResolution = [...stages].reverse().find((stage) => stage.model_resolution)?.model_resolution ?? null;
+  return agenticHumanReviewBoundary({
+    ...providerBoundary({
+      provider,
+      providerCallPerformed: stages.some((stage) => stage.provider_call_performed),
+      apiCallPerformed: stages.some((stage) => stage.api_call_performed),
+      externalEvidenceTransfer: stages.some((stage) => stage.external_evidence_transfer),
+      requestBytes,
+      responseBytes,
+      statusCode: lastStatusCode,
+      rawPixelsTransferred: false,
+      pageTextTransferred: transferFlags.supplied_flags?.includes('allow-page-text') === true,
+      domSummaryTransferred: transferFlags.supplied_flags?.includes('allow-dom-summary') === true,
+      urlMetadataTransferred: transferFlags.supplied_flags?.includes('allow-url') === true,
+      artifactRefsTransferred: transferFlags.supplied_flags?.includes('allow-artifact-refs') === true,
+      accessibilitySummaryTransferred: transferFlags.supplied_flags?.includes('allow-accessibility-summary') === true,
+      modelResolution
+    }),
+    execution_mode: 'staged',
+    staged_xhigh_execution_performed: true,
+    provider_call_count: stages.filter((stage) => stage.provider_call_performed).length,
+    api_call_count: stages.filter((stage) => stage.api_call_performed).length,
+    stage_count: stages.length,
+    raw_provider_response_stored: false,
+    credential_values_recorded: false
+  });
+}
+
+function sumNullable(values) {
+  const numbers = values.filter((value) => Number.isFinite(Number(value))).map(Number);
+  return numbers.length > 0 ? numbers.reduce((sum, value) => sum + value, 0) : null;
+}
+
+function buildStagedExecutionSummary({ plan, contract, stages, boundary }) {
+  return {
+    schema_version: SCHEMA_VERSION,
+    staged_xhigh_execution_version: STAGED_XHIGH_EXECUTION_VERSION,
+    type: 'agentic_human_review_staged_xhigh_execution',
+    plan_id: plan.id ?? null,
+    plan_hash: plan.plan_hash ?? null,
+    package_hash: plan.package_hash ?? null,
+    provider_capability_hash: plan.provider_capability_hash ?? null,
+    stage_count: stages.length,
+    provider_call_count: boundary.provider_call_count ?? 0,
+    api_call_count: boundary.api_call_count ?? 0,
+    true_multi_call_execution_performed: stages.length === contract.stage_count && stages.every((stage) => stage.status === 'completed'),
+    stages: stages.map((stage) => ({
+      stage_id: stage.stage_id,
+      stage_kind: stage.stage_kind,
+      round: stage.round,
+      roles: stage.roles,
+      status: stage.status,
+      stage_output_hash: stage.stage_output_hash,
+      final_contract_stage: stage.final_contract_stage,
+      provider_call_performed: stage.provider_call_performed,
+      api_call_performed: stage.api_call_performed,
+      raw_provider_response_stored: false,
+      credential_values_recorded: false
+    })),
+    stage_outputs_are_final_evidence: false,
+    final_advisory_result_required: true,
+    raw_provider_response_stored: false,
+    credential_values_recorded: false,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
 }
 
 function fakeAgenticReviewResult({ provider, model, surface, plan, planPath, transferFlags, execution, resultId, now }) {
@@ -9172,7 +9784,8 @@ function normalizeAgenticAdvisoryResult({ id, now, plan, planPath, input, provid
     roundRecords,
     critiqueRecords,
     integrationRecord,
-    roleInstructionCoverage
+    roleInstructionCoverage,
+    stagedExecution: input.xhigh_staged_execution ?? null
   });
   const qualityPreview = buildReportQualityFromParts({
     roleOpinions,
@@ -9275,6 +9888,7 @@ function normalizeAgenticAdvisoryResult({ id, now, plan, planPath, input, provid
     strict_output_contract: plan.strict_output_contract ?? plan.effort_execution_contract?.strict_output_contract ?? null,
     repair_retry_contract: plan.repair_retry_contract ?? plan.effort_execution_contract?.repair_retry_contract ?? null,
     xhigh_multi_step_contract: plan.xhigh_multi_step_contract ?? plan.effort_execution_contract?.xhigh_multi_step_contract ?? null,
+    xhigh_staged_execution: input.xhigh_staged_execution ?? null,
     role_instruction_coverage: roleInstructionCoverage,
     role_opinions: roleOpinions,
     role_execution_records: buildRoleExecutionRecords({ plan, roleOpinions, boundary }),
@@ -9347,6 +9961,10 @@ function normalizeAgenticAdvisoryResult({ id, now, plan, planPath, input, provid
       report_path: execution.report_path,
       provider_call_performed: boundary.provider_call_performed,
       api_call_performed: boundary.api_call_performed,
+      execution_mode: boundary.execution_mode ?? 'one-shot',
+      provider_call_count: boundary.provider_call_count ?? (boundary.provider_call_performed ? 1 : 0),
+      api_call_count: boundary.api_call_count ?? (boundary.api_call_performed ? 1 : 0),
+      stage_count: boundary.stage_count ?? null,
       external_evidence_transfer: boundary.external_evidence_transfer,
       raw_pixels_transferred: boundary.raw_pixels_transferred,
       page_text_transferred: boundary.page_text_transferred,
@@ -9378,6 +9996,7 @@ function buildExecutionRecord({
   surface,
   transferFlags,
   providerResult,
+  executionMode = 'one-shot',
   boundary
 }) {
   return redact({
@@ -9386,6 +10005,7 @@ function buildExecutionRecord({
     id,
     status,
     mode: 'agentic_human_review_run',
+    execution_mode: executionMode,
     created_at: now.toISOString(),
     completed_at: status === 'completed' ? now.toISOString() : null,
     execution_path: executionPath,
@@ -9405,6 +10025,7 @@ function buildExecutionRecord({
     surface: surfaceSummary(surface),
     transfer_permissions: transferFlags,
     live_dogfood_execution_gate: transferFlags.live_dogfood_execution_gate ?? null,
+    staged_execution: providerResult.staged_execution ?? null,
     steps: {
       plan_validation: {
         status: 'completed',
@@ -9422,6 +10043,10 @@ function buildExecutionRecord({
         provider_call_performed: boundary.provider_call_performed,
         api_call_performed: boundary.api_call_performed,
         external_evidence_transfer: boundary.external_evidence_transfer,
+        execution_mode: executionMode,
+        provider_call_count: boundary.provider_call_count ?? (boundary.provider_call_performed ? 1 : 0),
+        api_call_count: boundary.api_call_count ?? (boundary.api_call_performed ? 1 : 0),
+        stage_count: boundary.stage_count ?? null,
         request_bytes: boundary.request_bytes,
         response_bytes: boundary.response_bytes,
         provider_status_code: boundary.provider_status_code,
@@ -9447,9 +10072,14 @@ function buildExecutionRecord({
         : 'Inspect the execution error and rerun only after the plan hash and provider boundary are valid.'
     },
     gate_effect: 'none',
+    execution_mode: executionMode,
+    staged_execution: providerResult.staged_execution ?? null,
     provider_call_performed: boundary.provider_call_performed,
     api_call_performed: boundary.api_call_performed,
     external_evidence_transfer: boundary.external_evidence_transfer,
+    provider_call_count: boundary.provider_call_count ?? (boundary.provider_call_performed ? 1 : 0),
+    api_call_count: boundary.api_call_count ?? (boundary.api_call_performed ? 1 : 0),
+    stage_count: boundary.stage_count ?? null,
     automatic_upload: false,
     credential_storage: 'none',
     persistent_credential_storage: false,
@@ -9601,6 +10231,18 @@ function validateRunRequest({ plan, planPath, suppliedPlanHash, options, context
       mismatches: mismatches.map(([field, expected, actual]) => ({ field, expected, actual }))
     });
   }
+  const executionMode = normalizeAgenticReviewExecutionMode(options['execution-mode']);
+  if (!executionMode.ok) {
+    return validationError(executionMode.error.code, executionMode.error.message, executionMode.error.details);
+  }
+  if (executionMode.value === 'staged' && plan.review_effort?.mode !== 'xhigh') {
+    return validationError('AGENTIC_REVIEW_STAGED_XHIGH_REQUIRES_XHIGH_PLAN', 'agentic review run --execution-mode staged is valid only for approved xhigh plans.', {
+      review_effort: plan.review_effort?.mode ?? null,
+      provider_call_performed: false,
+      api_call_performed: false,
+      raw_provider_response_stored: false
+    });
+  }
   const currentCapabilityHash = agenticProviderCapabilityHash(provider.provider);
   if (plan.provider_capability_hash && plan.provider_capability_hash !== currentCapabilityHash) {
     return validationError('AGENTIC_REVIEW_PROVIDER_CAPABILITY_DRIFT', 'The current provider capability contract no longer matches the approved plan.', {
@@ -9631,6 +10273,7 @@ function validateRunRequest({ plan, planPath, suppliedPlanHash, options, context
     provider: provider.provider,
     model,
     surface,
+    executionMode: executionMode.value,
     transferFlags: {
       exact_match_required: true,
       required_flags: requiredFlagNames,
@@ -9641,6 +10284,27 @@ function validateRunRequest({ plan, planPath, suppliedPlanHash, options, context
       live_dogfood_execution_gate: liveDogfoodExecutionGate
     }
   };
+}
+
+function normalizeAgenticReviewExecutionMode(value) {
+  const mode = String(value ?? 'one-shot').trim() || 'one-shot';
+  if (!AGENTIC_REVIEW_EXECUTION_MODES.has(mode)) {
+    return {
+      ok: false,
+      error: {
+        code: 'AGENTIC_REVIEW_EXECUTION_MODE_UNSUPPORTED',
+        message: 'agentic review run received an unsupported execution mode.',
+        details: {
+          execution_mode: mode,
+          supported_execution_modes: [...AGENTIC_REVIEW_EXECUTION_MODES],
+          provider_call_performed: false,
+          api_call_performed: false,
+          raw_provider_response_stored: false
+        }
+      }
+    };
+  }
+  return { ok: true, value: mode };
 }
 
 function buildApprovalReceipt({ execution, transferFlags }) {
@@ -9679,11 +10343,16 @@ function buildRunReceipt({ execution, providerResult }) {
     plan_path: execution.plan_path,
     plan_hash: execution.plan_hash,
     status: execution.status,
+    execution_mode: execution.execution_mode ?? 'one-shot',
+    staged_execution: execution.staged_execution ?? null,
     provider_id: execution.provider?.id ?? null,
     model_id: execution.model?.id ?? null,
     model_resolution: execution.model_resolution ?? null,
     provider_call_performed: execution.provider_call_performed,
     api_call_performed: execution.api_call_performed,
+    provider_call_count: execution.provider_call_count ?? (execution.provider_call_performed ? 1 : 0),
+    api_call_count: execution.api_call_count ?? (execution.api_call_performed ? 1 : 0),
+    stage_count: execution.stage_count ?? null,
     external_evidence_transfer: execution.external_evidence_transfer,
     automatic_upload: false,
     credential_values_recorded: false,
@@ -11403,8 +12072,9 @@ function buildDissentAnalysis({ roleOpinions, claims, critiqueRecords, input }) 
   };
 }
 
-function buildXhighCompletionAssessment({ plan, roleOpinions, roundRecords, critiqueRecords, integrationRecord, roleInstructionCoverage }) {
+function buildXhighCompletionAssessment({ plan, roleOpinions, roundRecords, critiqueRecords, integrationRecord, roleInstructionCoverage, stagedExecution = null }) {
   const xhighExpected = plan.review_effort?.mode === 'xhigh';
+  const stagedPerformed = stagedExecution?.true_multi_call_execution_performed === true;
   const plannedAgents = Array.isArray(plan.sub_agents) ? plan.sub_agents : [];
   const reported = reportedRoleOpinions(roleOpinions)
     .filter((opinion) => opinion.round_matches_plan !== false);
@@ -11444,7 +12114,7 @@ function buildXhighCompletionAssessment({ plan, roleOpinions, roundRecords, crit
     synthesisIntegrated,
     placeholderOutputCount
   });
-  const multiStepPlan = buildXhighExecutionStepPlan({ plan, missingRoles, missingRounds });
+  const multiStepPlan = buildXhighExecutionStepPlan({ plan, missingRoles, missingRounds, stagedExecution });
   const evidenceProvenance = buildXhighEvidenceProvenance({
     plan,
     roleOpinions,
@@ -11474,8 +12144,9 @@ function buildXhighCompletionAssessment({ plan, roleOpinions, roundRecords, crit
     synthesis_integrated: synthesisIntegrated,
     role_instruction_coverage_score: roleInstructionCoverage.coverage_score,
     provider_round_execution_mode: plan.orchestration_contract?.provider_round_execution_mode ?? null,
-    true_multi_call_execution_performed: false,
-    single_call_multi_role_output_only: plan.orchestration_contract?.provider_round_execution_mode === 'single_provider_call_with_required_multi_role_round_output',
+    true_multi_call_execution_performed: stagedPerformed,
+    single_call_multi_role_output_only: !stagedPerformed && plan.orchestration_contract?.provider_round_execution_mode === 'single_provider_call_with_required_multi_role_round_output',
+    staged_execution: stagedExecution,
     missing_conditions: xhighExpected ? missingConditions : [],
     repair_plan: repairPlan,
     multi_step_plan: multiStepPlan,
@@ -11523,7 +12194,7 @@ function buildXhighRepairPlan({ plan, missingRoles, missingRounds, missingCritiq
   };
 }
 
-function buildXhighExecutionStepPlan({ plan, missingRoles, missingRounds }) {
+function buildXhighExecutionStepPlan({ plan, missingRoles, missingRounds, stagedExecution = null }) {
   const plannedSteps = (plan.xhigh_multi_step_contract?.steps ?? xhighPlannedRounds(plan)).map((step) => ({
     round: step.round,
     roles: step.roles ?? [],
@@ -11536,8 +12207,8 @@ function buildXhighExecutionStepPlan({ plan, missingRoles, missingRounds }) {
   return {
     schema_version: SCHEMA_VERSION,
     multi_step_xhigh_version: HUMAN_REVIEW_MULTI_STEP_XHIGH_VERSION,
-    true_multi_step_execution_available: plan.xhigh_multi_step_contract?.provider_declares_true_multi_step_supported === true,
-    true_multi_step_execution_performed: false,
+    true_multi_step_execution_available: plan.xhigh_multi_step_contract?.provider_declares_true_multi_step_supported === true || stagedExecution?.true_multi_call_execution_performed === true,
+    true_multi_step_execution_performed: stagedExecution?.true_multi_call_execution_performed === true,
     automatic_live_multi_call_enabled: false,
     steps: plannedSteps,
     incomplete_step_count: plannedSteps.filter((step) => step.status !== 'satisfied_or_not_required').length,

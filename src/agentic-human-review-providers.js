@@ -607,6 +607,7 @@ export async function executeAgenticHumanReviewApiProvider({
   reviewPackage,
   transferFlags,
   execution,
+  stageExecution = null,
   context = {}
 }) {
   const env = context.env ?? process.env;
@@ -727,7 +728,8 @@ export async function executeAgenticHumanReviewApiProvider({
     model: modelResolution.model,
     surface,
     execution,
-    modelResolution: modelResolution.resolution
+    modelResolution: modelResolution.resolution,
+    stageExecution
   });
   const payloadText = JSON.stringify(payload);
   if (Buffer.byteLength(payloadText, 'utf8') > provider.max_request_bytes) {
@@ -1139,7 +1141,7 @@ function parseOptionalPositiveIntegerEnv(env, key, field) {
   return { ok: true, configured: true, value };
 }
 
-function buildAgenticApiPayload({ plan, planPath, reviewPackage, transferFlags, provider, model, surface, execution, modelResolution = null }) {
+function buildAgenticApiPayload({ plan, planPath, reviewPackage, transferFlags, provider, model, surface, execution, modelResolution = null, stageExecution = null }) {
   const filteredPackage = filterReviewPackageForTransfer(reviewPackage, transferFlags);
   return redact({
     schema_version: SCHEMA_VERSION,
@@ -1192,6 +1194,7 @@ function buildAgenticApiPayload({ plan, planPath, reviewPackage, transferFlags, 
       id: execution.id,
       execution_path_included: false
     },
+    stage_execution: stageExecution,
     disclosure_policy: {
       approved_transfer_flags: transferFlags.supplied_flags,
       raw_pixels_included: false,

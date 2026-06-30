@@ -28,6 +28,7 @@ const VALUE_OPTIONS = new Set([
   'edit-diff',
   'effort',
   'execution',
+  'execution-mode',
   'expected-impression',
   'evaluator-policy',
   'evidence-set',
@@ -1206,6 +1207,7 @@ function parseAgentic(args, globals) {
       'surface',
       'provider',
       'model',
+      'execution-mode',
       'artifact-root',
       'max-bytes'
     ].includes(option));

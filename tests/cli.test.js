@@ -6669,8 +6669,328 @@ test('agentic human review injected runner redacts sensitive advisory text', asy
   assert.doesNotMatch(reportText, /sentinel/);
 });
 
+test('agentic human review staged xhigh run preserves the approved plan boundary', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'trace-cue-agentic-review-staged-'));
+  const png = minimalPngBuffer(120, 80);
+  await writeFile(path.join(cwd, 'screen.png'), png);
+
+  const imageReview = await executeCli(['review', '--image', 'screen.png', '--json'], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'image-review-staged'
+  });
+  assert.equal(imageReview.exitCode, 0);
+  const reviewIndexPath = '.browser-debug/review-artifacts/image-review-staged.json';
+
+  const standardPlan = await executeCli([
+    'agentic',
+    'review',
+    'plan',
+    '--review-index',
+    reviewIndexPath,
+    '--intent',
+    'Review visible text and reader trust without xhigh staging.',
+    '--effort',
+    'standard',
+    '--provider',
+    'fake-agent',
+    '--model',
+    'fake-model',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agentic-plan-staged-standard'
+  });
+  assert.equal(standardPlan.exitCode, 0);
+  const standardPlanBody = JSON.parse(standardPlan.stdout);
+  const standardFlags = standardPlanBody.data.agentic_human_review_plan.transfer_permissions.required_flags.slice().sort();
+  const standardStagedRun = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    '.browser-debug/agentic-human-review-plans/agentic-plan-staged-standard/plan.json',
+    '--plan-hash',
+    standardPlanBody.data.plan_hash,
+    ...standardFlags.map((flag) => `--${flag}`),
+    '--execution-mode',
+    'staged',
+    '--execute',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(standardStagedRun.exitCode, 1);
+  assert.equal(JSON.parse(standardStagedRun.stdout).errors[0].code, 'AGENTIC_REVIEW_STAGED_XHIGH_REQUIRES_XHIGH_PLAN');
+
+  const xhighPlan = await executeCli([
+    'agentic',
+    'review',
+    'plan',
+    '--review-index',
+    reviewIndexPath,
+    '--intent',
+    'Review the visual UI, visible text, trust, likely reader feeling, and missed evidence risks.',
+    '--effort',
+    'xhigh',
+    '--benchmark-case',
+    'blog-content-value',
+    '--provider',
+    'fake-agent',
+    '--model',
+    'fake-model',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agentic-plan-staged-xhigh'
+  });
+  assert.equal(xhighPlan.exitCode, 0);
+  const xhighPlanBody = JSON.parse(xhighPlan.stdout);
+  const xhighPlanPath = '.browser-debug/agentic-human-review-plans/agentic-plan-staged-xhigh/plan.json';
+  const xhighFlags = xhighPlanBody.data.agentic_human_review_plan.transfer_permissions.required_flags.slice().sort();
+
+  const unsupportedExecutionMode = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    xhighPlanPath,
+    '--plan-hash',
+    xhighPlanBody.data.plan_hash,
+    ...xhighFlags.map((flag) => `--${flag}`),
+    '--execution-mode',
+    'parallel',
+    '--execute',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(unsupportedExecutionMode.exitCode, 1);
+  assert.equal(JSON.parse(unsupportedExecutionMode.stdout).errors[0].code, 'AGENTIC_REVIEW_EXECUTION_MODE_UNSUPPORTED');
+
+  const stagedRun = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    xhighPlanPath,
+    '--plan-hash',
+    xhighPlanBody.data.plan_hash,
+    ...xhighFlags.map((flag) => `--${flag}`),
+    '--execution-mode',
+    'staged',
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: (prefix) => {
+      if (prefix === 'agentic-human-review-execution') {
+        return 'agentic-execution-staged-xhigh';
+      }
+      if (prefix === 'agentic-human-review-result') {
+        return 'agentic-result-staged-xhigh';
+      }
+      return 'unexpected-agentic-staged-id';
+    }
+  });
+  assert.equal(stagedRun.exitCode, 0);
+  const stagedRunBody = JSON.parse(stagedRun.stdout);
+  const stagedExecution = stagedRunBody.data.agentic_human_review_execution;
+  assert.equal(stagedExecution.status, 'completed');
+  assert.equal(stagedExecution.execution_mode, 'staged');
+  assert.equal(stagedExecution.provider_call_performed, true);
+  assert.equal(stagedExecution.api_call_performed, false);
+  assert.equal(stagedExecution.provider_call_count, 3);
+  assert.equal(stagedExecution.api_call_count, 0);
+  assert.equal(stagedExecution.stage_count, 3);
+  assert.equal(stagedExecution.raw_provider_response_stored, false);
+  assert.equal(stagedExecution.credential_values_recorded, false);
+  assert.equal(stagedExecution.staged_execution.true_multi_call_execution_performed, true);
+  assert.equal(stagedExecution.staged_execution.stage_outputs_are_final_evidence, false);
+  assert.equal(stagedExecution.staged_execution.stages.every((stage) => stage.raw_provider_response_stored === false), true);
+  assert.equal(stagedExecution.staged_execution.stages.every((stage) => stage.credential_values_recorded === false), true);
+
+  const resultText = await readFile(path.join(cwd, '.browser-debug', 'agentic-human-review-results', 'agentic-execution-staged-xhigh', 'result.json'), 'utf8');
+  const resultFile = JSON.parse(resultText);
+  assert.equal(resultFile.execution.execution_mode, 'staged');
+  assert.equal(resultFile.execution.provider_call_count, 3);
+  assert.equal(resultFile.execution.stage_count, 3);
+  assert.equal(resultFile.boundary.execution_mode, 'staged');
+  assert.equal(resultFile.boundary.staged_xhigh_execution_performed, true);
+  assert.equal(resultFile.xhigh_staged_execution.true_multi_call_execution_performed, true);
+  assert.equal(resultFile.xhigh_staged_execution.stage_outputs_are_final_evidence, false);
+  assert.equal(resultFile.xhigh_multi_round_review.status, 'complete');
+  assert.equal(resultFile.xhigh_multi_round_review.true_multi_call_execution_performed, true);
+  assert.equal(resultFile.xhigh_multi_round_review.single_call_multi_role_output_only, false);
+  assert.equal(resultFile.xhigh_multi_round_review.multi_step_plan.true_multi_step_execution_performed, true);
+  assert.equal(resultFile.benchmark_requirement_coverage.status, 'passed');
+  assert.equal(resultFile.agentic_human_review_findings.every((finding) => finding.claim_numerator_eligible === false), true);
+  assert.equal(JSON.stringify(resultFile).includes(png.toString('base64')), false);
+
+  const qualityResult = await executeCli([
+    'agentic',
+    'review',
+    'report-quality',
+    '--result',
+    '.browser-debug/agentic-human-review-results/agentic-execution-staged-xhigh/result.json',
+    '--execution',
+    '.browser-debug/agentic-human-review-results/agentic-execution-staged-xhigh/execution.json',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(qualityResult.exitCode, 0);
+  const qualityBody = JSON.parse(qualityResult.stdout);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.xhigh_multi_round_review.status, 'complete');
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.xhigh_multi_round_review.true_multi_call_execution_performed, true);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.human_equivalence_claim.human_equivalent_claim_allowed, false);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.human_equivalence_claim.human_superior_claim_allowed, false);
+});
+
+test('agentic human review staged xhigh incomplete stage output remains non-proof', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'trace-cue-agentic-review-staged-incomplete-'));
+  const png = minimalPngBuffer(120, 80);
+  await writeFile(path.join(cwd, 'screen.png'), png);
+
+  const imageReview = await executeCli(['review', '--image', 'screen.png', '--json'], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'image-review-staged-incomplete'
+  });
+  assert.equal(imageReview.exitCode, 0);
+
+  const planResult = await executeCli([
+    'agentic',
+    'review',
+    'plan',
+    '--review-index',
+    '.browser-debug/review-artifacts/image-review-staged-incomplete.json',
+    '--intent',
+    'Review visible text, likely reader feeling, trust, and missed proof risks with staged xhigh.',
+    '--effort',
+    'xhigh',
+    '--provider',
+    'injected-runner',
+    '--model',
+    'injected-local-model',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agentic-plan-staged-incomplete'
+  });
+  assert.equal(planResult.exitCode, 0);
+  const planBody = JSON.parse(planResult.stdout);
+  const requiredFlags = planBody.data.agentic_human_review_plan.transfer_permissions.required_flags.slice().sort();
+
+  const runResult = await executeCli([
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    '.browser-debug/agentic-human-review-plans/agentic-plan-staged-incomplete/plan.json',
+    '--plan-hash',
+    planBody.data.plan_hash,
+    ...requiredFlags.map((flag) => `--${flag}`),
+    '--provider',
+    'injected-runner',
+    '--model',
+    'injected-local-model',
+    '--execution-mode',
+    'staged',
+    '--execute',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: (prefix) => {
+      if (prefix === 'agentic-human-review-execution') {
+        return 'agentic-execution-staged-incomplete';
+      }
+      if (prefix === 'agentic-human-review-result') {
+        return 'agentic-result-staged-incomplete';
+      }
+      return 'unexpected-agentic-staged-incomplete-id';
+    },
+    agenticReviewRunner: async ({ stage_execution: stageExecution }) => {
+      const role = stageExecution?.stage_id === 'xhigh-round-1' ? 'content_reviewer' : null;
+      return {
+        summary: `Incomplete staged output for ${stageExecution?.stage_id ?? 'unknown-stage'}.`,
+        role_opinions: role
+          ? [{
+              role,
+              display_name: 'Content Reviewer',
+              effort: 'xhigh',
+              round: 1,
+              summary: 'Only one first-round role returned output, so the staged result is not proof-ready.',
+              findings: [],
+              uncertainties: ['Most planned xhigh roles are missing.']
+            }]
+          : [],
+        findings: [],
+        review_claims: []
+      };
+    }
+  });
+  assert.equal(runResult.exitCode, 0);
+  const resultText = await readFile(path.join(cwd, '.browser-debug', 'agentic-human-review-results', 'agentic-execution-staged-incomplete', 'result.json'), 'utf8');
+  const resultFile = JSON.parse(resultText);
+  assert.equal(resultFile.xhigh_staged_execution.true_multi_call_execution_performed, true);
+  assert.equal(resultFile.xhigh_staged_execution.stage_outputs_are_final_evidence, false);
+  assert.equal(resultFile.xhigh_multi_round_review.status, 'incomplete');
+  assert.equal(resultFile.xhigh_mechanical_enforcement.status, 'incomplete');
+  assert.equal(resultFile.review_quality_evaluation.xhigh_completion_status, 'incomplete');
+  assert.equal(resultFile.xhigh_multi_round_review.missing_roles.includes('synthesis_agent'), true);
+  assert.equal(resultFile.role_execution_records.some((record) => record.status === 'missing_output'), true);
+  assert.equal(resultFile.claim_integrity.claim_numerator_safe, false);
+  assert.equal(resultFile.agentic_human_review_findings.length, 0);
+  assert.equal(JSON.stringify(resultFile).includes(png.toString('base64')), false);
+
+  const qualityResult = await executeCli([
+    'agentic',
+    'review',
+    'report-quality',
+    '--result',
+    '.browser-debug/agentic-human-review-results/agentic-execution-staged-incomplete/result.json',
+    '--execution',
+    '.browser-debug/agentic-human-review-results/agentic-execution-staged-incomplete/execution.json',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(qualityResult.exitCode, 0);
+  const qualityBody = JSON.parse(qualityResult.stdout);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.xhigh_multi_round_review.status, 'incomplete');
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.human_equivalence_claim.human_equivalent_claim_allowed, false);
+  assert.equal(qualityBody.data.agentic_human_review_report_quality.human_review_maturity.human_equivalence_claim.human_superior_claim_allowed, false);
+});
+
 test('agentic human review responses adapter converts requests without leaking credentials or local paths', async () => {
   const request = adapterTraceCueRequest();
+  request.stage_execution = {
+    schema_version: '0.1.0',
+    staged_xhigh_execution_version: '1.0.0',
+    mode: 'staged_xhigh_provider_call',
+    stage_id: 'xhigh-round-2',
+    stage_kind: 'critique_and_verification',
+    final_contract_stage: false,
+    original_plan_hash: 'b'.repeat(64),
+    original_package_hash: 'c'.repeat(64),
+    required_roles: ['critic_reviewer', 'verification_reviewer'],
+    required_round: 2,
+    depends_on_stages: ['xhigh-round-1'],
+    previous_stage_summaries: [{
+      stage_id: 'xhigh-round-1',
+      stage_output_hash: 'd'.repeat(64),
+      roles: ['visual_reviewer', 'content_reviewer'],
+      summary: 'Initial independent roles completed.',
+      role_summaries: [{
+        role: 'content_reviewer',
+        round: 1,
+        summary: 'The content reviewer identified the main trust proof gap.'
+      }]
+    }],
+    ignored_local_path: '/tmp/local-plan/stage.json',
+    stage_outputs_are_final_evidence: false,
+    final_advisory_required: false,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
   request.plan.review_quality_benchmark = {
     enabled: true,
     case_id: 'blog-content-value',
@@ -6788,13 +7108,21 @@ test('agentic human review responses adapter converts requests without leaking c
   assert.equal(observedFetch.body.text.format.schema.required.includes('agentic_human_review_findings'), true);
   assert.equal(observedFetch.body.text.format.schema.required.includes('owner_baseline_findings'), false);
   assert.match(observedFetch.body.instructions, /without paraphrasing keys/);
+  assert.match(observedFetch.body.instructions, /staged xhigh provider call/);
   assert.match(observedFetch.body.instructions, /Do not claim human-equivalent or human-superior quality/);
   assert.doesNotMatch(observedFetch.body.instructions, /expert human-equivalent reviewer/);
-  assert.doesNotMatch(observedFetch.body.input, /adapter-secret-value|provider-secret-value|\.browser-debug|\/tmp\/local-plan/);
+  assert.doesNotMatch(observedFetch.body.input, /adapter-secret-value|provider-secret-value|\.browser-debug|\/tmp\/local-plan|stage\.json/);
   assert.match(observedFetch.body.input, /evidence_reference_catalog/);
   assert.match(observedFetch.body.input, /text-snippet-1/);
   assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value|output_text/);
   const observedInput = JSON.parse(observedFetch.body.input);
+  assert.equal(observedInput.stage_execution.stage_id, 'xhigh-round-2');
+  assert.equal(observedInput.stage_execution.stage_kind, 'critique_and_verification');
+  assert.equal(observedInput.stage_execution.final_contract_stage, false);
+  assert.equal(observedInput.stage_execution.required_roles.includes('critic_reviewer'), true);
+  assert.equal(observedInput.stage_execution.previous_stage_summaries[0].stage_output_hash, 'd'.repeat(64));
+  assert.equal(observedInput.stage_execution.previous_stage_summaries[0].summary, 'Initial independent roles completed.');
+  assert.equal(observedInput.stage_execution.stage_outputs_are_final_evidence, false);
   assert.equal(observedInput.required_benchmark_coverage.required_mentions[0].mention, 'content value');
   assert.equal(observedInput.required_benchmark_coverage.required_dimensions[0].dimension, 'content_comprehension');
   assert.equal(observedInput.required_benchmark_coverage.forbidden_claims[0].claim, 'release is approved');
@@ -6812,6 +7140,9 @@ test('agentic human review responses adapter converts requests without leaking c
   assert.equal(directRequest.reasoning.effort, 'high');
   assert.doesNotMatch(directRequest.input, /\.browser-debug|\/tmp\/local-plan/);
   assert.equal(directRequest.text.format.schema.required.includes('owner_baseline_findings'), false);
+  const directInput = JSON.parse(directRequest.input);
+  assert.equal(directInput.stage_execution.stage_id, 'xhigh-round-2');
+  assert.equal(directInput.stage_execution.stage_outputs_are_final_evidence, false);
   const benchmarkSchema = directRequest.text.format.schema.properties.benchmark_requirement_coverage.properties;
   assert.equal(benchmarkSchema.required_mentions.items.required.includes('evidence'), true);
   assert.equal(benchmarkSchema.required_mentions.items.required.includes('evidence_refs'), true);
