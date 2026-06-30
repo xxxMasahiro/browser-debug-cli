@@ -6,11 +6,13 @@ export const AGENTIC_REVIEW_API_ENDPOINT_ENV = 'AGENTIC_HUMAN_REVIEW_API_ENDPOIN
 export const AGENTIC_REVIEW_API_CREDENTIAL_ENV = 'AGENTIC_HUMAN_REVIEW_API_TOKEN';
 export const AGENTIC_REVIEW_API_TIMEOUT_ENV = 'AGENTIC_HUMAN_REVIEW_API_TIMEOUT_MS';
 export const AGENTIC_REVIEW_LIVE_DOGFOOD_ENV = 'AGENTIC_HUMAN_REVIEW_LIVE_DOGFOOD';
+export const AGENTIC_REVIEW_RESPONSES_ADAPTER_MODEL_ENV = 'AGENTIC_HUMAN_REVIEW_OPENAI_MODEL';
 
 const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_TIMEOUT_MS = 2147483647;
 const DEFAULT_MAX_REQUEST_BYTES = 128 * 1024;
 const DEFAULT_MAX_RESPONSE_BYTES = 256 * 1024;
+const GENERIC_API_PROVIDER_PLACEHOLDER_MODEL = 'generic-agentic-review-model';
 const CAPABILITY_CONTRACT_VERSION = '2.0.0';
 const EFFORT_CAPABILITY_CONTRACT_VERSION = '1.0.0';
 const REAL_PROVIDER_ADAPTER_CONTRACT_VERSION = '1.0.0';
@@ -121,7 +123,10 @@ export const AGENTIC_HUMAN_REVIEW_PROVIDERS = Object.freeze([
     endpoint_env: AGENTIC_REVIEW_API_ENDPOINT_ENV,
     credential_env: AGENTIC_REVIEW_API_CREDENTIAL_ENV,
     timeout_env: AGENTIC_REVIEW_API_TIMEOUT_ENV,
-    default_model: 'generic-agentic-review-model',
+    runtime_model_env: AGENTIC_REVIEW_RESPONSES_ADAPTER_MODEL_ENV,
+    default_model: GENERIC_API_PROVIDER_PLACEHOLDER_MODEL,
+    abstract_model_ids: Object.freeze([GENERIC_API_PROVIDER_PLACEHOLDER_MODEL]),
+    model_resolution_policy: 'explicit_plan_model_or_runtime_model_env_required_for_live_adapter_execution',
     supported_modalities: Object.freeze(['metadata', 'text_summary', 'artifact_references']),
     transferable_evidence_classes: Object.freeze(['page_text', 'url', 'artifact_refs', 'accessibility_summary']),
     external_evidence_transfer: true,
@@ -339,7 +344,10 @@ export function agenticProviderSummary(provider) {
     endpoint_env: normalized.endpoint_env ?? null,
     credential_env: normalized.credential_env ?? null,
     timeout_env: normalized.timeout_env ?? null,
+    runtime_model_env: normalized.runtime_model_env ?? null,
     default_model: normalized.default_model,
+    abstract_model_ids: [...normalized.abstract_model_ids],
+    model_resolution_policy: normalized.model_resolution_policy,
     supported_modalities: [...(normalized.supported_modalities ?? [])],
     transferable_evidence_classes: [...(normalized.transferable_evidence_classes ?? [])],
     supported_review_efforts: [...(normalized.supported_review_efforts ?? [])],
@@ -398,7 +406,7 @@ export function buildAgenticProviderReadiness({
   if (!prepared.ok) {
     return prepared;
   }
-  const providers = prepared.providers.map((provider) => readinessProviderRecord(provider, { surface, model }));
+  const providers = prepared.providers.map((provider) => readinessProviderRecord(provider, { surface, model, context }));
   const selected = providerId && providerId !== 'all'
     ? providers.filter((provider) => provider.id === providerId)
     : providers;
@@ -464,15 +472,18 @@ export function buildAgenticDogfoodSetupReadiness({ provider, context = {} } = {
   const endpointEnv = provider?.endpoint_env ?? null;
   const credentialEnv = provider?.credential_env ?? null;
   const timeoutEnv = provider?.timeout_env ?? null;
+  const runtimeModelEnv = provider?.runtime_model_env ?? null;
   const liveDogfoodValue = env[AGENTIC_REVIEW_LIVE_DOGFOOD_ENV];
   return redact({
     endpoint_env: endpointEnv,
     credential_env: credentialEnv,
     timeout_env: timeoutEnv,
+    runtime_model_env: runtimeModelEnv,
     live_dogfood_env: AGENTIC_REVIEW_LIVE_DOGFOOD_ENV,
     endpoint_configured: hasEnvKey(env, endpointEnv),
     credential_configured: hasEnvKey(env, credentialEnv),
     timeout_configured: hasEnvKey(env, timeoutEnv),
+    runtime_model_env_configured: hasEnvKey(env, runtimeModelEnv),
     timeout_ms: provider?.timeout_ms ?? DEFAULT_TIMEOUT_MS,
     live_dogfood_enabled: liveDogfoodValue === '1' || String(liveDogfoodValue ?? '').toLowerCase() === 'true',
     manual_live_provider_default: false,
@@ -519,6 +530,71 @@ export function buildAgenticLiveDogfoodExecutionGate({ provider, plan = {}, cont
     advisory_only: true,
     gate_effect: 'none'
   });
+}
+
+export function isAgenticHumanReviewAbstractModel(provider, model) {
+  const normalized = normalizeProviderDescriptor(provider ?? {});
+  const modelId = typeof model === 'string' ? model : model?.id;
+  return Boolean(modelId && normalized.abstract_model_ids.includes(modelId));
+}
+
+export function resolveAgenticHumanReviewProviderModel({ provider, model, context = {}, endpointUrl = null } = {}) {
+  const normalized = normalizeProviderDescriptor(provider ?? {});
+  const env = context.env ?? process.env;
+  const requestedModelId = typeof model === 'string' ? model : model?.id ?? normalized.default_model;
+  const runtimeModelEnv = normalized.runtime_model_env ?? null;
+  const runtimeModel = hasEnvKey(env, runtimeModelEnv) ? String(env[runtimeModelEnv] ?? '').trim() : null;
+  const requestModelAbstract = isAgenticHumanReviewAbstractModel(normalized, requestedModelId);
+  if (!requestModelAbstract) {
+    return {
+      ok: true,
+      model: { id: requestedModelId },
+      resolution: {
+        requested_model_id: requestedModelId,
+        effective_model_id: requestedModelId,
+        model_resolution_source: 'approved_tracecue_plan',
+        runtime_model_env: runtimeModelEnv,
+        runtime_model_env_configured: hasEnvKey(env, runtimeModelEnv),
+        request_model_abstract: false,
+        endpoint_loopback: endpointUrl ? isLoopbackHost(endpointUrl.hostname) : null
+      }
+    };
+  }
+  if (runtimeModel) {
+    return {
+      ok: true,
+      model: { id: runtimeModel },
+      resolution: {
+        requested_model_id: requestedModelId,
+        effective_model_id: runtimeModel,
+        model_resolution_source: 'runtime_model_env',
+        runtime_model_env: runtimeModelEnv,
+        runtime_model_env_configured: true,
+        request_model_abstract: true,
+        endpoint_loopback: endpointUrl ? isLoopbackHost(endpointUrl.hostname) : null
+      }
+    };
+  }
+  return {
+    ok: false,
+    error: {
+      code: 'AGENTIC_REVIEW_PROVIDER_MODEL_UNRESOLVED',
+      message: 'Agentic human review provider API execution requires a real provider model from the approved plan/run request or the provider runtime model environment variable.',
+      details: {
+        provider: normalized.id,
+        requested_model_id: requestedModelId ?? null,
+        request_model_abstract: true,
+        runtime_model_env: runtimeModelEnv,
+        runtime_model_env_configured: false,
+        model_resolution_policy: normalized.model_resolution_policy,
+        endpoint_loopback: endpointUrl ? isLoopbackHost(endpointUrl.hostname) : null,
+        provider_call_performed: false,
+        api_call_performed: false,
+        credential_values_recorded: false,
+        raw_provider_response_stored: false
+      }
+    }
+  };
 }
 
 export async function executeAgenticHumanReviewApiProvider({
@@ -606,6 +682,25 @@ export async function executeAgenticHumanReviewApiProvider({
     });
   }
 
+  const modelResolution = resolveAgenticHumanReviewProviderModel({
+    provider,
+    model,
+    context,
+    endpointUrl
+  });
+  if (!modelResolution.ok) {
+    return providerFailure({
+      status: 'blocked',
+      code: modelResolution.error.code,
+      message: modelResolution.error.message,
+      details: modelResolution.error.details,
+      provider,
+      providerCallPerformed: false,
+      apiCallPerformed: false,
+      externalEvidenceTransfer: false
+    });
+  }
+
   const fetchImpl = context.fetch ?? globalThis.fetch;
   if (typeof fetchImpl !== 'function') {
     return providerFailure({
@@ -627,9 +722,10 @@ export async function executeAgenticHumanReviewApiProvider({
     reviewPackage,
     transferFlags,
     provider,
-    model,
+    model: modelResolution.model,
     surface,
-    execution
+    execution,
+    modelResolution: modelResolution.resolution
   });
   const payloadText = JSON.stringify(payload);
   if (Buffer.byteLength(payloadText, 'utf8') > provider.max_request_bytes) {
@@ -780,7 +876,8 @@ export async function executeAgenticHumanReviewApiProvider({
       domSummaryTransferred: transferFlags.supplied_flags?.includes('allow-dom-summary') === true,
       urlMetadataTransferred: transferFlags.supplied_flags?.includes('allow-url') === true,
       artifactRefsTransferred: transferFlags.supplied_flags?.includes('allow-artifact-refs') === true,
-      accessibilitySummaryTransferred: transferFlags.supplied_flags?.includes('allow-accessibility-summary') === true
+      accessibilitySummaryTransferred: transferFlags.supplied_flags?.includes('allow-accessibility-summary') === true,
+      modelResolution: modelResolution.resolution
     }),
     warnings: []
   };
@@ -799,7 +896,8 @@ export function providerBoundary({
   domSummaryTransferred = false,
   urlMetadataTransferred = false,
   artifactRefsTransferred = false,
-  accessibilitySummaryTransferred = false
+  accessibilitySummaryTransferred = false,
+  modelResolution = null
 }) {
   return {
     provider_adapter_implemented: provider.implemented === true,
@@ -815,13 +913,15 @@ export function providerBoundary({
     url_metadata_transferred: Boolean(urlMetadataTransferred),
     artifact_refs_transferred: Boolean(artifactRefsTransferred),
     accessibility_summary_transferred: Boolean(accessibilitySummaryTransferred),
+    model_resolution: modelResolution,
     credential_values_recorded: false,
     raw_provider_response_stored: false
   };
 }
 
-function readinessProviderRecord(provider, { surface, model }) {
+function readinessProviderRecord(provider, { surface, model, context = {} }) {
   const summary = agenticProviderSummary(provider);
+  const env = context.env ?? process.env;
   return {
     ...summary,
     requested_surface_id: surface?.id ?? surface ?? null,
@@ -848,7 +948,9 @@ function readinessProviderRecord(provider, { surface, model }) {
       endpoint_env: summary.endpoint_env,
       credential_env: summary.credential_env,
       timeout_env: summary.timeout_env,
+      runtime_model_env: summary.runtime_model_env,
       live_dogfood_env: AGENTIC_REVIEW_LIVE_DOGFOOD_ENV,
+      runtime_model_env_configured: hasEnvKey(env, summary.runtime_model_env),
       credential_values_read_by_readiness: false,
       credential_values_recorded: false,
       raw_provider_response_stored: false
@@ -901,7 +1003,14 @@ function normalizeProviderDescriptor(provider) {
     endpoint_env: provider.endpoint_env ?? null,
     credential_env: provider.credential_env ?? null,
     timeout_env: provider.timeout_env ?? null,
+    runtime_model_env: provider.runtime_model_env ?? null,
     default_model: provider.default_model ?? 'fake-model',
+    abstract_model_ids: Array.isArray(provider.abstract_model_ids)
+      ? uniqueSorted(provider.abstract_model_ids.map((item) => String(item ?? '').trim()).filter(Boolean))
+      : [],
+    model_resolution_policy: typeof provider.model_resolution_policy === 'string' && provider.model_resolution_policy.trim()
+      ? provider.model_resolution_policy.trim()
+      : 'provider_default_model_allowed',
     supported_modalities: Array.isArray(provider.supported_modalities) ? provider.supported_modalities : ['metadata'],
     transferable_evidence_classes: Array.isArray(provider.transferable_evidence_classes)
       ? provider.transferable_evidence_classes
@@ -1024,7 +1133,7 @@ function parseOptionalPositiveIntegerEnv(env, key, field) {
   return { ok: true, configured: true, value };
 }
 
-function buildAgenticApiPayload({ plan, planPath, reviewPackage, transferFlags, provider, model, surface, execution }) {
+function buildAgenticApiPayload({ plan, planPath, reviewPackage, transferFlags, provider, model, surface, execution, modelResolution = null }) {
   const filteredPackage = filterReviewPackageForTransfer(reviewPackage, transferFlags);
   return redact({
     schema_version: SCHEMA_VERSION,
@@ -1068,6 +1177,7 @@ function buildAgenticApiPayload({ plan, planPath, reviewPackage, transferFlags, 
       raw_provider_response_stored: false
     },
     model: { id: model.id },
+    model_resolution: modelResolution,
     surface: {
       id: surface.id,
       kind: surface.kind ?? null
@@ -1461,7 +1571,7 @@ function providerFailure({
 }
 
 function diagnosticStageForCode(code) {
-  if (/CONFIGURATION|ENDPOINT|FETCH/.test(code)) {
+  if (/CONFIGURATION|ENDPOINT|FETCH|MODEL/.test(code)) {
     return 'setup';
   }
   if (/REQUEST|TIMEOUT/.test(code)) {
@@ -1474,6 +1584,12 @@ function diagnosticStageForCode(code) {
 }
 
 function providerFailureNextActions(code) {
+  if (/MODEL/.test(code)) {
+    return [
+      'Create the approved plan with an explicit provider model or configure the provider runtime model environment variable.',
+      'Do not pass abstract placeholder model identifiers to a live provider adapter.'
+    ];
+  }
   if (/CONFIGURATION/.test(code)) {
     return [
       'Configure endpoint and credential environment variables for the selected provider.',

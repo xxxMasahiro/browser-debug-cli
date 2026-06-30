@@ -136,7 +136,8 @@ import {
   AGENTIC_REVIEW_API_CREDENTIAL_ENV,
   AGENTIC_REVIEW_API_ENDPOINT_ENV,
   AGENTIC_REVIEW_API_TIMEOUT_ENV,
-  AGENTIC_REVIEW_LIVE_DOGFOOD_ENV
+  AGENTIC_REVIEW_LIVE_DOGFOOD_ENV,
+  AGENTIC_REVIEW_RESPONSES_ADAPTER_MODEL_ENV
 } from '../src/agentic-human-review-providers.js';
 import {
   buildOpenAiResponsesRequest,
@@ -3852,6 +3853,109 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(apiReadinessBody.data.agentic_human_review_provider_readiness.providers[0].timeout_env, AGENTIC_REVIEW_API_TIMEOUT_ENV);
   assert.equal(apiReadinessBody.data.agentic_human_review_provider_readiness.providers[0].timeout_ms, 90000);
   assert.equal(apiReadinessBody.data.agentic_human_review_provider_readiness.providers[0].setup_readiness.timeout_env, AGENTIC_REVIEW_API_TIMEOUT_ENV);
+  assert.equal(apiReadinessBody.data.agentic_human_review_provider_readiness.providers[0].setup_readiness.runtime_model_env, AGENTIC_REVIEW_RESPONSES_ADAPTER_MODEL_ENV);
+  assert.equal(apiReadinessBody.data.agentic_human_review_provider_readiness.providers[0].setup_readiness.runtime_model_env_configured, false);
+
+  const abstractApiPlanResult = await executeCli([
+    'agentic',
+    'review',
+    'plan',
+    '--review-index',
+    reviewIndexPath,
+    '--intent',
+    'Review page text, artifact references, accessibility summary, and likely viewer feeling with an API provider using runtime model resolution.',
+    '--provider',
+    'generic-api-provider',
+    '--json'
+  ], {
+    cwd,
+    now: fixedNow,
+    createId: () => 'agentic-plan-api-abstract-model',
+    env: {
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '90000'
+    }
+  });
+  assert.equal(abstractApiPlanResult.exitCode, 0);
+  const abstractApiPlanBody = JSON.parse(abstractApiPlanResult.stdout);
+  assert.equal(abstractApiPlanBody.data.agentic_human_review_plan.model.id, 'generic-agentic-review-model');
+  assert.equal(abstractApiPlanBody.data.agentic_human_review_plan.provider.runtime_model_env, AGENTIC_REVIEW_RESPONSES_ADAPTER_MODEL_ENV);
+  assert.deepEqual(abstractApiPlanBody.data.agentic_human_review_plan.provider.abstract_model_ids, ['generic-agentic-review-model']);
+  const abstractApiPlanPath = '.browser-debug/agentic-human-review-plans/agentic-plan-api-abstract-model/plan.json';
+  const abstractApiFlags = abstractApiPlanBody.data.agentic_human_review_plan.transfer_permissions.required_flags.slice().sort();
+  const abstractApiRunArgs = [
+    'agentic',
+    'review',
+    'run',
+    '--plan',
+    abstractApiPlanPath,
+    '--plan-hash',
+    abstractApiPlanBody.data.plan_hash,
+    ...abstractApiFlags.map((flag) => `--${flag}`),
+    '--provider',
+    'generic-api-provider',
+    '--execute',
+    '--json'
+  ];
+  const abstractModelMissingRun = await executeCli(abstractApiRunArgs, {
+    cwd,
+    now: fixedNow,
+    env: {
+      [AGENTIC_REVIEW_API_ENDPOINT_ENV]: 'http://127.0.0.1:8787/review',
+      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value',
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '90000'
+    },
+    fetch: async () => {
+      throw new Error('fetch must not be called when the live provider model is unresolved');
+    }
+  });
+  assert.equal(abstractModelMissingRun.exitCode, 1);
+  const abstractModelMissingBody = JSON.parse(abstractModelMissingRun.stdout);
+  assert.equal(abstractModelMissingBody.errors[0].code, 'AGENTIC_REVIEW_PROVIDER_MODEL_UNRESOLVED');
+  const abstractModelMissingExecution = abstractModelMissingBody.data.agentic_human_review_execution;
+  assert.equal(abstractModelMissingExecution.provider_call_performed, false);
+  assert.equal(abstractModelMissingExecution.api_call_performed, false);
+  assert.equal(abstractModelMissingExecution.failure_diagnostics.stage, 'setup');
+  assert.equal(abstractModelMissingExecution.failure_diagnostics.details.runtime_model_env, AGENTIC_REVIEW_RESPONSES_ADAPTER_MODEL_ENV);
+  assert.equal(abstractModelMissingExecution.failure_diagnostics.details.request_model_abstract, true);
+  assert.doesNotMatch(abstractModelMissingRun.stdout, /api-secret-value|127\.0\.0\.1:8787/);
+
+  let runtimeModelPayload = null;
+  const abstractModelRuntimeRun = await executeCli(abstractApiRunArgs, {
+    cwd,
+    now: fixedNow,
+    createId: (prefix) => {
+      if (prefix === 'agentic-human-review-execution') {
+        return 'agentic-execution-api-runtime-model';
+      }
+      if (prefix === 'agentic-human-review-result') {
+        return 'agentic-result-api-runtime-model';
+      }
+      return 'unexpected-agentic-runtime-model-id';
+    },
+    env: {
+      [AGENTIC_REVIEW_API_ENDPOINT_ENV]: 'http://127.0.0.1:8787/review',
+      [AGENTIC_REVIEW_API_CREDENTIAL_ENV]: 'api-secret-value',
+      [AGENTIC_REVIEW_API_TIMEOUT_ENV]: '90000',
+      [AGENTIC_REVIEW_RESPONSES_ADAPTER_MODEL_ENV]: 'runtime-model-for-test'
+    },
+    fetch: async (url, init) => {
+      assert.equal(url, 'http://127.0.0.1:8787/review');
+      runtimeModelPayload = JSON.parse(init.body);
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ summary: 'Runtime model advisory completed.' })
+      };
+    }
+  });
+  assert.equal(abstractModelRuntimeRun.exitCode, 0);
+  const abstractModelRuntimeBody = JSON.parse(abstractModelRuntimeRun.stdout);
+  assert.equal(runtimeModelPayload.model.id, 'runtime-model-for-test');
+  assert.equal(runtimeModelPayload.model_resolution.requested_model_id, 'generic-agentic-review-model');
+  assert.equal(runtimeModelPayload.model_resolution.effective_model_id, 'runtime-model-for-test');
+  assert.equal(runtimeModelPayload.model_resolution.model_resolution_source, 'runtime_model_env');
+  assert.equal(abstractModelRuntimeBody.data.agentic_human_review_execution.model.id, 'generic-agentic-review-model');
+  assert.equal(abstractModelRuntimeBody.data.agentic_human_review_execution.model_resolution.effective_model_id, 'runtime-model-for-test');
 
   const invalidApiTimeoutReadiness = await executeCli([
     'agentic',
@@ -6289,10 +6393,10 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(listResult.exitCode, 0);
   const listBody = JSON.parse(listResult.stdout);
   assert.equal(listBody.command, 'agentic review list');
-  assert.equal(listBody.data.summary.total, 8);
-  assert.equal(listBody.data.summary.completed, 3);
+  assert.equal(listBody.data.summary.total, 10);
+  assert.equal(listBody.data.summary.completed, 4);
   assert.equal(listBody.data.summary.failed, 2);
-  assert.equal(listBody.data.summary.blocked, 3);
+  assert.equal(listBody.data.summary.blocked, 4);
   assert.equal(listBody.data.summary.api_call_performed, true);
   assert.equal(listBody.data.summary.external_evidence_transfer, true);
   assert.equal(listBody.data.boundary.mcp_execution_exposed, false);
@@ -6514,6 +6618,8 @@ test('agentic human review responses adapter converts requests without leaking c
   assert.equal(result.body.benchmark_requirement_coverage.forbidden_claims[0].forbidden_claim_absence_confirmed, true);
   assert.equal(result.body.adapter_boundary.raw_provider_response_stored, false);
   assert.equal(result.body.adapter_boundary.credential_values_recorded, false);
+  assert.equal(result.body.adapter_boundary.model_resolution.effective_model_id, 'review-model-for-test');
+  assert.equal(result.body.adapter_boundary.model_resolution.model_resolution_source, 'adapter_provider_model_env');
   assert.equal(observedFetch.url, 'https://api.openai.com/v1/responses');
   assert.equal(observedFetch.init.method, 'POST');
   assert.equal(observedFetch.init.headers.authorization, 'Bearer provider-secret-value');
@@ -6562,6 +6668,38 @@ test('agentic human review responses adapter converts requests without leaking c
   assert.equal(benchmarkSchema.required_mentions.items.properties.evidence_reference_ids.items.type, 'string');
   assert.equal(benchmarkSchema.required_dimensions.items.properties.evidence_reference_id.type, 'string');
   assert.deepEqual(benchmarkSchema.forbidden_claims.items.properties.present.enum, [false]);
+});
+
+test('agentic human review responses adapter rejects abstract request models before provider fetch', async () => {
+  const request = adapterTraceCueRequest();
+  let fetchCalls = 0;
+  const result = await handleAgenticHumanReviewResponsesAdapterRequest({
+    method: 'POST',
+    url: '/agentic-human-review',
+    headers: {
+      host: '127.0.0.1:8787',
+      'content-type': 'application/json',
+      authorization: 'Bearer adapter-secret-value'
+    },
+    remoteAddress: '127.0.0.1',
+    bodyText: JSON.stringify(request),
+    env: adapterEnv({ [AGENTIC_REVIEW_RESPONSES_ADAPTER_MODEL_ENV]: '' }),
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error('fetch must not be called without a real provider model');
+    },
+    now: fixedNow
+  });
+
+  assert.equal(result.statusCode, 503);
+  assert.equal(result.body.error.code, 'AHR_RESPONSES_ADAPTER_PROVIDER_MODEL_MISSING');
+  assert.equal(result.body.error.details.provider_model_env, AGENTIC_REVIEW_RESPONSES_ADAPTER_MODEL_ENV);
+  assert.equal(result.body.error.details.request_model_id, 'generic-agentic-review-model');
+  assert.equal(result.body.error.details.blocked_model_id, 'generic-agentic-review-model');
+  assert.equal(result.body.error.details.model_resolution_source, 'approved_tracecue_plan');
+  assert.equal(result.body.error.details.runtime_model_env_configured, false);
+  assert.equal(fetchCalls, 0);
+  assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value/);
 });
 
 test('agentic human review responses adapter accepts coverage evidence reference aliases without synthesizing evidence', async () => {

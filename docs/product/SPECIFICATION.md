@@ -580,6 +580,7 @@ Boundary behavior:
 - The adapter binds only to loopback hosts and rejects non-loopback Host or Origin headers.
 - The adapter accepts POST requests only on the exact configured path.
 - The inbound adapter bearer token is never forwarded upstream; the upstream Authorization header uses the separate provider key.
+- Provider model resolution is source-aware and fail-closed. The adapter resolves the upstream model from explicit adapter configuration, then the provider model environment variable, then the approved TraceCue request model. Abstract or local-only placeholder ids such as `generic-agentic-review-model`, fake-provider models, and injected-runner models are rejected before provider fetch, and diagnostics report only the source, env name, requested id, blocked id, and effective id when available.
 - Raw pixel bytes, local plan paths, local execution paths, and local filesystem references are rejected or stripped before provider dispatch.
 - The provider request sets `store: false`, sends no provider tools, requests JSON advisory output, and treats all page/evidence text as untrusted evidence.
 - Benchmark-enabled provider output must include exact required-mention, required-dimension, and forbidden-claim records with non-empty evidence and evidence-reference ids from the request catalog. Unknown evidence-reference ids are not converted into local references.
@@ -587,6 +588,17 @@ Boundary behavior:
 - Bounded contract repair retries may request a complete replacement advisory object when benchmark or `xhigh` mechanical fields are incomplete, but repair retries do not expand transfer permission, provider authority, credential handling, raw response storage, or claim permission.
 - Provider responses are parsed in memory, size bounded, normalized to advisory JSON, redacted, and not stored as raw provider responses.
 - Adapter output remains advisory-only with `gate_effect: none`; it does not mutate deterministic findings, metrics, release gates, existing review artifacts, MCP permissions, or visual review artifacts.
+
+The TraceCue `generic-api-provider` descriptor exposes a separate model-resolution contract:
+
+```text
+default_model: provider-neutral abstract placeholder
+abstract_model_ids: provider-declared non-executable placeholders
+runtime_model_env: environment variable name for a concrete upstream model
+model_resolution_policy: explicit plan/run model or runtime model env required for live adapter execution
+```
+
+`agentic review plan` may preserve an abstract default model for provider-neutral planning and plan-hash review. `agentic review run` resolves the effective provider model before building the API payload. If the approved plan/run model is abstract and the runtime model environment variable is not configured, the run fails with `AGENTIC_REVIEW_PROVIDER_MODEL_UNRESOLVED` before fetch, before provider calls, and before evidence transfer. Successful runtime-env fallback records `model_resolution` in the provider payload, execution record, run receipt, and advisory result without recording credential values or raw provider responses.
 
 ## MCP Adapter Contract
 

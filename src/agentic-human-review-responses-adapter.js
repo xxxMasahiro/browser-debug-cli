@@ -439,6 +439,7 @@ export async function handleAgenticHumanReviewResponsesAdapterRequest({
             raw_provider_response_stored: false,
             credential_values_recorded: false,
             request_payload_stored: false,
+            model_resolution: model.resolution,
             contract_repair_attempts_performed: contractRepairAttemptsPerformed,
             advisory_only: true,
             gate_effect: 'none'
@@ -2764,7 +2765,13 @@ function isPathKey(key) {
 }
 
 function resolveProviderModel({ payload, config, env }) {
-  const model = firstString(config.providerModel, env?.[config.providerModelEnv], payload?.model?.id);
+  const candidates = [
+    { source: 'adapter_config', value: config.providerModel ?? null },
+    { source: 'adapter_provider_model_env', value: env?.[config.providerModelEnv] ?? null },
+    { source: 'approved_tracecue_plan', value: payload?.model?.id ?? null }
+  ];
+  const selected = candidates.find((candidate) => typeof candidate.value === 'string' && candidate.value.trim());
+  const model = selected?.value?.trim() ?? '';
   if (!model || BLOCKED_MODEL_IDS.has(model)) {
     return {
       ok: false,
@@ -2772,11 +2779,25 @@ function resolveProviderModel({ payload, config, env }) {
       message: 'Provider model must be configured through the adapter model environment variable or the approved TraceCue plan.',
       details: {
         provider_model_env: config.providerModelEnv,
-        request_model_id: payload?.model?.id ?? null
+        request_model_id: payload?.model?.id ?? null,
+        selected_model_id: model || null,
+        model_resolution_source: selected?.source ?? null,
+        blocked_model_id: model && BLOCKED_MODEL_IDS.has(model) ? model : null,
+        runtime_model_env_configured: Boolean(env?.[config.providerModelEnv])
       }
     };
   }
-  return { ok: true, value: model };
+  return {
+    ok: true,
+    value: model,
+    resolution: {
+      request_model_id: payload?.model?.id ?? null,
+      effective_model_id: model,
+      model_resolution_source: selected.source,
+      provider_model_env: config.providerModelEnv,
+      runtime_model_env_configured: Boolean(env?.[config.providerModelEnv])
+    }
+  };
 }
 
 async function dispatchProviderRequest({ endpoint, credential, requestText, timeoutMs, maxResponseBytes, fetchImpl }) {

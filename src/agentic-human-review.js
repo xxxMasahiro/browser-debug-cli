@@ -8754,6 +8754,7 @@ async function executeAgenticProvider({ provider, model, surface, plan, planPath
         boundary: providerResult.boundary
       }),
       boundary: providerResult.boundary,
+      model_resolution: providerResult.boundary?.model_resolution ?? null,
       warnings: providerResult.warnings
     };
   }
@@ -9123,6 +9124,7 @@ function normalizeAgenticAdvisoryResult({ id, now, plan, planPath, input, provid
       capability_contract_included: false
     },
     model: { id: model.id },
+    model_resolution: boundary.model_resolution ?? null,
     surface: surfaceSummary(surface),
     transfer_permissions: transferFlags,
     execution: {
@@ -9186,6 +9188,7 @@ function buildExecutionRecord({
     provider_capability_hash: plan.provider_capability_hash ?? agenticProviderCapabilityHash(provider),
     provider,
     model,
+    model_resolution: boundary.model_resolution ?? providerResult.model_resolution ?? null,
     surface: surfaceSummary(surface),
     transfer_permissions: transferFlags,
     live_dogfood_execution_gate: transferFlags.live_dogfood_execution_gate ?? null,
@@ -9251,6 +9254,7 @@ function buildExecutionRecord({
     response_bytes: boundary.response_bytes,
     provider_status_code: boundary.provider_status_code,
     failure_diagnostics: providerResult.failure_diagnostics ?? null,
+    model_resolution: boundary.model_resolution ?? providerResult.model_resolution ?? null,
     deterministic_findings_mutated: false,
     metrics_finding_count_mutated: false,
     existing_review_mutated: false,
@@ -9464,6 +9468,7 @@ function buildRunReceipt({ execution, providerResult }) {
     status: execution.status,
     provider_id: execution.provider?.id ?? null,
     model_id: execution.model?.id ?? null,
+    model_resolution: execution.model_resolution ?? null,
     provider_call_performed: execution.provider_call_performed,
     api_call_performed: execution.api_call_performed,
     external_evidence_transfer: execution.external_evidence_transfer,

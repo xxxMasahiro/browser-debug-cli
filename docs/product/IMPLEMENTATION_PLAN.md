@@ -179,6 +179,16 @@ Implementation order: preserve the current Agentic Human Review plan/run gate; a
 
 Recovery: this slice is additive and local. Existing review, content UX, visual review, agent execution, Agentic Human Review proposal/plan/run/report-quality, safe HTTP MCP, stdio MCP, release readiness, artifact-root policy, alias compatibility, deterministic findings, and release gates remain compatible. Rollback is a standard Git revert of the adapter changes; no artifact migration, publication, credential persistence, raw response persistence, release gate change, or MCP permission expansion is involved.
 
+### Agentic Human Review Provider Model Resolution Hardening
+
+Purpose: keep provider/model choice configurable while preventing provider-neutral placeholder model ids from reaching live upstream adapter execution as if they were concrete provider models.
+
+Implemented scope: add provider descriptor metadata for runtime model env names, abstract model ids, and model-resolution policy; resolve the effective provider model before any generic API fetch; fail with `AGENTIC_REVIEW_PROVIDER_MODEL_UNRESOLVED` when a live API run has only an abstract model and no runtime model env; send the resolved concrete model in the provider payload; record non-secret `model_resolution` diagnostics in payloads, execution records, receipts, and advisory results; extend the Responses adapter resolver with source-aware diagnostics and fetch-before-model guards. Non-scope: hard-coded provider model defaults, provider SDK dependencies, credential persistence, raw provider response storage, deterministic review mutation, release-gate mutation, MCP expansion, or forced removal of provider-neutral planning placeholders.
+
+Implementation order: add reusable provider metadata and resolver helpers; wire the resolver into `agentic review run` before payload construction and fetch; keep plan/proposal model selection backward compatible; add adapter source-aware diagnostics; add no-browser tests for unresolved abstract models, runtime-env fallback, adapter fetch prevention, and model-resolution metadata; update product/workflow/security/verification documents; then run focused no-browser tests and product checks.
+
+Recovery: this slice is additive and local. Existing plans with concrete models continue to run under the same plan-hash and transfer-flag gates. Existing provider-neutral plans with abstract models now fail earlier and more clearly unless a runtime model env is configured. Rollback is a standard Git revert of this model-resolution hardening; no artifact migration, credential storage, raw response persistence, release gate change, or MCP permission expansion is involved.
+
 ### Agentic Human Review Roadmap AHR-13-24: Provider Dogfood, Benchmark Calibration, And Orchestration Quality
 
 Purpose: make Agentic Human Review quality measurable and safely improvable after the AHR-01-12 schema v2 foundation. This slice adds provider capability contracts, evidence planning, page-type rubric profiles, benchmark fixtures, calibration comparisons, xhigh orchestration diagnostics, direct-vs-TraceCue comparison metadata, privacy/disclosure audit output, and live-provider dogfood readiness while preserving the existing plan-hash, exact-transfer-flag, advisory-only, no-MCP-execution boundary.
