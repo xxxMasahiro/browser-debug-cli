@@ -6450,7 +6450,85 @@ test('agentic human review responses adapter converts requests without leaking c
   assert.equal(benchmarkSchema.required_mentions.items.required.includes('evidence_refs'), true);
   assert.equal(benchmarkSchema.required_mentions.items.properties.evidence.minLength, 1);
   assert.equal(benchmarkSchema.required_mentions.items.properties.evidence_refs.minItems, 1);
+  assert.equal(benchmarkSchema.required_mentions.items.properties.evidence_reference_ids.items.type, 'string');
+  assert.equal(benchmarkSchema.required_dimensions.items.properties.evidence_reference_id.type, 'string');
   assert.deepEqual(benchmarkSchema.forbidden_claims.items.properties.present.enum, [false]);
+});
+
+test('agentic human review responses adapter accepts coverage evidence reference aliases without synthesizing evidence', async () => {
+  const request = adapterTraceCueRequest();
+  request.plan.review_effort = { mode: 'standard' };
+  request.plan.review_quality_benchmark = {
+    enabled: true,
+    case_id: 'blog-content-value',
+    required_mentions: ['content value'],
+    required_dimensions: ['content_comprehension'],
+    forbidden_claims: ['release is approved']
+  };
+  const result = await handleAgenticHumanReviewResponsesAdapterRequest({
+    method: 'POST',
+    url: '/agentic-human-review',
+    headers: {
+      host: '127.0.0.1:8787',
+      authorization: 'Bearer adapter-secret-value',
+      'content-type': 'application/json'
+    },
+    remoteAddress: '127.0.0.1',
+    bodyText: JSON.stringify(request),
+    env: adapterEnv(),
+    fetchImpl: async () => jsonResponse({
+      output_text: JSON.stringify({
+        summary: 'The adapter provider used evidence reference aliases.',
+        role_opinions: request.plan.sub_agents.map((agent) => ({
+          role: agent.role,
+          display_name: agent.display_name,
+          effort: agent.effort,
+          round: agent.round,
+          summary: `${agent.display_name} reviewed the aliased coverage rows.`,
+          findings: [],
+          uncertainties: []
+        })),
+        agentic_human_review_findings: [{
+          message: 'The visible content has enough evidence for this adapter check.',
+          evidence_ref_ids: ['text-snippet-1']
+        }],
+        benchmark_requirement_coverage: {
+          required_mentions: [{
+            mention: 'content value',
+            present: true,
+            status: 'covered',
+            evidence: 'The provider explicitly covered the page content value.',
+            evidence_refs: [],
+            evidence_reference_ids: ['benchmark-required-mention-1']
+          }],
+          required_dimensions: [{
+            dimension: 'content_comprehension',
+            present: true,
+            status: 'covered',
+            evidence: 'The provider explicitly covered content comprehension.',
+            evidence_reference_id: 'benchmark-required-dimension-1'
+          }],
+          forbidden_claims: [{
+            claim: 'release is approved',
+            present: false,
+            status: 'absent',
+            evidence: 'The advisory does not claim that a release is approved.',
+            evidence_refs: [],
+            evidence_reference_ids: ['benchmark-forbidden-claim-1']
+          }]
+        }
+      })
+    }),
+    now: fixedNow
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.benchmark_requirement_coverage.required_mentions[0].evidence_refs[0].id, 'benchmark-required-mention-1');
+  assert.equal(result.body.benchmark_requirement_coverage.required_dimensions[0].evidence_refs[0].id, 'benchmark-required-dimension-1');
+  assert.equal(result.body.benchmark_requirement_coverage.forbidden_claims[0].evidence_refs[0].id, 'benchmark-forbidden-claim-1');
+  assert.equal(result.body.benchmark_requirement_coverage.forbidden_claims[0].present, false);
+  assert.equal(result.body.benchmark_requirement_coverage.forbidden_claims[0].forbidden_claim_absence_confirmed, true);
+  assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value|output_text/);
 });
 
 test('agentic human review responses adapter retries repairable benchmark contract gaps once', async () => {

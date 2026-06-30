@@ -91,6 +91,8 @@ function buildAdvisoryResponseSchema(traceCueRequest) {
       reason: { type: 'string' },
       evidence_refs: { type: 'array', minItems: 1, items: evidenceRefSchema },
       evidence_ref_ids: { type: 'array', items: { type: 'string' } },
+      evidence_reference_ids: { type: 'array', items: { type: 'string' } },
+      evidence_reference_id: { type: 'string' },
       citations: { type: 'array' },
       source_refs: { type: 'array' }
     },
@@ -1232,7 +1234,7 @@ function validateAdapterBenchmarkCoverage(advisory, traceCueRequest) {
     for (const expected of expectedValues) {
       const expectedKey = normalizeAdapterCoverageKey(expected);
       const record = records.find((item) => normalizeAdapterCoverageKey(item?.[labelKey] ?? item?.id ?? item?.name ?? item?.label) === expectedKey);
-      const evidenceRefCount = normalizeAdapterEvidenceRefs(record?.evidence_refs ?? record?.evidence_ref_ids, evidenceCatalog).length;
+      const evidenceRefCount = normalizeAdapterEvidenceRefsFromAliases(record, evidenceCatalog).length;
       const missingFields = [];
       if (!record) {
         missingFields.push('record');
@@ -1619,7 +1621,7 @@ function normalizeAdapterCoverageRecords(value, labelKey, evidenceCatalog, optio
         ? (forbiddenClaim ? 'absent' : 'not_covered')
         : firstString(source.status, source.state, source.result, explicitPositive ? 'covered' : 'not_covered')), 120),
       evidence,
-      evidence_refs: normalizeAdapterEvidenceRefs(source.evidence_refs ?? source.evidence_ref_ids ?? source.citations ?? source.source_refs ?? source.references ?? source.artifacts, evidenceCatalog)
+      evidence_refs: normalizeAdapterEvidenceRefsFromAliases(source, evidenceCatalog)
     };
   }).filter((record) => record[labelKey]);
 }
@@ -1737,6 +1739,25 @@ function normalizeAdapterReviewClaims(advisory, evidenceCatalog) {
       gate_effect: 'none'
     };
   });
+}
+
+function normalizeAdapterEvidenceRefsFromAliases(source, evidenceCatalog) {
+  for (const candidate of [
+    source?.evidence_refs,
+    source?.evidence_ref_ids,
+    source?.evidence_reference_ids,
+    source?.evidence_reference_id,
+    source?.citations,
+    source?.source_refs,
+    source?.references,
+    source?.artifacts
+  ]) {
+    const refs = normalizeAdapterEvidenceRefs(candidate, evidenceCatalog);
+    if (refs.length > 0) {
+      return refs;
+    }
+  }
+  return [];
 }
 
 function normalizeAdapterEvidenceRefs(value, evidenceCatalog) {
