@@ -7,7 +7,9 @@ export const MCP_TOOL_TAGS = Object.freeze({
   AGENT_EXECUTION_PLAN_WRITE: 'agent_execution_plan_write',
   AGENT_EXECUTION_RUN_EXECUTE: 'agent_execution_run_execute',
   PROVIDER_STATUS_LIST_READ: 'provider_status_list_read',
-  PROVIDER_EXECUTION_ADMIN: 'provider_execution_admin'
+  PROVIDER_EXECUTION_ADMIN: 'provider_execution_admin',
+  BOUNDED_SUPERVISE_FULL: 'bounded_supervise_full',
+  PERSISTENT_SESSION_ADMIN: 'persistent_session_admin'
 });
 
 const SAFE_PROFILE_TOOLS = Object.freeze([
@@ -50,6 +52,7 @@ const SAFE_PROFILE_TOOLS = Object.freeze([
 const FULL_PROFILE_TOOLS = Object.freeze([
   'browser_debug_doctor',
   'browser_debug_observe',
+  'browser_debug_supervise',
   'browser_debug_review',
   'browser_debug_target_init',
   'browser_debug_target_validate',
@@ -90,6 +93,13 @@ const FULL_PROFILE_TOOLS = Object.freeze([
 
 const ADMIN_PROFILE_TOOLS = Object.freeze([
   ...FULL_PROFILE_TOOLS,
+  'browser_debug_session_start',
+  'browser_debug_session_status',
+  'browser_debug_session_stop',
+  'browser_debug_session_act',
+  'browser_debug_session_observe',
+  'browser_debug_session_checkpoint',
+  'browser_debug_session_review',
   'browser_debug_agent_execution_plan',
   'browser_debug_agent_execution_run'
 ]);
@@ -162,6 +172,41 @@ const TOOL_REGISTRY = Object.freeze([
     },
     effects: effects({ browserLaunched: true, writesArtifacts: true }),
     toCliArgs: (args) => withCommonOptions(['observe', '--url', args.url], args)
+  },
+  {
+    name: 'browser_debug_supervise',
+    minimumProfile: 'full',
+    description: 'Run bounded ordered browser actions in one ephemeral local context, then close the browser.',
+    tags: [MCP_TOOL_TAGS.BOUNDED_SUPERVISE_FULL],
+    inputSchema: {
+      type: 'object',
+      required: ['url'],
+      additionalProperties: false,
+      properties: {
+        url: { type: 'string' },
+        actions: {
+          type: 'array',
+          maxItems: 25,
+          items: { type: 'object' }
+        },
+        screenshot: { type: 'boolean' },
+        trace: { type: 'boolean' },
+        timeout: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: true, writesArtifacts: true }),
+    validate: validateBoundedSuperviseArgs,
+    toCliArgs: (args) => {
+      const output = ['supervise', '--url', args.url];
+      if (args.actions !== undefined) {
+        output.push('--actions', JSON.stringify(args.actions));
+      }
+      if (args.artifactRoot !== undefined) {
+        output.push('--artifact-root', String(args.artifactRoot));
+      }
+      return withCommonOptions(output, args);
+    }
   },
   {
     name: 'browser_debug_review',
@@ -375,6 +420,165 @@ const TOOL_REGISTRY = Object.freeze([
     toCliArgs: (args) => withOptionalOptions(['agent', 'execution', 'list'], args, {
       artifactRoot: '--artifact-root'
     })
+  },
+  {
+    name: 'browser_debug_session_start',
+    minimumProfile: 'admin',
+    description: 'Start an admin-only local persistent browser session with TTL, idle timeout, and origin allowlist boundaries.',
+    tags: [MCP_TOOL_TAGS.PERSISTENT_SESSION_ADMIN],
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        url: { type: 'string' },
+        ttl: { type: 'string' },
+        idleTimeout: { type: 'string' },
+        timeout: { type: 'string' },
+        headed: { type: 'boolean' },
+        manualCheckpoint: { type: 'string' },
+        originAllowlist: { type: 'string' },
+        storageState: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: true, writesArtifacts: true }),
+    validate: validateSessionStartArgs,
+    toCliArgs: (args) => sessionStartCliArgs(args)
+  },
+  {
+    name: 'browser_debug_session_status',
+    minimumProfile: 'admin',
+    description: 'Read admin-only local persistent browser session status.',
+    tags: [MCP_TOOL_TAGS.PERSISTENT_SESSION_ADMIN],
+    inputSchema: {
+      type: 'object',
+      required: ['session'],
+      additionalProperties: false,
+      properties: {
+        session: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: false }),
+    validate: (args) => validateExactRequiredStrings(args, ['session', 'artifactRoot'], ['session']),
+    toCliArgs: (args) => withOptionalOptions(['session', 'status', '--session', args.session], args, {
+      artifactRoot: '--artifact-root'
+    })
+  },
+  {
+    name: 'browser_debug_session_stop',
+    minimumProfile: 'admin',
+    description: 'Stop an admin-only local persistent browser session owned by TraceCue.',
+    tags: [MCP_TOOL_TAGS.PERSISTENT_SESSION_ADMIN],
+    inputSchema: {
+      type: 'object',
+      required: ['session'],
+      additionalProperties: false,
+      properties: {
+        session: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: false, writesArtifacts: true }),
+    validate: (args) => validateExactRequiredStrings(args, ['session', 'artifactRoot'], ['session']),
+    toCliArgs: (args) => withOptionalOptions(['session', 'stop', '--session', args.session], args, {
+      artifactRoot: '--artifact-root'
+    })
+  },
+  {
+    name: 'browser_debug_session_act',
+    minimumProfile: 'admin',
+    description: 'Apply one bounded action to an admin-only persistent browser session.',
+    tags: [MCP_TOOL_TAGS.PERSISTENT_SESSION_ADMIN],
+    inputSchema: {
+      type: 'object',
+      required: ['session', 'action'],
+      additionalProperties: false,
+      properties: {
+        session: { type: 'string' },
+        action: { type: 'object' },
+        screenshot: { type: 'boolean' },
+        timeout: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: true, writesArtifacts: true }),
+    validate: validateSessionActionArgs,
+    toCliArgs: (args) => {
+      const output = ['session', 'act', '--session', args.session, '--action', JSON.stringify(args.action)];
+      if (args.artifactRoot !== undefined) {
+        output.push('--artifact-root', String(args.artifactRoot));
+      }
+      return withCommonOptions(output, args);
+    }
+  },
+  {
+    name: 'browser_debug_session_observe',
+    minimumProfile: 'admin',
+    description: 'Observe the current page state of an admin-only persistent browser session.',
+    tags: [MCP_TOOL_TAGS.PERSISTENT_SESSION_ADMIN],
+    inputSchema: {
+      type: 'object',
+      required: ['session'],
+      additionalProperties: false,
+      properties: {
+        session: { type: 'string' },
+        screenshot: { type: 'boolean' },
+        timeout: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: true, writesArtifacts: true }),
+    validate: (args) => validateSessionCommonArgs(args, ['session', 'screenshot', 'timeout', 'artifactRoot'], ['session']),
+    toCliArgs: (args) => withCommonOptions(withOptionalOptionsBase(['session', 'observe', '--session', args.session], args, {
+      artifactRoot: '--artifact-root'
+    }), args)
+  },
+  {
+    name: 'browser_debug_session_checkpoint',
+    minimumProfile: 'admin',
+    description: 'Record a manual-login checkpoint for an admin-only persistent browser session and optionally export storageState.',
+    tags: [MCP_TOOL_TAGS.PERSISTENT_SESSION_ADMIN],
+    inputSchema: {
+      type: 'object',
+      required: ['session', 'name'],
+      additionalProperties: false,
+      properties: {
+        session: { type: 'string' },
+        name: { type: 'string' },
+        untilUrl: { type: 'string' },
+        untilSelector: { type: 'string' },
+        exportStorageState: { type: 'boolean' },
+        timeout: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: true, writesArtifacts: true }),
+    validate: validateSessionCheckpointArgs,
+    toCliArgs: (args) => sessionCheckpointCliArgs(args)
+  },
+  {
+    name: 'browser_debug_session_review',
+    minimumProfile: 'admin',
+    description: 'Create a local review handoff artifact index from an admin-only persistent browser session.',
+    tags: [MCP_TOOL_TAGS.PERSISTENT_SESSION_ADMIN],
+    inputSchema: {
+      type: 'object',
+      required: ['session'],
+      additionalProperties: false,
+      properties: {
+        session: { type: 'string' },
+        screenshot: { type: 'boolean' },
+        report: { type: 'boolean' },
+        timeout: { type: 'string' },
+        artifactRoot: { type: 'string' }
+      }
+    },
+    effects: effects({ browserLaunched: true, writesArtifacts: true }),
+    validate: (args) => validateSessionCommonArgs(args, ['session', 'screenshot', 'report', 'timeout', 'artifactRoot'], ['session']),
+    toCliArgs: (args) => withCommonOptions(withOptionalOptionsBase(['session', 'review', '--session', args.session], args, {
+      artifactRoot: '--artifact-root'
+    }), args)
   },
   {
     name: 'browser_debug_agent_execution_plan',
@@ -960,13 +1164,18 @@ function withCommonOptions(base, args) {
   return output;
 }
 
-function withOptionalOptions(base, args, optionMap) {
+function withOptionalOptionsBase(base, args, optionMap) {
   const output = [...base];
   for (const [key, flag] of Object.entries(optionMap)) {
     if (args[key] !== undefined) {
       output.push(flag, String(args[key]));
     }
   }
+  return output;
+}
+
+function withOptionalOptions(base, args, optionMap) {
+  const output = withOptionalOptionsBase(base, args, optionMap);
   output.push('--json');
   return output;
 }
@@ -990,4 +1199,195 @@ function validateExactRequiredStrings(args, allowedKeys, requiredKeys) {
     }
   }
   return { ok: true };
+}
+
+function validateBoundedSuperviseArgs(args = {}) {
+  const required = validateSessionCommonArgs(args, ['url', 'actions', 'screenshot', 'trace', 'timeout', 'artifactRoot'], ['url']);
+  if (!required.ok) {
+    return required;
+  }
+  const url = validateMcpUrl(args.url);
+  if (!url.ok) {
+    return url;
+  }
+  if (args.actions !== undefined) {
+    const actions = validateMcpActionArray(args.actions, 25);
+    if (!actions.ok) {
+      return actions;
+    }
+  }
+  return { ok: true };
+}
+
+function validateSessionStartArgs(args = {}) {
+  const required = validateSessionCommonArgs(args, [
+    'url',
+    'ttl',
+    'idleTimeout',
+    'timeout',
+    'headed',
+    'manualCheckpoint',
+    'originAllowlist',
+    'storageState',
+    'artifactRoot'
+  ], []);
+  if (!required.ok) {
+    return required;
+  }
+  if (!args.url && !args.storageState) {
+    return { ok: false, message: 'browser_debug_session_start requires url or storageState.' };
+  }
+  if (args.url) {
+    const url = validateMcpUrl(args.url);
+    if (!url.ok) {
+      return url;
+    }
+  }
+  if (args.manualCheckpoint && args.headed !== true) {
+    return { ok: false, message: 'manualCheckpoint requires headed: true.' };
+  }
+  return { ok: true };
+}
+
+function validateSessionActionArgs(args = {}) {
+  const required = validateSessionCommonArgs(args, ['session', 'action', 'screenshot', 'timeout', 'artifactRoot'], ['session']);
+  if (!required.ok) {
+    return required;
+  }
+  const action = validateMcpAction(args.action);
+  if (!action.ok) {
+    return action;
+  }
+  return { ok: true };
+}
+
+function validateSessionCheckpointArgs(args = {}) {
+  const required = validateSessionCommonArgs(args, [
+    'session',
+    'name',
+    'untilUrl',
+    'untilSelector',
+    'exportStorageState',
+    'timeout',
+    'artifactRoot'
+  ], ['session', 'name']);
+  if (!required.ok) {
+    return required;
+  }
+  if (args.exportStorageState !== undefined && args.exportStorageState !== true && args.exportStorageState !== false) {
+    return { ok: false, message: 'exportStorageState must be a boolean.' };
+  }
+  return { ok: true };
+}
+
+function validateSessionCommonArgs(args = {}, allowedKeys, requiredKeys) {
+  const required = validateExactRequiredStrings(args, allowedKeys, requiredKeys);
+  if (!required.ok) {
+    return required;
+  }
+  for (const key of ['screenshot', 'trace', 'report', 'headed', 'exportStorageState']) {
+    if (args[key] !== undefined && typeof args[key] !== 'boolean') {
+      return { ok: false, message: `${key} must be a boolean.` };
+    }
+  }
+  return { ok: true };
+}
+
+function validateMcpActionArray(value, maxItems) {
+  if (!Array.isArray(value)) {
+    return { ok: false, message: 'actions must be an array.' };
+  }
+  if (value.length > maxItems) {
+    return { ok: false, message: `actions must contain at most ${maxItems} items.` };
+  }
+  for (const action of value) {
+    const result = validateMcpAction(action);
+    if (!result.ok) {
+      return result;
+    }
+  }
+  return { ok: true };
+}
+
+function validateMcpAction(action) {
+  if (!action || typeof action !== 'object' || Array.isArray(action)) {
+    return { ok: false, message: 'action must be an object.' };
+  }
+  const supported = new Set(['click', 'fill', 'select', 'press', 'scroll', 'wait', 'observe', 'screenshot', 'navigate']);
+  if (!supported.has(action.type)) {
+    return { ok: false, message: `Unsupported action type: ${action.type}` };
+  }
+  if (action.type === 'navigate') {
+    return validateMcpUrl(action.url);
+  }
+  return { ok: true };
+}
+
+function validateMcpUrl(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return { ok: false, message: 'A non-empty URL is required.' };
+  }
+  try {
+    const url = new URL(value);
+    if (!['http:', 'https:', 'file:'].includes(url.protocol)) {
+      return { ok: false, message: `Unsupported URL protocol: ${url.protocol}` };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, message: 'URL must be absolute.' };
+  }
+}
+
+function sessionStartCliArgs(args) {
+  const output = ['session', 'start'];
+  if (args.url !== undefined) {
+    output.push('--url', String(args.url));
+  }
+  if (args.ttl !== undefined) {
+    output.push('--ttl', String(args.ttl));
+  }
+  if (args.idleTimeout !== undefined) {
+    output.push('--idle-timeout', String(args.idleTimeout));
+  }
+  if (args.timeout !== undefined) {
+    output.push('--timeout', String(args.timeout));
+  }
+  if (args.headed === true) {
+    output.push('--headed');
+  }
+  if (args.manualCheckpoint !== undefined) {
+    output.push('--manual-checkpoint', String(args.manualCheckpoint));
+  }
+  if (args.originAllowlist !== undefined) {
+    output.push('--origin-allowlist', String(args.originAllowlist));
+  }
+  if (args.storageState !== undefined) {
+    output.push('--storage-state', String(args.storageState));
+  }
+  if (args.artifactRoot !== undefined) {
+    output.push('--artifact-root', String(args.artifactRoot));
+  }
+  output.push('--json');
+  return output;
+}
+
+function sessionCheckpointCliArgs(args) {
+  const output = ['session', 'checkpoint', '--session', args.session, '--name', args.name];
+  if (args.untilUrl !== undefined) {
+    output.push('--until-url', String(args.untilUrl));
+  }
+  if (args.untilSelector !== undefined) {
+    output.push('--until-selector', String(args.untilSelector));
+  }
+  if (args.exportStorageState === true) {
+    output.push('--export-storage-state');
+  }
+  if (args.timeout !== undefined) {
+    output.push('--timeout', String(args.timeout));
+  }
+  if (args.artifactRoot !== undefined) {
+    output.push('--artifact-root', String(args.artifactRoot));
+  }
+  output.push('--json');
+  return output;
 }

@@ -115,10 +115,15 @@ import { mcpProfileMetadata } from './mcp-profiles.js';
 import { mcpServerInfo } from './mcp.js';
 import {
   buildReport,
+  checkpointSession,
   closeSession,
   exportSpec,
+  observeSession,
+  reviewSession,
   runSessionAction,
-  startSession
+  startSession,
+  statusSession,
+  stopSession
 } from './sessions.js';
 
 export async function runCli(argv, context = {}) {
@@ -553,8 +558,32 @@ export async function executeCli(argv, context = {}) {
       return runtimeResult(parsed.command, await startSession(parsed.options, context), parsed.json, now);
     }
 
+    if (parsed.command === 'session status') {
+      return runtimeResult(parsed.command, await statusSession(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'session stop') {
+      return runtimeResult(parsed.command, await stopSession(parsed.options, context), parsed.json, now);
+    }
+
     if (parsed.command === 'session close') {
       return runtimeResult(parsed.command, await closeSession(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'session act') {
+      return runtimeResult(parsed.command, await runSessionAction(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'session observe') {
+      return runtimeResult(parsed.command, await observeSession(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'session checkpoint') {
+      return runtimeResult(parsed.command, await checkpointSession(parsed.options, context), parsed.json, now);
+    }
+
+    if (parsed.command === 'session review') {
+      return runtimeResult(parsed.command, await reviewSession(parsed.options, context), parsed.json, now);
     }
 
     if (parsed.command === 'act') {
@@ -1121,8 +1150,19 @@ function usageText(topic) {
     ].join('\n');
   }
 
-  if (topic === 'session start') {
-    return `Usage: ${CLI_NAME} session start [--url <url>] [--json]`;
+  if (topic === 'session' || topic === 'session start') {
+    return [
+      `Usage: ${CLI_NAME} session start --url <url> [--ttl 30m] [--idle-timeout 10m] [--json]`,
+      `       ${CLI_NAME} session start --url <login-url> --headed --manual-checkpoint login [--ttl 30m] [--json]`,
+      `       ${CLI_NAME} session status --session <id> [--json]`,
+      `       ${CLI_NAME} session act --session <id> --action <json> [--json]`,
+      `       ${CLI_NAME} session observe --session <id> [--screenshot] [--json]`,
+      `       ${CLI_NAME} session checkpoint --session <id> --name <name> [--until-url <pattern>] [--until-selector <selector>] [--export-storage-state] [--json]`,
+      `       ${CLI_NAME} session review --session <id> [--screenshot] [--report] [--json]`,
+      `       ${CLI_NAME} session stop --session <id> [--json]`,
+      '',
+      'Persistent sessions require TTL/idle lifecycle guards, stay local, and do not automate OAuth or print cookie/token values.'
+    ].join('\n');
   }
 
   return [
@@ -1140,7 +1180,13 @@ function usageText(topic) {
     '  resource artifacts cleanup --dry-run --json',
     '  target init --url <url> --json',
     '  target validate --target <manifest> --json',
-    '  session start [--url <url>]',
+    '  session start --url <url> [--ttl 30m]',
+    '  session status --session <id>',
+    '  session act --session <id> --action <json>',
+    '  session observe --session <id> --screenshot',
+    '  session checkpoint --session <id> --name <name>',
+    '  session review --session <id> --screenshot --report',
+    '  session stop --session <id>',
     '  session close --session <id>',
     '  act --session <id> --action <json>',
     '  report --session <id>',

@@ -9,6 +9,20 @@
 
 ## Phase Plan
 
+### Persistent Browser Session Slices 0-8
+
+Purpose: provide a generic, local, bounded persistent browser session workflow for manual-login handoff and retained-page review without relying on existing browser profiles, OAuth automation, target-specific branches, remote control channels, or protocol-only instructions.
+
+Implemented scope: define the safe/full/admin boundary contract; expose bounded process-scoped `supervise` through full MCP only; add persistent `session start/status/stop/act/observe/checkpoint/review` commands backed by a detached local worker, local artifact-root command queue, TTL and idle-timeout guards, origin allowlists, metadata receipts, and reliable stop cleanup; keep legacy session metadata, `act`, `report`, and `spec export` behavior compatible; support manual-login checkpoints with headed browser state and bounded completion checks; hand the retained page state to local review artifacts; support explicit storageState import/export only under the configured artifact auth directory; expose session tools through stdio `admin` MCP only; add schema registry coverage for session actions and persistent session metadata; update CLI/API/MCP docs; and add parser, MCP capability, architecture, redaction, no-browser, and browser-smoke coverage.
+
+Non-scope: existing browser profile reuse, `launchPersistentContext`, `userDataDir`, OAuth automation, password automation, credential storage, default storageState persistence, cookie or token value printing, external upload, HTTP persistent session tools, safe/full persistent session tools, socket or remote listeners, arbitrary JavaScript execution, arbitrary shell execution, target-specific login logic, parent-repository changes, consumer-repository changes, dependency additions, package publication, or release-gate mutation.
+
+Implementation order: Slice 0 fixed the boundary contract, schema direction, and MCP profile policy. Slice 1 exposed bounded process-scoped supervise through full MCP while keeping safe MCP excluded. Slice 2 added the persistent session worker and manager. Slice 3 added retained-page act and observe. Slice 4 added manual checkpoint completion evidence. Slice 5 added local review handoff from the retained page. Slice 6 added explicit storageState admin opt-in. Slice 7 added admin-only MCP session tools. Slice 8 synchronized docs, schemas, tests, and release/security verification.
+
+Verification: run JavaScript syntax checks for the changed runtime modules, focused no-browser tests for session parsing, storageState confinement, MCP profile gating, and architecture boundaries, full `npm test`, browser smoke coverage because browser runtime behavior changed, product docs/security/structure checks, package smoke checks, product gate, and `git diff --check`. Browser smoke can be skipped only when the local environment cannot launch Chromium, and that skip must be reported explicitly.
+
+Recovery: this slice is additive and local. Existing one-shot observe, review, legacy session metadata, process-scoped supervise, daemon, resource guard, artifact cleanup, agent advisory, agent execution, Agentic Human Review, visual review, capture readiness, localization, operation policy, safe HTTP MCP, release readiness, artifact-root policy, alias compatibility, deterministic findings, and release gates remain compatible. Rollback is a standard Git revert of the persistent session manager, worker, parser/API/MCP/schema/docs/tests additions; no artifact migration, publication, credential persistence, raw response persistence, release-gate change, or non-admin MCP permission expansion is involved.
+
 ### Agentic Human Review Staged Placeholder Repair Context
 
 Purpose: make staged `xhigh` real-provider dogfood recover when a provider returns a role entry that is structurally present but semantically placeholder-only. The slice is generic across target URLs, repositories, providers, models, benchmark cases, and artifact layouts by deriving all repair metadata from the active staged execution contract and role output shape.
@@ -643,7 +657,7 @@ Current status: completed for local deterministic review, target manifests, rout
 - Completed: reused the same CLI/core contracts used by local commands.
 - Completed: exposed a narrow allowlist of tools for doctor, observe, review, and schema operations.
 - Completed: kept the adapter local and stdio-only.
-- Completed: did not add HTTP listeners, socket listeners, remote control channels, arbitrary shell tools, cleanup execution tools, existing profile reuse, storage-state persistence, OAuth, external upload, or credential handling.
+- Completed: did not add HTTP listeners, socket listeners, remote control channels, arbitrary shell tools, cleanup execution tools, existing profile reuse, unapproved storage-state persistence, OAuth, external upload, or credential handling.
 - Completed: added adapter tests that verify tool allowlists and schema-compatible output.
 
 #### Phase 7h: Model or Vision Review Layer
@@ -896,7 +910,7 @@ Phase 14 adds a local content UX advisory layer for the gap identified during do
 - Completed: Markdown target reports include a bounded Content UX Advisory section when advisory output exists.
 - Completed: no-browser tests cover schema parity, manifest normalization, source-value non-disclosure, and pure advisory behavior.
 - Completed: browser smoke tests verify opt-in advisory output and prove the enabled advisory does not alter existing findings, metrics, action plans, or release readiness.
-- Completed: architecture tests cover the pure advisory module and continue to block target-specific literals, browser profile reuse, storage-state persistence, external listeners, arbitrary shell execution, unapproved uploads, and cleanup outside the configured artifact root.
+- Completed: architecture tests cover the pure advisory module and continue to block target-specific literals, browser profile reuse, unapproved storage-state persistence outside the explicit artifact-auth opt-in, external listeners, arbitrary shell execution, unapproved uploads, and cleanup outside the configured artifact root.
 
 ### Phase 15: Content UX Heuristic Strengthening
 
@@ -969,7 +983,7 @@ Phase 16 completes the six-step local implementation path for turning content UX
 
 - Completed: no-browser tests cover dedicated content UX findings/action/readiness generation, advisory status, source-value non-disclosure, and unchanged advisory-only gates.
 - Completed: browser smoke tests cover opt-in top-level `content_ux_*` output, disabled-output absence, Markdown handoff output, and unchanged review findings, metrics, existing action plans, and release readiness.
-- Completed: architecture tests continue to guard against target-specific runtime literals, profile reuse, storage-state persistence, external listeners, arbitrary shell execution, unapproved upload paths, cleanup outside the configured artifact root, filesystem reads in the advisory helper, and model/API review.
+- Completed: architecture tests continue to guard against target-specific runtime literals, profile reuse, unapproved storage-state persistence outside the explicit artifact-auth opt-in, external listeners, arbitrary shell execution, unapproved upload paths, cleanup outside the configured artifact root, filesystem reads in the advisory helper, and model/API review.
 
 ### Phase 17: Practical Content UX Handoff
 
@@ -1303,7 +1317,7 @@ Phase 31 turns the local stdio MCP adapter from one fixed allowlist into a launc
 - Completed: documented three MCP profiles: `safe`, `full`, and `admin`.
 - Completed: kept no-profile `browser-debug-mcp` and `.mcp.json` behavior compatible with the current adapter by resolving to the `full` profile.
 - Completed: recommended `safe` for low-trust or discovery-only MCP clients because it exposes no-browser/no-delete/no-provider tools only.
-- Completed: defined `admin` as an explicit reserved local-maintenance profile for this phase, without exposing cleanup execution, provider execution, daemon/session control, shell, HTTP/socket listeners, or arbitrary process control.
+- Completed: defined `admin` as an explicit reserved local-maintenance profile for that phase, without exposing cleanup execution, provider execution, daemon/session control, shell, HTTP/socket listeners, or arbitrary process control. Later persistent-session work exposes only the approved stdio `admin` session tools and keeps safe/full/HTTP persistent session control excluded.
 - Completed: recorded that profile selection happens at server launch or trusted adapter context, not per MCP request.
 
 #### Phase 31b: Reusable MCP Profile Registry
@@ -1360,13 +1374,13 @@ Phase 32 prepared the package, plugin, MCP, and test surfaces for a future repos
 
 ### Phase 33: MCP Read-Only Agent Status Surface
 
-Phase 33 expands the local stdio MCP adapter with read-only local advisory/status tools that already exist in the CLI. It keeps `safe` no-browser, no-delete, no-provider, no-shell, and no-external-listener. It does not expose agent execution run, provider/API execution, artifact cleanup execution, workflow creation, package generation, ingest, report writing, daemon/session control, HTTP/socket transport, external upload, credential handling, or arbitrary process control.
+Phase 33 expands the local stdio MCP adapter with read-only local advisory/status tools that already exist in the CLI. It keeps `safe` no-browser, no-delete, no-provider, no-shell, and no-external-listener. It does not expose agent execution run, provider/API execution, artifact cleanup execution, workflow creation, package generation, ingest, report writing, daemon/session control, HTTP/socket transport, external upload, credential handling, or arbitrary process control in that phase. Later persistent-session work keeps safe/full/HTTP session control excluded and exposes only the approved stdio `admin` session tools.
 
 #### Phase 33a: Scope and Boundary Documentation
 
 - Completed: documented that MCP can read local agent surfaces, request status/detail, workflow status/index, and execution status/list through the same CLI/core contracts.
 - Completed: kept write-producing advisory commands such as package generation, ingest, reports, workflow creation, and execution planning out of the MCP read-only slice.
-- Completed: kept `agent execution run`, cleanup execution, provider/API execution, shell tools, daemon/session control, and HTTP/socket transport out of every MCP profile.
+- Completed: kept `agent execution run`, cleanup execution, provider/API execution, shell tools, daemon/session control, and HTTP/socket transport out of every MCP profile for that phase. Later slices expose only approved stdio `admin` agent execution and persistent session tools.
 
 #### Phase 33b: Reusable MCP Tool Mapping
 
@@ -1387,7 +1401,7 @@ Phase 33 expands the local stdio MCP adapter with read-only local advisory/statu
 
 ### Phase 34: Safe HTTP MCP Foundation and Integration Docs
 
-Phase 34 adds a minimal HTTP MCP transport as a safe foundation for MCP clients that cannot use stdio. It preserves CLI-first behavior, packaged `.mcp.json` compatibility, existing stdio profile behavior, and every existing no-browser/browser/review/package contract. It does not add HTTP `full` or `admin`, socket transport, remote listeners, shell tools, cleanup execution, provider/API execution, `agent execution run`, package generation, ingest, report writing, workflow creation, execution planning, daemon/session control, external upload, profile reuse, credential storage, or marketplace mutation through MCP.
+Phase 34 adds a minimal HTTP MCP transport as a safe foundation for MCP clients that cannot use stdio. It preserves CLI-first behavior, packaged `.mcp.json` compatibility, existing stdio profile behavior, and every existing no-browser/browser/review/package contract. It does not add HTTP `full` or `admin`, socket transport, remote listeners, shell tools, cleanup execution, provider/API execution, `agent execution run`, package generation, ingest, report writing, workflow creation, execution planning, persistent session control, external upload, profile reuse, credential storage, or marketplace mutation through MCP.
 
 #### Phase 34a: Transport Policy Module
 
@@ -1448,7 +1462,7 @@ Phase 36 implements a read-only MCP capability policy report so users and agents
 
 - Completed: added `src/mcp-capabilities.js` as a pure no-side-effect report builder over the existing MCP profile, transport, and product identity contracts.
 - Completed: added `browser-debug mcp capabilities --json` with `--profile safe|full|admin|all` and `--scope all|profiles|excluded` filtering.
-- Completed: recorded explicit excluded operations for cleanup execution, package/ingest/report writing, workflow creation/report writing, daemon/session control, arbitrary shell, socket transport, remote HTTP listeners, and HTTP `full` or `admin`, while Phase 74-76 later exposes agent execution plan/run through stdio admin only.
+- Completed: recorded explicit excluded operations for cleanup execution, package/ingest/report writing, workflow creation/report writing, non-approved daemon/session control, arbitrary shell, socket transport, remote HTTP listeners, and HTTP `full` or `admin`, while later approved slices expose agent execution plan/run and persistent session tools through stdio admin only.
 - Completed: recorded the original `admin` equivalence boundary. Phase 74-76 later makes `admin` distinct from `full` only for the approved agent execution plan/run tools.
 
 #### Phase 36b: MCP, API, and Package Reuse
@@ -1460,7 +1474,7 @@ Phase 36 implements a read-only MCP capability policy report so users and agents
 #### Phase 36c: Documentation and Boundaries
 
 - Completed: synchronized requirements, specification, implementation plan, security, verification, release, README, plugin skill, manifests, task tracker, handoff, AGENTS, changelog, and session memory with the read-only capability policy boundary.
-- Completed: kept cleanup execution, shell tools, daemon/session control, credential handling, HTTP `full` or `admin`, socket transport, remote listeners, and then-unapproved provider/API or `agent execution run` surfaces out of MCP; the later Slice 5 section records the approved stdio `admin` agent execution bridge.
+- Completed: kept cleanup execution, shell tools, non-approved daemon/session control, credential handling, HTTP `full` or `admin`, socket transport, remote listeners, and then-unapproved provider/API or `agent execution run` surfaces out of MCP; later sections record the approved stdio `admin` agent execution bridge and persistent session tools.
 
 #### Phase 36 Verification Plan
 
@@ -1575,7 +1589,7 @@ Phase 39 records the external-repository dogfood lesson that Browser Debug CLI c
 - Phase 34 checks cover HTTP MCP safe transport policy, loopback bind enforcement, bearer-token enforcement, Host and Origin validation, body-size limits, safe-profile-only tools, CLI metadata, packed-install API exports, and architecture/security isolation for the approved listener module.
 - Phase 35/38 checks cover token-free MCP client configuration output, installed-bin and local-checkout stdio and safe HTTP client setup metadata, safe-profile defaulting, HTTP full/admin rejection, packed-install HTTP MCP initialize smoke coverage, and unchanged non-exposure of execution, cleanup, provider/API, shell, socket, remote HTTP, and credential-bearing tools.
 - Phase 39 checks cover packaged consumer runtime-readiness guidance, frontend-only dev-server/API prerequisite wording, and continued absence of consumer-specific product names or local user paths.
-- Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, storage-state persistence, unapproved external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
+- Security checks should be extended to guard against `launchPersistentContext`, `userDataDir`, unapproved storage-state persistence outside the explicit artifact-auth opt-in, unapproved external listener creation, arbitrary shell execution, unapproved upload paths, host cache/swap mutation, and cleanup outside the configured artifact root.
 
 ## Recovery Path
 
@@ -1599,7 +1613,7 @@ Phase 39 records the external-repository dogfood lesson that Browser Debug CLI c
 - Ask before model/API review integration outside the Phase 29 agent execution adapter boundary or any evidence transfer beyond the bounded package/prompt disclosure policy.
 - Ask before extending the generic API-provider boundary beyond Phase 29 dry-run planning, explicit `--execute`, env-only credentials, local receipts, bounded disclosure, advisory-only normalization, and no raw provider response storage.
 - Ask before adding provider SDKs, storing provider credentials, or exposing agent/API execution through MCP.
-- Ask before socket MCP server mode, remote HTTP MCP listeners, HTTP `full` or `admin` MCP profiles, remote control channels, persistent session storage, existing-browser-profile reuse, or authentication automation.
+- Ask before socket MCP server mode, remote HTTP MCP listeners, HTTP `full` or `admin` MCP profiles, remote control channels, storageState persistence outside the approved explicit artifact-auth opt-in, existing-browser-profile reuse, or authentication automation.
 - Ask before public API stabilization, npm package file-set changes intended for publication, package naming, license changes, or packed release promotion.
 
 ## Phase 41 Visual Evidence Core

@@ -36,6 +36,8 @@ test('runtime and tests avoid caller-specific implementation literals', async ()
     'src/content-ux-advisory.js',
     'src/daemon.js',
     'src/daemon-worker.js',
+    'src/browser-session-manager.js',
+    'src/browser-session-worker.js',
     'src/durations.js',
     'src/observe.js',
     'src/page-evidence.js',
@@ -155,9 +157,11 @@ test('review platform keeps local-first and manifest-driven boundaries', async (
   const mcpProfiles = await readText('src/mcp-profiles.js');
   const target = await readText('src/target.js');
   const combined = `${review}\n${contentUxAdvisory}\n${mcp}\n${mcpCapabilities}\n${mcpProfiles}\n${target}`;
+  const deterministicReviewBoundary = `${review}\n${contentUxAdvisory}\n${mcp}\n${target}`;
 
   assert.doesNotMatch(combined, /127\.0\.0\.1:517[34]|Control Center|FrameCue|ai-driven-development-lesson/);
-  assert.doesNotMatch(combined, /launchPersistentContext|userDataDir|storageState/);
+  assert.doesNotMatch(deterministicReviewBoundary, /launchPersistentContext|userDataDir|storageState/);
+  assert.doesNotMatch(combined, /launchPersistentContext|userDataDir/);
   assert.doesNotMatch(combined, /createServer|listen\(|WebSocket|EventSource/);
   assert.doesNotMatch(combined, /node:child_process|child_process|execFile|spawn\(/);
   assert.match(review, /normalizeTargetManifest/);
@@ -167,6 +171,29 @@ test('review platform keeps local-first and manifest-driven boundaries', async (
   assert.match(target, /createTargetManifest/);
   assert.match(mcp, /tools\/list/);
   assert.match(mcp, /tools\/call/);
+});
+
+test('persistent session implementation keeps admin-only local boundaries', async () => {
+  const manager = await readText('src/browser-session-manager.js');
+  const worker = await readText('src/browser-session-worker.js');
+  const sessions = await readText('src/sessions.js');
+  const mcpProfiles = await readText('src/mcp-profiles.js');
+  const combined = `${manager}\n${worker}\n${sessions}\n${mcpProfiles}`;
+
+  assert.match(manager, /local_file_command_queue/);
+  assert.match(worker, /browser\.newContext/);
+  assert.match(worker, /storageState/);
+  assert.match(worker, /manual_checkpoint/);
+  assert.match(worker, /external_upload:\s*false/);
+  assert.match(worker, /credential_values_recorded:\s*false/);
+  assert.match(worker, /cookie_values_recorded:\s*false/);
+  assert.match(mcpProfiles, /browser_debug_session_start/);
+  assert.match(mcpProfiles, /browser_debug_session_checkpoint/);
+  assert.match(mcpProfiles, /minimumProfile:\s*'admin'/);
+  assert.match(sessions, /requiresPersistentSession/);
+  assert.doesNotMatch(combined, /launchPersistentContext|userDataDir/);
+  assert.doesNotMatch(combined, /from 'node:http'|from 'node:https'|createServer|\.listen\(|WebSocket|EventSource/);
+  assert.doesNotMatch(combined, /OAuth|oauth_automation:\s*true|external_upload:\s*true|credential_values_recorded:\s*true|cookie_values_recorded:\s*true/);
 });
 
 test('resource status preflight stays read-only and local', async () => {

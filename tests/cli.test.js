@@ -956,6 +956,90 @@ test('parser keeps the planned session command surface explicit', () => {
   assert.equal(parsed.command, 'session close');
   assert.equal(parsed.json, true);
   assert.equal(parsed.options.session, 'abc123');
+
+  const started = parseCliArgs([
+    'session',
+    'start',
+    '--url',
+    'https://example.test/login',
+    '--ttl',
+    '30m',
+    '--idle-timeout',
+    '10m',
+    '--origin-allowlist',
+    'https://example.test',
+    '--headed',
+    '--manual-checkpoint',
+    'login',
+    '--json'
+  ]);
+  assert.equal(started.ok, true);
+  assert.equal(started.command, 'session start');
+  assert.equal(started.options.ttl, '30m');
+  assert.equal(started.options['idle-timeout'], '10m');
+  assert.equal(started.options['manual-checkpoint'], 'login');
+
+  const storageStateImport = parseCliArgs([
+    'session',
+    'start',
+    '--storage-state',
+    '.browser-debug/auth/session.json',
+    '--origin-allowlist',
+    'https://example.test',
+    '--json'
+  ]);
+  assert.equal(storageStateImport.ok, true);
+  assert.equal(storageStateImport.options['storage-state'], '.browser-debug/auth/session.json');
+
+  const manualCheckpointWithoutHeaded = parseCliArgs([
+    'session',
+    'start',
+    '--url',
+    'https://example.test/login',
+    '--manual-checkpoint',
+    'login',
+    '--json'
+  ]);
+  assert.equal(manualCheckpointWithoutHeaded.ok, false);
+  assert.equal(manualCheckpointWithoutHeaded.error.code, 'MANUAL_CHECKPOINT_REQUIRES_HEADED');
+
+  const acted = parseCliArgs([
+    'session',
+    'act',
+    '--session',
+    'abc123',
+    '--action',
+    '{"type":"click","selector":"#save"}',
+    '--json'
+  ]);
+  assert.equal(acted.ok, true);
+  assert.equal(acted.command, 'session act');
+
+  const observed = parseCliArgs(['session', 'observe', '--session', 'abc123', '--screenshot', '--json']);
+  assert.equal(observed.ok, true);
+  assert.equal(observed.command, 'session observe');
+
+  const checkpointed = parseCliArgs([
+    'session',
+    'checkpoint',
+    '--session',
+    'abc123',
+    '--name',
+    'logged-in',
+    '--until-url',
+    '*/dashboard',
+    '--until-selector',
+    '[data-testid=dashboard]',
+    '--export-storage-state',
+    '--json'
+  ]);
+  assert.equal(checkpointed.ok, true);
+  assert.equal(checkpointed.command, 'session checkpoint');
+  assert.equal(checkpointed.options['export-storage-state'], true);
+
+  const reviewed = parseCliArgs(['session', 'review', '--session', 'abc123', '--screenshot', '--report', '--json']);
+  assert.equal(reviewed.ok, true);
+  assert.equal(reviewed.command, 'session review');
 });
 
 test('supervise parses actions and returns a deterministic JSON envelope', async () => {
@@ -2107,7 +2191,9 @@ test('schema commands expose machine-readable contracts', async () => {
     ['agentic_human_review_advisory', '../schemas/agentic-human-review-advisory.schema.json'],
     ['agentic_human_review_receipt', '../schemas/agentic-human-review-receipt.schema.json'],
     ['agent_advisory_result', '../schemas/agent-advisory-result.schema.json'],
-    ['agent_disclosure_policy', '../schemas/agent-disclosure-policy.schema.json']
+    ['agent_disclosure_policy', '../schemas/agent-disclosure-policy.schema.json'],
+    ['session_action', '../schemas/session-action.schema.json'],
+    ['persistent_session', '../schemas/persistent-session.schema.json']
   ];
   for (const [name, file] of agentSchemaPairs) {
     const schemaFile = JSON.parse(await readFile(new URL(file, import.meta.url), 'utf8'));
@@ -10596,8 +10682,43 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_admin_readiness'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_operation_provider_readiness'), true);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_review_target'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_supervise'), true);
+  assert.equal(listed.result.tools.some((tool) => tool.name.startsWith('browser_debug_session_')), false);
   assert.equal(listed.result.tools.some((tool) => /agentic.*review|human_review|agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_aggregate|desktop_review_provider|capture_handoff|raw_pixel|page_text|shell_run|shell_execute/i.test(tool.name)), false);
   assert.equal(listed.result.tools.every((tool) => tool.effects.shellUsed === false), true);
+
+  const mcpSupervise = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_supervise',
+      arguments: {
+        url: 'https://example.test/',
+        actions: [{ type: 'observe' }],
+        screenshot: true
+      }
+    }
+  }, {
+    now: fixedNow,
+    supervisorRunner: async (options) => ({
+      status: 'ok',
+      data: {
+        supervision: {
+          id: 'mcp-supervision-fixed',
+          current_url: options.url,
+          action_history: JSON.parse(options.actions)
+        },
+        final_observation: { title: 'MCP Supervision Fixture' }
+      },
+      warnings: [],
+      errors: [],
+      artifacts: [{ type: 'supervision', path: '.browser-debug/sessions/mcp-supervision-fixed.json' }]
+    })
+  });
+  assert.equal(mcpSupervise.result.structuredContent.command, 'supervise');
+  assert.equal(mcpSupervise.result.structuredContent.data.supervision.id, 'mcp-supervision-fixed');
+  assert.equal(mcpSupervise.result.structuredContent.data.supervision.action_history[0].type, 'observe');
 
   const safeListed = await handleMcpRequest({ jsonrpc: '2.0', id: 11, method: 'tools/list' }, { mcpProfile: 'safe' });
   const safeToolNames = safeListed.result.tools.map((tool) => tool.name);
@@ -10631,8 +10752,10 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(safeToolNames.includes('browser_debug_operation_provider_readiness'), true);
   assert.equal(safeToolNames.includes('browser_debug_review'), false);
   assert.equal(safeToolNames.includes('browser_debug_observe'), false);
+  assert.equal(safeToolNames.includes('browser_debug_supervise'), false);
   assert.equal(safeToolNames.includes('browser_debug_target_init'), false);
   assert.equal(safeToolNames.includes('browser_debug_review_target'), false);
+  assert.equal(safeToolNames.some((name) => name.startsWith('browser_debug_session_')), false);
   assert.equal(safeToolNames.some((name) => /agentic.*review|human_review|agent_execution_plan|agent_execution_run|cleanup_execute|provider_execute|visual_review_prepare|visual_review_plan|visual_review_run|visual_review_aggregate|desktop_review_provider|capture_handoff|raw_pixel|page_text|shell_run|shell_execute/i.test(name)), false);
   assert.equal(safeListed.result.tools.every((tool) => tool.effects.browserLaunched === false), true);
   assert.equal(safeListed.result.tools.every((tool) => tool.effects.deletesFiles === false), true);
@@ -10656,12 +10779,78 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   const adminToolNames = adminListed.result.tools.map((tool) => tool.name);
   assert.equal(adminToolNames.includes('browser_debug_agent_execution_plan'), true);
   assert.equal(adminToolNames.includes('browser_debug_agent_execution_run'), true);
+  assert.equal(adminToolNames.includes('browser_debug_session_start'), true);
+  assert.equal(adminToolNames.includes('browser_debug_session_status'), true);
+  assert.equal(adminToolNames.includes('browser_debug_session_stop'), true);
+  assert.equal(adminToolNames.includes('browser_debug_session_act'), true);
+  assert.equal(adminToolNames.includes('browser_debug_session_observe'), true);
+  assert.equal(adminToolNames.includes('browser_debug_session_checkpoint'), true);
+  assert.equal(adminToolNames.includes('browser_debug_session_review'), true);
   assert.equal(adminToolNames.some((name) => /agentic.*review|human_review|raw_pixel|page_text/i.test(name)), false);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_agent_execution_plan'), false);
   assert.equal(listed.result.tools.some((tool) => tool.name === 'browser_debug_agent_execution_run'), false);
   assert.equal(adminListed.result.tools.find((tool) => tool.name === 'browser_debug_agent_execution_run').effects.providerCall, true);
   assert.equal(adminListed.result.tools.find((tool) => tool.name === 'browser_debug_agent_execution_run').effects.writesArtifacts, true);
+  assert.equal(adminListed.result.tools.find((tool) => tool.name === 'browser_debug_session_start').effects.browserLaunched, true);
   assert.equal(adminListed.result.tools.every((tool) => tool.effects.deletesFiles === false), true);
+
+  const mcpSessionCwd = await mkdtemp(path.join(tmpdir(), 'trace-cue-mcp-session-'));
+  await mkdir(path.join(mcpSessionCwd, '.browser-debug', 'sessions'), { recursive: true });
+  await writeFile(path.join(mcpSessionCwd, '.browser-debug', 'sessions', 'session-admin.json'), JSON.stringify({
+    schema_version: '0.1.0',
+    id: 'session-admin',
+    status: 'running',
+    process_status: 'alive',
+    pid: process.pid,
+    mode: 'persistent_browser_session',
+    created_at: fixedNow,
+    updated_at: fixedNow,
+    artifact_root: '.browser-debug',
+    current_url: 'https://example.test/',
+    browser: {
+      engine: 'chromium',
+      headless: true,
+      devtools: false,
+      retained_context: true,
+      ephemeral_context: true,
+      existing_profile_reused: false,
+      persistent_storage: false
+    },
+    lifecycle: {
+      ttl_ms: 60000,
+      idle_timeout_ms: 30000,
+      command_timeout_ms: 10000,
+      started_at: fixedNow,
+      last_activity_at: fixedNow,
+      expires_at: fixedNow,
+      stop_reason: null
+    },
+    security: {
+      origin_allowlist: ['https://example.test'],
+      manual_checkpoint: null,
+      arbitrary_javascript: false,
+      oauth_automation: false,
+      external_upload: false,
+      credential_values_recorded: false,
+      cookie_values_recorded: false
+    },
+    observations: [],
+    action_history: [],
+    checkpoints: [],
+    storage_state: { imported: false, exported: false, values_recorded: false },
+    artifact: '.browser-debug/sessions/session-admin.json'
+  }, null, 2), 'utf8');
+  const mcpSessionStatus = await handleMcpRequest({
+    jsonrpc: '2.0',
+    id: 17,
+    method: 'tools/call',
+    params: {
+      name: 'browser_debug_session_status',
+      arguments: { session: 'session-admin' }
+    }
+  }, { mcpProfile: 'admin', cwd: mcpSessionCwd, now: fixedNow });
+  assert.equal(mcpSessionStatus.result.structuredContent.command, 'session status');
+  assert.equal(mcpSessionStatus.result.structuredContent.data.session.id, 'session-admin');
 
   const invalidProfile = await handleMcpRequest({ jsonrpc: '2.0', id: 13, method: 'tools/list' }, { mcpProfile: 'wide-open' });
   assert.equal(invalidProfile.error.code, -32602);
@@ -10746,6 +10935,9 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.write_execute_tools_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.cleanup_plan_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.cleanup_execution_exposed, false);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.bounded_supervise_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.persistent_session_control_exposed, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.storage_state_opt_in_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agent_execution_plan_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agent_execution_run_exposed, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.agentic_human_review_propose_exposed, false);
@@ -10760,6 +10952,9 @@ test('MCP adapter exposes a local allowlisted tool surface', async () => {
   assert.equal(mcpCapabilitiesBody.data.capabilities.admin_policy.shell_tools_exposed, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.cleanup_execution, false);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.cleanup_plan, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.bounded_supervise, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.persistent_session_control, true);
+  assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.storage_state_opt_in, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agent_execution_plan, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agent_execution_run, true);
   assert.equal(mcpCapabilitiesBody.data.capabilities.boundaries.agentic_human_review_propose, false);
@@ -11271,6 +11466,25 @@ test('daemon commands parse and return deterministic JSON envelopes', async () =
   assert.equal(JSON.parse(stopped.stdout).data.daemon.status, 'stopped');
 });
 
+test('persistent session storageState import stays confined to the auth artifact directory', async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), `${filesystemSafeName(PRODUCT_IDENTITY.packageName)}-storage-state-`));
+  await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
+
+  const outsideAuth = await executeCli([
+    'session',
+    'start',
+    '--storage-state',
+    'auth-state.json',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(outsideAuth.exitCode, 1);
+  const body = JSON.parse(outsideAuth.stdout);
+  assert.equal(body.command, 'session start');
+  assert.equal(body.errors[0].code, 'SESSION_ARTIFACT_ROOT_INVALID');
+  assert.equal(outsideAuth.stdout.includes('cookie'), false);
+  assert.equal(outsideAuth.stdout.includes('token'), false);
+});
+
 test('session start, act, report, and spec export use local artifacts', async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), `${filesystemSafeName(PRODUCT_IDENTITY.packageName)}-session-`));
   await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
@@ -11319,6 +11533,16 @@ test('session start, act, report, and spec export use local artifacts', async ()
   assert.equal(actedFromInput.exitCode, 0);
   assert.equal(JSON.parse(actedFromInput.stdout).data.action_result.type, 'observe');
 
+  const filled = await executeCli(
+    ['act', '--session', 'session-fixed', '--action', '{"type":"fill","selector":"#name","value":"Sensitive Form Value"}', '--json'],
+    context
+  );
+  assert.equal(filled.exitCode, 0);
+  const filledBody = JSON.parse(filled.stdout);
+  assert.equal(filledBody.data.action_result.type, 'fill');
+  assert.equal(filledBody.data.session.action_history.at(-1).action.value_recorded, false);
+  assert.equal(filled.stdout.includes('Sensitive Form Value'), false);
+
   const reported = await executeCli(['report', '--session', 'session-fixed', '--json'], context);
   assert.equal(reported.exitCode, 0);
   assert.equal(JSON.parse(reported.stdout).artifacts[0].type, 'report');
@@ -11326,9 +11550,12 @@ test('session start, act, report, and spec export use local artifacts', async ()
   const exported = await executeCli(['spec', 'export', '--session', 'session-fixed', '--json'], context);
   assert.equal(exported.exitCode, 0);
   assert.equal(JSON.parse(exported.stdout).artifacts[0].type, 'spec');
+  assert.equal(exported.stdout.includes('Sensitive Form Value'), false);
 
   const report = await readFile(path.join(cwd, '.browser-debug', 'reports', 'session-fixed.md'), 'utf8');
   assert.match(report, /TraceCue Report: session-fixed/);
+  assert.match(report, /value_recorded/);
+  assert.equal(report.includes('Sensitive Form Value'), false);
 });
 
 test('redaction removes common secrets and sensitive query params', () => {

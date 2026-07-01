@@ -22,6 +22,9 @@ TraceCue should make visual evidence, browser debugging, and UI review reusable 
 - Support headed browser and DevTools workflows for visual quality, animations, hover, focus, scroll, and final interaction checks.
 - Support an opt-in process-scoped supervised browser run for ordered local actions when one-shot observation is too slow.
 - Support an opt-in local background daemon for ephemeral browser supervision when a browser must stay open across CLI invocations.
+- Support opt-in persistent browser sessions for cases where the current authenticated or multi-step page state must survive across CLI invocations, while keeping the retained context local, TTL/idle bounded, origin-allowlisted, receipt-backed, redacted, and independent of existing browser profiles.
+- Support manual-login checkpoints where the human performs authentication in a headed browser and TraceCue records only completion evidence, checkpoint metadata, screenshots when requested, and redacted summaries.
+- Support explicit storageState import/export only as an admin-only local opt-in under the configured artifact auth directory, with value-silent receipts and no cookie, token, password, or local-storage value printing.
 - Return structured page observations suitable for AI decision making.
 - Provide explicit action candidates instead of requiring raw DOM scraping.
 - Record reproducible artifacts such as screenshots, traces, console messages, network summaries, and issue reports.
@@ -132,9 +135,9 @@ TraceCue should make visual evidence, browser debugging, and UI review reusable 
 - Do not read arbitrary source-data files or remote source-data URLs from target manifests in the local content UX advisory layer.
 - Do not mutate system memory cache, configure swap, delete artifacts automatically, kill arbitrary processes, or perform privileged host cleanup from the local resource status preflight or guard.
 - Do not expose artifact cleanup execution through MCP; MCP may report local artifact usage but must not delete files.
-- Do not expose HTTP `full` or `admin`, remote HTTP listeners, socket transports, shell tools, cleanup execution, package generation, ingest, report writing, workflow creation, execution planning outside the approved stdio `admin` agent execution plan path, `agent execution run` outside the approved stdio `admin` path, provider/API execution outside the approved stdio `admin` agent execution adapter path, or credential handling through MCP without a separate approved phase.
+- Do not expose HTTP `full` or `admin`, remote HTTP listeners, socket transports, shell tools, cleanup execution, package generation, ingest, report writing, workflow creation, execution planning outside the approved stdio `admin` agent execution plan path, `agent execution run` outside the approved stdio `admin` path, provider/API execution outside the approved stdio `admin` agent execution adapter path, persistent session tools outside stdio `admin`, storageState import/export outside explicit admin opt-in, or credential handling through MCP without a separate approved phase.
 - Do not emit bearer token values, credentials, local secrets, raw environment values, or external upload configuration from MCP client configuration helpers.
-- Do not treat an MCP capability policy report or the `admin` profile name as permission to expose write, delete, provider/API, shell, daemon/session, or credential-bearing tools.
+- Do not treat an MCP capability policy report or the `admin` profile name as permission to expose write, delete, provider/API, shell, non-approved daemon/session, storageState, or credential-bearing tools.
 - Do not hide consumer application API/backend startup failures through TraceCue runtime branches; document target runtime prerequisites in the consumer repository instead.
 - Do not treat local agent advisory output as deterministic findings, release approval, or a replacement for owner judgment.
 - Do not run provider APIs, upload evidence, store credentials, or expose agent/API execution through MCP as part of the local agent advisory handoff layer, except for the approved stdio `admin` agent execution plan/run adapter path that requires a prior local plan, explicit execute acknowledgement, bounded disclosure, and local receipts.
@@ -179,7 +182,7 @@ TraceCue should make visual evidence, browser debugging, and UI review reusable 
 - The default runtime mode is local-first, headless, and artifact-safe.
 - The first implementation slice is `doctor` plus a no-browser command parser and JSON output contract.
 - The first Playwright slice is a one-shot `observe --url <url> --json` command using an ephemeral browser context.
-- The default artifact root is `.browser-debug/`, which must stay ignored and must not contain cookies, storage state, credentials, or raw secrets.
+- The default artifact root is `.browser-debug/`, which must stay ignored. It must not contain credentials or raw secrets, must not store cookies or storage state by default, and may contain storageState only under the explicit ignored auth artifact directory when the admin opt-in export/import flow is used.
 - Long-running browser supervision is opt-in after the one-shot observation flow is working.
 
 ## Current Local MVP Criteria
@@ -275,10 +278,10 @@ TraceCue should make visual evidence, browser debugging, and UI review reusable 
 
 - Add a no-side-effect MCP capability policy command that can be used from any repository after install or from this checkout.
 - Report safe/full/admin profile tool surfaces, stdio and safe HTTP transport support, and the current `admin` policy in a machine-readable JSON envelope.
-- Report excluded MCP operations such as artifact cleanup execution, package/ingest/report writing, workflow creation/report writing, execution planning outside the approved stdio `admin` agent execution plan path, `agent execution run` outside the approved stdio `admin` path, provider/API execution outside the approved stdio `admin` agent execution adapter path, arbitrary shell, daemon/session control, socket transport, remote HTTP listeners, and HTTP `full` or `admin`.
+- Report excluded MCP operations such as artifact cleanup execution, package/ingest/report writing, workflow creation/report writing, execution planning outside the approved stdio `admin` agent execution plan path, `agent execution run` outside the approved stdio `admin` path, provider/API execution outside the approved stdio `admin` agent execution adapter path, arbitrary shell, safe/full/HTTP persistent session control, unapproved daemon control, socket transport, remote HTTP listeners, and HTTP `full` or `admin`.
 - Keep the report read-only, token-free, credential-free, local-first, reusable, and generic across external repositories.
 - Expose the same report through the safe/full/admin MCP profiles because the report does not launch browsers, write artifacts, delete files, call providers, upload evidence, execute shell commands, or open listeners.
-- Keep `admin` distinct from `full`; the capability report may identify approved stdio `admin` agent execution plan/run exposure but must not itself enable cleanup execution, unrelated provider/API execution, shell tools, daemon/session control, credential handling, HTTP `full` or `admin`, socket transport, or remote listeners.
+- Keep `admin` distinct from `full`; the capability report may identify approved stdio `admin` agent execution plan/run exposure and approved stdio `admin` persistent session exposure, but must not itself enable cleanup execution, unrelated provider/API execution, shell tools, non-admin persistent session control, credential handling, HTTP `full` or `admin`, socket transport, or remote listeners.
 
 ## Phase 29 Agent Execution Criteria
 

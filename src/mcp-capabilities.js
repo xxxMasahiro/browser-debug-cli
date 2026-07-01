@@ -140,12 +140,17 @@ function adminPolicy() {
     || tool.effects?.shellUsed
   ));
   const agentExecutionRunExposed = adminToolNames.has('browser_debug_agent_execution_run');
+  const boundedSuperviseExposed = getMcpTools('full').some((tool) => tool.name === 'browser_debug_supervise');
+  const persistentSessionExposed = adminToolNames.has('browser_debug_session_start');
   return {
     profile_name: 'admin',
     currently_equivalent_to_full: MCP_PROFILES.admin.tools.join('\n') === MCP_PROFILES.full.tools.join('\n'),
     write_execute_tools_exposed: writeExecuteToolsExposed,
     cleanup_plan_exposed: adminToolNames.has('browser_debug_resource_artifacts_plan'),
     cleanup_execution_exposed: false,
+    bounded_supervise_exposed: boundedSuperviseExposed,
+    persistent_session_control_exposed: persistentSessionExposed,
+    storage_state_opt_in_exposed: adminToolNames.has('browser_debug_session_checkpoint'),
     agent_execution_plan_exposed: adminToolNames.has('browser_debug_agent_execution_plan'),
     agent_execution_run_exposed: agentExecutionRunExposed,
     agentic_human_review_propose_exposed: false,
@@ -178,10 +183,12 @@ function adminPolicy() {
     shell_readiness_exposed: adminToolNames.has('browser_debug_shell_readiness'),
     shell_tools_exposed: false,
     final_readiness_exposed: adminToolNames.has('browser_debug_final_readiness'),
-    daemon_session_control_exposed: false,
+    daemon_session_control_exposed: persistentSessionExposed,
     credential_handling_exposed: false,
-    decision: agentExecutionRunExposed ? 'admin-only agent execution approved' : 'read-only policy report only',
-    reason: agentExecutionRunExposed
+    decision: persistentSessionExposed ? 'admin-only persistent session control approved with explicit storage-state opt-in' : agentExecutionRunExposed ? 'admin-only agent execution approved' : 'read-only policy report only',
+    reason: persistentSessionExposed
+      ? 'Persistent session tools are exposed only on stdio admin; safe, full, and HTTP MCP do not expose persistent session or storageState tools.'
+      : agentExecutionRunExposed
       ? 'Phase 74-76 exposes agent execution plan/run only on the admin MCP profile while safe and full remain non-execution profiles.'
       : 'Phase 36 records the current MCP capability boundary without adding write, delete, provider, shell, or runtime-control tools.'
   };
@@ -192,6 +199,9 @@ function boundarySummary() {
   return {
     cleanup_plan: adminPolicySummary.cleanup_plan_exposed,
     cleanup_execution: false,
+    bounded_supervise: adminPolicySummary.bounded_supervise_exposed,
+    persistent_session_control: adminPolicySummary.persistent_session_control_exposed,
+    storage_state_opt_in: adminPolicySummary.storage_state_opt_in_exposed,
     agent_execution_plan: adminPolicySummary.agent_execution_plan_exposed,
     agent_execution_run: adminPolicySummary.agent_execution_run_exposed,
     agentic_human_review_propose: false,
@@ -233,8 +243,10 @@ function boundarySummary() {
     http_full_or_admin: false,
     credential_values_read: false,
     credential_values_stored: false,
-    external_upload: adminPolicySummary.provider_api_execution_exposed,
+    external_upload: false,
+    bounded_provider_disclosure: adminPolicySummary.provider_api_execution_exposed,
     browser_profile_reuse: false,
+    persistent_browser_profile_reuse: false,
     config_files_written: false
   };
 }
@@ -242,7 +254,7 @@ function boundarySummary() {
 function nextSteps() {
   return [
     'Use this report to inspect current MCP tool/profile exposure before configuring a client.',
-    'Keep delete, visual review execution, agentic human review execution, shell, daemon/session, and credential-bearing operations on the CLI unless a later phase approves one operation at a time.',
+    'Keep delete, visual review execution, agentic human review execution, shell, credential-bearing operations, and non-admin persistent session control out of MCP unless a later phase approves one operation at a time.',
     'Use trace-cue mcp config for token-free client setup metadata.'
   ];
 }

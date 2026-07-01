@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/session-action.schema.json",
+  "title": "TraceCue Session Action",
+  "type": "object",
+  "required": [
+    "type"
+  ],
+  "properties": {
+    "type": {
+      "enum": [
+        "click",
+        "fill",
+        "select",
+        "press",
+        "scroll",
+        "wait",
+        "observe",
+        "screenshot",
+        "navigate"
+      ]
+    },
+    "selector": {
+      "type": "string"
+    },
+    "value": {},
+    "key": {
+      "type": "string"
+    },
+    "deltaX": {
+      "type": "number"
+    },
+    "deltaY": {
+      "type": "number"
+    },
+    "ms": {
+      "type": "number"
+    },
+    "url": {
+      "type": "string"
+    },
+    "screenshot": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": true
+}

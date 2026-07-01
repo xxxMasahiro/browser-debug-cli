@@ -15,6 +15,12 @@ const MCP_EXPOSURE_ADMIN = Object.freeze({
   admin: true
 });
 
+const MCP_EXPOSURE_FULL = Object.freeze({
+  safe: false,
+  full: true,
+  admin: true
+});
+
 const MCP_EXPOSURE_ALL = Object.freeze({
   safe: true,
   full: true,
@@ -118,21 +124,67 @@ const OPERATIONS = Object.freeze([
     ]
   }),
   operation({
-    id: 'daemon_session_control',
+    id: 'bounded_supervise',
     group: 'operation_governance',
-    command: 'daemon start/status/stop and session start/act/report/spec',
+    command: 'supervise --actions',
+    category: 'bounded_browser_supervision',
+    cliAvailable: true,
+    currentStatus: 'full_exposed_ephemeral',
+    proposedStage: 'bounded_supervision_available',
+    risk: ['write', 'capture'],
+    mcpExposure: MCP_EXPOSURE_FULL,
+    capabilityExcluded: false,
+    capabilityReason: 'Runs bounded actions in one local ephemeral browser context and closes the context before returning.',
+    futureReview: 'Any persistent state, storage state, login checkpoint, or external upload remains outside this full-profile supervise surface.',
+    gates: [
+      gate('full_profile_only', 'Bounded supervise must stay out of the safe MCP profile.'),
+      gate('ephemeral_context', 'Supervise must not reuse persistent browser profiles or storage state.'),
+      gate('bounded_actions', 'MCP input must limit action count, timeout, URL protocol, and artifact root scope.'),
+      gate('local_artifacts', 'Observation, screenshot, trace, and action history artifacts must stay under the configured local artifact root.')
+    ]
+  }),
+  operation({
+    id: 'persistent_session_control',
+    group: 'operation_governance',
+    command: 'session start/status/stop/act/observe/checkpoint/review',
     category: 'local_runtime_control',
     cliAvailable: true,
-    currentStatus: 'not_exposed',
-    proposedStage: 'runtime_control_gate_required',
+    currentStatus: 'admin_exposed_persistent_session_only',
+    proposedStage: 'admin_session_available',
     risk: ['write', 'capture'],
-    mcpGate: false,
-    capabilityReason: 'Controls local browser runtime state or writes browser/session artifacts.',
-    futureReview: 'Requires lifecycle receipts, process ownership constraints, and browser artifact disclosure review.',
+    capabilityId: 'daemon_session_control',
+    mcpExposure: MCP_EXPOSURE_ADMIN,
+    capabilityExcluded: false,
+    capabilityReason: 'Controls only TraceCue-owned local persistent browser sessions through stdio admin MCP.',
+    futureReview: 'Any safe/full/HTTP exposure, external upload, OAuth automation, arbitrary JavaScript, or persistent profile reuse requires separate approval.',
     gates: [
+      gate('admin_stdio_only', 'Persistent session tools must stay out of safe, full, and HTTP MCP profiles.'),
       gate('process_ownership', 'Runtime control must be limited to TraceCue-owned processes.'),
+      gate('ttl_idle_required', 'Persistent sessions need TTL and idle-timeout lifecycle guards.'),
+      gate('origin_allowlist', 'Navigation must stay within the session origin allowlist.'),
       gate('browser_artifact_disclosure', 'Browser/session artifacts need local disclosure boundaries.'),
       gate('no_arbitrary_process_control', 'Runtime control must not become arbitrary process control.')
+    ]
+  }),
+  operation({
+    id: 'session_storage_state_opt_in',
+    group: 'operation_governance',
+    command: 'session checkpoint --export-storage-state and session start --storage-state',
+    category: 'storage_state_opt_in',
+    cliAvailable: true,
+    currentStatus: 'admin_exposed_explicit_opt_in',
+    proposedStage: 'admin_storage_state_opt_in_available',
+    risk: ['write', 'capture'],
+    mcpExposure: MCP_EXPOSURE_ADMIN,
+    capabilityExcluded: false,
+    capabilityReason: 'Imports or exports Playwright storageState only when explicitly requested and confined to the local artifact auth directory.',
+    futureReview: 'Any default credential persistence, profile reuse, committed storage state, or external transfer remains prohibited.',
+    gates: [
+      gate('admin_stdio_only', 'Storage-state import/export must stay admin MCP only and CLI explicit.'),
+      gate('explicit_flag_required', 'Export requires an explicit export flag and import requires an explicit storage-state path.'),
+      gate('auth_artifact_confined', 'Storage state files must stay under the configured artifact auth directory.'),
+      gate('no_value_disclosure', 'Cookie, token, and localStorage values must never be printed in stdout, receipts, reports, or MCP capability output.'),
+      gate('no_profile_reuse', 'Storage state opt-in must not use a persistent browser profile or user data directory.')
     ]
   }),
   operation({

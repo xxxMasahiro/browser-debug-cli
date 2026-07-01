@@ -247,6 +247,27 @@ export {
 } from './localization-resources.js';
 export { buildArtifactCleanupPlan, runResourceArtifactsCleanup, runResourceArtifactsPlan } from './resource-artifacts.js';
 export {
+  buildReport,
+  checkpointSession,
+  closeSession,
+  exportSpec,
+  observeSession,
+  reviewSession,
+  runSessionAction,
+  startSession,
+  statusSession,
+  stopSession
+} from './sessions.js';
+export {
+  checkpointPersistentBrowserSession,
+  observePersistentBrowserSession,
+  persistentSessionStatus,
+  reviewPersistentBrowserSession,
+  runPersistentSessionAction,
+  startPersistentBrowserSession,
+  stopPersistentBrowserSession
+} from './browser-session-manager.js';
+export {
   ensureArtifactWriteRoots,
   readJsonArtifactAcrossRoots,
   resolveArtifactReadRoots,

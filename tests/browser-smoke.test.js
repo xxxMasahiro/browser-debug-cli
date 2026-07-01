@@ -114,6 +114,134 @@ test('session action can click and observe the changed page', { skip: !runBrowse
   assert.match(observed.page.visible_text, /Clicked/);
 });
 
+test('persistent session keeps one browser context across act observe checkpoint review and stop', { skip: !runBrowserSmoke }, async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), 'trace-cue-persistent-session-smoke-'));
+  await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');
+  const fixture = path.join(cwd, 'fixture.html');
+  await writeFile(fixture, [
+    '<!doctype html>',
+    '<html lang="en">',
+    '<head><title>Persistent Session Smoke</title></head>',
+    '<body>',
+    '<h1>Persistent Session Page</h1>',
+    '<button id="primary" onclick="document.getElementById(\'result\').textContent = \'Persistent Clicked\'">Primary Action</button>',
+    '<p id="result">Waiting</p>',
+    '</body>',
+    '</html>'
+  ].join('\n'), 'utf8');
+
+  let sessionId = null;
+  try {
+    const started = await executeCli([
+      'session',
+      'start',
+      '--url',
+      `file://${fixture}`,
+      '--ttl',
+      '1m',
+      '--idle-timeout',
+      '30s',
+      '--timeout',
+      '10000',
+      '--json'
+    ], { cwd });
+    assert.equal(started.exitCode, 0);
+    const startedBody = JSON.parse(started.stdout);
+    sessionId = startedBody.data.session.id;
+    assert.equal(startedBody.command, 'session start');
+    assert.equal(startedBody.data.session.mode, 'persistent_browser_session');
+    assert.equal(startedBody.data.session.browser.retained_context, true);
+    assert.equal(startedBody.data.session.browser.existing_profile_reused, false);
+    assert.equal(startedBody.data.session.security.external_upload, false);
+
+    const status = await executeCli(['session', 'status', '--session', sessionId, '--json'], { cwd });
+    assert.equal(status.exitCode, 0);
+    assert.equal(JSON.parse(status.stdout).data.session.process_status, 'alive');
+
+    const acted = await executeCli([
+      'session',
+      'act',
+      '--session',
+      sessionId,
+      '--action',
+      '{"type":"click","selector":"#primary"}',
+      '--timeout',
+      '10000',
+      '--json'
+    ], { cwd });
+    assert.equal(acted.exitCode, 0);
+    const actedBody = JSON.parse(acted.stdout);
+    assert.equal(actedBody.data.action_result.type, 'click');
+    assert.equal(actedBody.data.session.action_history[0].action.value_recorded, false);
+    const actionObservation = actedBody.artifacts.find((artifact) => artifact.type === 'observation');
+    assert.ok(actionObservation);
+    const actionObservationJson = JSON.parse(await readFile(path.join(cwd, actionObservation.path), 'utf8'));
+    assert.match(actionObservationJson.page.visible_text, /Persistent Clicked/);
+
+    const observed = await executeCli([
+      'session',
+      'observe',
+      '--session',
+      sessionId,
+      '--screenshot',
+      '--timeout',
+      '10000',
+      '--json'
+    ], { cwd });
+    assert.equal(observed.exitCode, 0);
+    const observedBody = JSON.parse(observed.stdout);
+    assert.equal(observedBody.data.session.id, sessionId);
+    assert.ok(observedBody.artifacts.find((artifact) => artifact.type === 'screenshot'));
+
+    const checkpointed = await executeCli([
+      'session',
+      'checkpoint',
+      '--session',
+      sessionId,
+      '--name',
+      'clicked',
+      '--until-selector',
+      '#result',
+      '--timeout',
+      '10000',
+      '--json'
+    ], { cwd });
+    assert.equal(checkpointed.exitCode, 0);
+    const checkpointedBody = JSON.parse(checkpointed.stdout);
+    assert.equal(checkpointedBody.data.checkpoint.session, sessionId);
+    assert.equal(checkpointedBody.data.storage_state.exported, false);
+    const checkpointArtifact = checkpointedBody.artifacts.find((artifact) => artifact.type === 'session_checkpoint');
+    assert.ok(checkpointArtifact);
+    await access(path.join(cwd, checkpointArtifact.path));
+
+    const reviewed = await executeCli([
+      'session',
+      'review',
+      '--session',
+      sessionId,
+      '--screenshot',
+      '--report',
+      '--timeout',
+      '10000',
+      '--json'
+    ], { cwd });
+    assert.equal(reviewed.exitCode, 0);
+    const reviewedBody = JSON.parse(reviewed.stdout);
+    assert.equal(reviewedBody.data.review_artifact_index.session, sessionId);
+    assert.equal(reviewedBody.data.review_artifact_index.boundaries.agentic_human_review_input_compatible, true);
+    assert.ok(reviewedBody.artifacts.find((artifact) => artifact.type === 'review_artifact_index'));
+
+    const stopped = await executeCli(['session', 'stop', '--session', sessionId, '--timeout', '10000', '--json'], { cwd });
+    assert.equal(stopped.exitCode, 0);
+    assert.match(JSON.parse(stopped.stdout).data.session.status, /^(stopped|exited)$/);
+    sessionId = null;
+  } finally {
+    if (sessionId) {
+      await executeCli(['session', 'stop', '--session', sessionId, '--timeout', '10000', '--json'], { cwd }).catch(() => {});
+    }
+  }
+});
+
 test('session actions cover form controls and exported evidence', { skip: !runBrowserSmoke }, async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), 'browser-debug-actions-smoke-'));
   await writeFile(path.join(cwd, '.gitignore'), '.browser-debug/\n', 'utf8');

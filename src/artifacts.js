@@ -6,6 +6,10 @@ import { resolveArtifactRootConfig } from './artifact-root-policy.js';
 
 const ARTIFACT_DIRS = [
   'sessions',
+  'session-commands',
+  'session-results',
+  'checkpoints',
+  'auth',
   'observations',
   'screenshots',
   'traces',

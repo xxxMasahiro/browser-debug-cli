@@ -49,12 +49,14 @@ const VALUE_OPTIONS = new Set([
   'max-routes',
   'max-bytes',
   'max-lifetime',
+  'manual-checkpoint',
   'mock',
   'model',
   'name',
   'older-than',
   'operation',
   'overlay',
+  'origin-allowlist',
   'package',
   'phase',
   'policy',
@@ -79,6 +81,7 @@ const VALUE_OPTIONS = new Set([
   'source',
   'session',
   'surface',
+  'storage-state',
   'target',
   'target-registry',
   'threshold',
@@ -88,6 +91,9 @@ const VALUE_OPTIONS = new Set([
   'transport',
   'task',
   'url',
+  'ttl',
+  'until-selector',
+  'until-url',
   'viewport',
   'workflow'
 ]);
@@ -102,6 +108,7 @@ const BOOLEAN_OPTIONS = new Set([
   'devtools',
   'dry-run',
   'execute',
+  'export-storage-state',
   'headed',
   'report',
   'screenshot',
@@ -310,19 +317,66 @@ function parseSession(args, globals) {
     return parseError('session', globals.json, {
       code: 'MISSING_SUBCOMMAND',
       message: 'session requires a subcommand.',
-      details: { subcommands: ['start', 'close'] }
+      details: { subcommands: ['start', 'status', 'stop', 'close', 'act', 'observe', 'checkpoint', 'review'] }
     });
   }
   if (subcommand === 'start') {
-    return parseOptionalOptions('session start', args.slice(1), globals);
+    const parsed = parseOptionalOptions('session start', args.slice(1), globals);
+    if (!parsed.ok) {
+      return parsed;
+    }
+    if (parsed.options.url) {
+      const urlError = validateUrl(parsed.options.url);
+      if (urlError) {
+        return parseError('session start', globals.json, urlError);
+      }
+    }
+    if (!parsed.options.url && !parsed.options['storage-state']) {
+      return parseError('session start', globals.json, {
+        code: 'MISSING_REQUIRED_OPTION',
+        message: 'session start requires --url <url> unless --storage-state <path> is supplied.',
+        details: { option: 'url' }
+      });
+    }
+    if (parsed.options['manual-checkpoint'] && !parsed.options.headed && !parsed.options.devtools) {
+      return parseError('session start', globals.json, {
+        code: 'MANUAL_CHECKPOINT_REQUIRES_HEADED',
+        message: 'session start --manual-checkpoint requires --headed or --devtools.',
+        details: { option: 'manual-checkpoint' }
+      });
+    }
+    return parsed;
   }
-  if (subcommand === 'close') {
-    return parseRequiredOptions('session close', args.slice(1), globals, ['session']);
+  if (subcommand === 'status' || subcommand === 'stop' || subcommand === 'close') {
+    return parseRequiredOptions(`session ${subcommand}`, args.slice(1), globals, ['session']);
+  }
+  if (subcommand === 'act') {
+    const parsed = parseRequiredOptions('session act', args.slice(1), globals, ['session']);
+    if (!parsed.ok) {
+      return parsed;
+    }
+    if (!parsed.options.action && !parsed.options.input) {
+      return parseError('session act', globals.json, {
+        code: 'MISSING_REQUIRED_OPTION',
+        message: 'session act requires --action <json> or --input <json|@file|->.',
+        details: { option: 'action' }
+      });
+    }
+    return parsed;
+  }
+  if (subcommand === 'observe') {
+    return parseRequiredOptions('session observe', args.slice(1), globals, ['session']);
+  }
+  if (subcommand === 'checkpoint') {
+    return parseRequiredOptions('session checkpoint', args.slice(1), globals, ['session', 'name']);
+  }
+  if (subcommand === 'review') {
+    return parseRequiredOptions('session review', args.slice(1), globals, ['session']);
   }
   return parseError('session', globals.json, {
     code: 'UNKNOWN_SUBCOMMAND',
     message: `Unknown session subcommand: ${subcommand}`,
-    details: { subcommands: ['start', 'close'] }
+    details: { subcommands: ['start', 'status', 'stop', 'close', 'act', 'observe', 'checkpoint', 'review'] }
   });
 }
 

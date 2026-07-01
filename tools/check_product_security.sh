@@ -63,9 +63,10 @@ scan_runtime_pattern() {
   rm -f /tmp/trace-cue-security-scan.$$
 }
 
-scan_runtime_pattern 'launchPersistentContext|userDataDir|storageState' 'browser profile or persistent storage reuse'
+scan_runtime_pattern 'launchPersistentContext|userDataDir' 'browser profile reuse'
+scan_runtime_pattern 'storageState' 'unapproved storageState persistence' 'src/browser-session-worker\.js:|src/browser-session-manager\.js:|src/mcp-profiles\.js:|src/operation-registry\.js:|src/mcp-capabilities\.js:'
 scan_runtime_pattern 'createServer|listen\(|WebSocket|EventSource' 'unapproved external control channel' 'src/mcp-http-transport\.js:|src/agentic-human-review-responses-adapter\.js:'
-scan_runtime_pattern "node:child_process|from ['\"]child_process|require\\(['\"]child_process|execFile|spawn\\(" 'arbitrary shell execution' 'src/daemon\.js:'
+scan_runtime_pattern "node:child_process|from ['\"]child_process|require\\(['\"]child_process|execFile|spawn\\(" 'arbitrary shell execution' "src/daemon\\.js:|src/browser-session-manager\\.js:[0-9]+:import \\{ spawn as defaultSpawn \\} from 'node:child_process';|src/browser-session-manager\\.js:[0-9]+:  const child = spawn\\(process\\.execPath, args, \\{"
 scan_runtime_pattern 'npm publish|gh repo|curl |wget ' 'publication or external transfer'
 
 if ! grep -q 'trace-cue-mcp' "$ROOT/.mcp.json"; then

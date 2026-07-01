@@ -12,8 +12,21 @@ import {
 import { runObserve, validateUrl } from './observe.js';
 import { resolveJsonInput } from './input.js';
 import { redact, redactUrl, truncateText } from './redaction.js';
+import {
+  checkpointPersistentBrowserSession,
+  isPersistentSessionMetadata,
+  observePersistentBrowserSession,
+  persistentSessionStatus,
+  reviewPersistentBrowserSession,
+  runPersistentSessionAction,
+  startPersistentBrowserSession,
+  stopPersistentBrowserSession
+} from './browser-session-manager.js';
 
 export async function startSession(options = {}, context = {}) {
+  if (requiresPersistentSession(options)) {
+    return startPersistentBrowserSession(options, context);
+  }
   const cwd = context.cwd ?? process.cwd();
   const artifactRoot = options['artifact-root'] ?? DEFAULT_ARTIFACT_ROOT;
   const now = materializeNow(context.now);
@@ -66,6 +79,9 @@ export async function startSession(options = {}, context = {}) {
 
 export async function closeSession(options = {}, context = {}) {
   const { root, artifactRoot, session } = await loadSessionFromOptions(options, context);
+  if (isPersistentSessionMetadata(session)) {
+    return stopPersistentBrowserSession(options, context);
+  }
   session.status = 'closed';
   session.updated_at = materializeNow(context.now).toISOString();
   await writeSession(root, session);
@@ -78,8 +94,19 @@ export async function closeSession(options = {}, context = {}) {
   };
 }
 
+export async function statusSession(options = {}, context = {}) {
+  return persistentSessionStatus(options, context);
+}
+
+export async function stopSession(options = {}, context = {}) {
+  return stopPersistentBrowserSession(options, context);
+}
+
 export async function runSessionAction(options = {}, context = {}) {
   const { root, artifactRoot, session } = await loadSessionFromOptions(options, context);
+  if (isPersistentSessionMetadata(session)) {
+    return runPersistentSessionAction(options, context);
+  }
   if (session.status !== 'open') {
     return sessionError('SESSION_CLOSED', 'The session is closed.', { session: session.id });
   }
@@ -92,7 +119,7 @@ export async function runSessionAction(options = {}, context = {}) {
   const now = materializeNow(context.now);
   const actionEntry = {
     at: now.toISOString(),
-    action: redact(action.value)
+    action: safeActionForLog(action.value)
   };
 
   let observed = null;
@@ -158,6 +185,18 @@ export async function runSessionAction(options = {}, context = {}) {
   };
 }
 
+export async function observeSession(options = {}, context = {}) {
+  return observePersistentBrowserSession(options, context);
+}
+
+export async function checkpointSession(options = {}, context = {}) {
+  return checkpointPersistentBrowserSession(options, context);
+}
+
+export async function reviewSession(options = {}, context = {}) {
+  return reviewPersistentBrowserSession(options, context);
+}
+
 export async function buildReport(options = {}, context = {}) {
   const { root, artifactRoot, session } = await loadSessionFromOptions(options, context);
   const now = materializeNow(context.now);
@@ -189,6 +228,16 @@ export async function buildReport(options = {}, context = {}) {
   };
 }
 
+function requiresPersistentSession(options = {}) {
+  return Boolean(
+    options.ttl
+    || options['idle-timeout']
+    || options['manual-checkpoint']
+    || options['storage-state']
+    || options['origin-allowlist']
+  );
+}
+
 export async function exportSpec(options = {}, context = {}) {
   const { root, artifactRoot, session } = await loadSessionFromOptions(options, context);
   const specRel = artifactRelPath(artifactRoot, 'specs', `${session.id}.json`);
@@ -200,7 +249,7 @@ export async function exportSpec(options = {}, context = {}) {
     generated_at: materializeNow(context.now).toISOString(),
     steps: session.action_history.map((entry) => ({
       at: entry.at,
-      action: entry.action
+      action: safeActionForLog(entry.action)
     })),
     observations: session.observations
   });
@@ -212,6 +261,20 @@ export async function exportSpec(options = {}, context = {}) {
     errors: [],
     artifacts: [artifactObject({ type: 'spec', path: specRel, description: 'JSON action/spec export.' })]
   };
+}
+
+function safeActionForLog(action = {}) {
+  return redact({
+    type: action.type,
+    selector: action.selector,
+    key: action.key,
+    url: action.url ? redactUrl(action.url) : undefined,
+    deltaX: action.deltaX,
+    deltaY: action.deltaY,
+    ms: action.ms,
+    value_recorded: false,
+    screenshot: Boolean(action.screenshot)
+  });
 }
 
 async function parseAction(value, context) {

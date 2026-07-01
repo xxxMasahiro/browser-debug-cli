@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/persistent-session.schema.json",
+  "title": "TraceCue Persistent Browser Session",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "status",
+    "mode",
+    "artifact_root",
+    "browser",
+    "lifecycle",
+    "security"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "process_status": {
+      "type": "string"
+    },
+    "mode": {
+      "const": "persistent_browser_session"
+    },
+    "current_url": {
+      "type": "string"
+    },
+    "artifact_root": {
+      "type": "string"
+    },
+    "browser": {
+      "type": "object"
+    },
+    "lifecycle": {
+      "type": "object"
+    },
+    "security": {
+      "type": "object"
+    },
+    "observations": {
+      "type": "array"
+    },
+    "action_history": {
+      "type": "array"
+    },
+    "checkpoints": {
+      "type": "array"
+    },
+    "storage_state": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}
