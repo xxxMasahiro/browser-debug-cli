@@ -750,6 +750,7 @@ function buildAdapterContractRepairContext(validation, attempt) {
     missing_roles: compactRepairStrings(details.missing_roles),
     missing_rounds: compactRepairStrings(details.missing_rounds),
     missing_critique_roles: compactRepairStrings(details.missing_critique_roles),
+    placeholder_outputs: compactRepairPlaceholderOutputs(details.placeholder_outputs),
     synthesis_integrated: details.synthesis_integrated ?? null,
     missing_conditions: compactRepairStrings(details.missing_conditions),
     raw_provider_response_stored: false
@@ -763,6 +764,7 @@ function compactRepairContractFailures(values) {
     missing_benchmark_record_count: Number.isFinite(Number(failure?.missing_benchmark_record_count)) ? Number(failure.missing_benchmark_record_count) : undefined,
     missing_owner_baseline_record_count: Number.isFinite(Number(failure?.missing_owner_baseline_record_count)) ? Number(failure.missing_owner_baseline_record_count) : undefined,
     invalid_review_claim_count: Number.isFinite(Number(failure?.invalid_review_claim_count)) ? Number(failure.invalid_review_claim_count) : undefined,
+    placeholder_output_count: Number.isFinite(Number(failure?.placeholder_output_count)) ? Number(failure.placeholder_output_count) : undefined,
     missing_condition_count: Number.isFinite(Number(failure?.missing_condition_count)) ? Number(failure.missing_condition_count) : undefined
   }).filter(([, value]) => value !== undefined && value !== null && value !== '')));
 }
@@ -778,6 +780,10 @@ function compactRepairRecords(values) {
       reason: truncateText(firstString(record.reason, null), 220),
       required_present: record.required_present === undefined ? undefined : record.required_present,
       missing_fields: compactRepairStrings(record.missing_fields),
+      stage_id: truncateText(firstString(record.stage_id, null), 120),
+      stage_kind: truncateText(firstString(record.stage_kind, null), 120),
+      role: truncateText(firstString(record.role, null), 120),
+      round: Number.isFinite(Number(record.round)) ? Number(record.round) : undefined,
       criterion_id: truncateText(firstString(record.criterion_id, record.must_not_miss_criterion_id, null), 120),
       owner_label_ids: compactRepairStrings(record.owner_label_ids),
       criteria_refs: compactRepairStrings(record.criteria_refs),
@@ -788,6 +794,17 @@ function compactRepairRecords(values) {
       evidence_ref_count: Number.isFinite(Number(record.evidence_ref_count)) ? Number(record.evidence_ref_count) : undefined
     }).filter(([, value]) => value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0)));
   });
+}
+
+function compactRepairPlaceholderOutputs(values) {
+  return arrayOrEmpty(values).slice(0, MAX_ADAPTER_REPAIR_RECORDS).map((record) => Object.fromEntries(Object.entries({
+    stage_id: truncateText(firstString(record?.stage_id, null), 120),
+    stage_kind: truncateText(firstString(record?.stage_kind, null), 120),
+    role: truncateText(firstString(record?.role, null), 120),
+    round: Number.isFinite(Number(record?.round)) ? Number(record.round) : undefined,
+    reason: truncateText(firstString(record?.reason, null), 180),
+    planned_role_match: record?.planned_role_match === undefined ? undefined : record.planned_role_match
+  }).filter(([, value]) => value !== undefined && value !== null && value !== '')));
 }
 
 function compactRepairOwnerBaselineHints(values) {
@@ -881,6 +898,9 @@ function buildAdapterContractRepairInstruction(repairContext) {
   const missingConditions = Array.isArray(repairContext.missing_conditions)
     ? repairContext.missing_conditions
     : [];
+  const placeholderOutputs = Array.isArray(repairContext.placeholder_outputs)
+    ? repairContext.placeholder_outputs
+    : [];
   const evidenceReferenceIds = Array.isArray(repairContext.evidence_reference_ids)
     ? repairContext.evidence_reference_ids
     : [];
@@ -935,6 +955,9 @@ function buildAdapterContractRepairInstruction(repairContext) {
       : '',
     missingConditions.length > 0
       ? `Satisfy these missing xhigh mechanical conditions: ${JSON.stringify(missingConditions)}.`
+      : '',
+    placeholderOutputs.length > 0
+      ? `Replace placeholder role_opinions for these exact stage/role/round items with provider-authored output; do not keep "did not return", "not available", or "missing output" summaries: ${JSON.stringify(placeholderOutputs)}.`
       : '',
     'Every benchmark record must include the exact label string, present, status, non-empty evidence, and non-empty evidence_refs using ids from evidence_reference_catalog.',
     'Every owner-baseline finding must include must_not_miss_criterion_id or criteria_refs, owner_label_ids when applicable, recommendation, and non-empty evidence_refs using ids from evidence_reference_catalog.',
@@ -1028,6 +1051,7 @@ function mergeAdapterContractFailureDetails(failures) {
   const missingRoles = uniqueAdapterStrings(detailsList.flatMap((details) => normalizeStringArray(details.missing_roles)));
   const missingRounds = uniqueAdapterStrings(detailsList.flatMap((details) => normalizeStringArray(details.missing_rounds)));
   const missingCritiqueRoles = uniqueAdapterStrings(detailsList.flatMap((details) => normalizeStringArray(details.missing_critique_roles)));
+  const placeholderOutputs = detailsList.flatMap((details) => arrayOrEmpty(details.placeholder_outputs));
   const missingConditions = uniqueAdapterStrings(detailsList.flatMap((details) => normalizeStringArray(details.missing_conditions)));
   const ownerBaselineCriterionHints = filterOwnerBaselineHintsForMissingCriteria(
     detailsList.flatMap((details) => arrayOrEmpty(details.owner_baseline_criterion_hints)),
@@ -1052,6 +1076,7 @@ function mergeAdapterContractFailureDetails(failures) {
       missing_benchmark_record_count: arrayOrEmpty(failure.details?.missing_benchmark_records).length,
       missing_owner_baseline_record_count: arrayOrEmpty(failure.details?.missing_owner_baseline_records).length,
       invalid_review_claim_count: arrayOrEmpty(failure.details?.invalid_review_claims).length,
+      placeholder_output_count: arrayOrEmpty(failure.details?.placeholder_outputs).length,
       missing_condition_count: arrayOrEmpty(failure.details?.missing_conditions).length
     })),
     missing_benchmark_records: compactRepairRecords(missingBenchmarkRecords),
@@ -1065,6 +1090,7 @@ function mergeAdapterContractFailureDetails(failures) {
     missing_roles: missingRoles,
     missing_rounds: missingRounds,
     missing_critique_roles: missingCritiqueRoles,
+    placeholder_outputs: compactRepairPlaceholderOutputs(placeholderOutputs),
     synthesis_integrated: firstDefined(detailsList.map((details) => details.synthesis_integrated)),
     missing_conditions: missingConditions,
     raw_provider_response_stored: false,
@@ -1188,6 +1214,7 @@ function validateAdapterFullXhighContract(advisory, traceCueRequest) {
       .map((agent) => agent.role),
     requireAtLeastThreeRounds: true,
     requireSynthesis: true,
+    stageExecution: null,
     incompleteCode: 'AHR_RESPONSES_ADAPTER_XHIGH_CONTRACT_INCOMPLETE',
     incompleteMessage: 'Provider output did not satisfy the TraceCue xhigh mechanical output contract.'
   });
@@ -1207,6 +1234,7 @@ function validateAdapterStageExecutionContract(advisory, traceCueRequest) {
     requiredCritiqueRoles: requiredRoles.filter((role) => ['critic_reviewer', 'verification_reviewer'].includes(role)),
     requireAtLeastThreeRounds: false,
     requireSynthesis: stage.final_contract_stage === true,
+    stageExecution: stage,
     incompleteCode: 'AHR_RESPONSES_ADAPTER_XHIGH_CONTRACT_INCOMPLETE',
     incompleteMessage: 'Provider output did not satisfy the TraceCue staged xhigh output contract.'
   });
@@ -1218,11 +1246,17 @@ function validateAdapterRoleRoundContract({
   requiredCritiqueRoles,
   requireAtLeastThreeRounds,
   requireSynthesis,
+  stageExecution,
   incompleteCode,
   incompleteMessage
 }) {
   const roleOpinions = Array.isArray(advisory?.role_opinions) ? advisory.role_opinions : [];
-  const reported = roleOpinions.filter((opinion) => opinion && typeof opinion === 'object' && !opinion.placeholder_generated && opinion.reported_by_provider !== false);
+  const placeholderOutputs = adapterPlaceholderRoleOutputs({
+    roleOpinions,
+    plannedAgents,
+    stageExecution
+  });
+  const reported = roleOpinions.filter((opinion) => opinion && typeof opinion === 'object' && !adapterPlaceholderRoleOpinionReason(opinion));
   const reportedPairs = new Set(reported.map((opinion) => `${opinion.role}:${Number(opinion.round ?? 1)}`));
   const requiredCritiqueRoleList = normalizeStringArray(requiredCritiqueRoles);
   const missingRoles = plannedAgents
@@ -1239,7 +1273,7 @@ function validateAdapterRoleRoundContract({
   const missingCritiqueRoles = requiredCritiqueRoleList.filter((role) => !critiqueRoles.has(role));
   const synthesisIntegrated = Boolean(advisory?.integration_record)
     || (requireSynthesis === false ? true : reported.some((opinion) => opinion.role === 'synthesis_agent'));
-  const placeholderCount = roleOpinions.filter((opinion) => opinion?.placeholder_generated === true || opinion?.reported_by_provider === false || /did not return|not available|missing output/i.test(String(opinion?.summary ?? ''))).length;
+  const placeholderCount = placeholderOutputs.length;
   const missingConditions = [
     ...(!requireAtLeastThreeRounds || plannedRounds.length >= 3 ? [] : ['xhigh requires at least three planned rounds']),
     ...(missingRoles.length === 0 ? [] : [`missing planned roles: ${missingRoles.join(', ')}`]),
@@ -1259,12 +1293,67 @@ function validateAdapterRoleRoundContract({
         missing_critique_roles: missingCritiqueRoles,
         synthesis_integrated: synthesisIntegrated,
         placeholder_output_count: placeholderCount,
+        placeholder_outputs: placeholderOutputs,
         missing_conditions: missingConditions,
         raw_provider_response_stored: false
       }
     };
   }
   return { ok: true };
+}
+
+function adapterPlaceholderRoleOpinionReason(opinion) {
+  if (!opinion || typeof opinion !== 'object' || Array.isArray(opinion)) {
+    return null;
+  }
+  if (opinion.placeholder_generated) {
+    return 'placeholder_generated';
+  }
+  if (opinion.reported_by_provider === false) {
+    return 'reported_by_provider_false';
+  }
+  if (adapterPlaceholderRoleSummary(opinion.summary)) {
+    return 'placeholder_summary';
+  }
+  return null;
+}
+
+function adapterPlaceholderRoleSummary(value) {
+  const summary = String(value ?? '')
+    .toLowerCase()
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!summary) {
+    return false;
+  }
+  const roleActor = '(?:reviewer|agent|role|visual reviewer|content reviewer|ux reviewer|audience reviewer|accessibility reviewer|risk reviewer|critic reviewer|verification reviewer|synthesis agent)';
+  return new RegExp(`\\b${roleActor}\\b\\s+(?:did not return|failed to return)\\b`, 'i').test(summary)
+    || /\b(?:role output|role opinion|output)\s+(?:was\s+|is\s+)?(?:not available|unavailable|missing)\b/i.test(summary)
+    || new RegExp(`\\b(?:missing output|no output)\\b\\s+(?:from|for)\\s+(?:the\\s+)?${roleActor}\\b`, 'i').test(summary);
+}
+
+function adapterPlaceholderRoleOutputs({ roleOpinions, plannedAgents, stageExecution }) {
+  const plannedPairs = new Set(arrayOrEmpty(plannedAgents).map((agent) => `${agent.role}:${Number(agent.round ?? 1)}`));
+  return arrayOrEmpty(roleOpinions)
+    .map((opinion) => {
+      const reason = adapterPlaceholderRoleOpinionReason(opinion);
+      if (!reason) {
+        return null;
+      }
+      const role = truncateText(firstString(opinion?.role, null), 120);
+      const round = Number.isFinite(Number(opinion?.round)) ? Number(opinion.round) : 1;
+      return {
+        stage_id: truncateText(firstString(stageExecution?.stage_id, null), 120),
+        stage_kind: truncateText(firstString(stageExecution?.stage_kind, null), 120),
+        role,
+        round,
+        reason,
+        planned_role_match: plannedPairs.has(`${role}:${round}`)
+      };
+    })
+    .filter(Boolean)
+    .slice(0, MAX_ADAPTER_REPAIR_RECORDS);
 }
 
 function validateAdapterOwnerBaselineCoverage(advisory, traceCueRequest) {

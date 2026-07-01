@@ -7395,6 +7395,241 @@ test('agentic human review responses adapter accepts staged claims supported by 
   assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value|output_text/);
 });
 
+test('agentic human review responses adapter repairs staged summary-placeholder role output with exact role context', async () => {
+  const request = adapterTraceCueRequest();
+  request.plan.review_effort = { mode: 'standard' };
+  request.plan.sub_agents = [{
+    role: 'visual_reviewer',
+    display_name: 'Visual Reviewer',
+    effort: 'deep',
+    round: 1
+  }, {
+    role: 'content_reviewer',
+    display_name: 'Content Reviewer',
+    effort: 'deep',
+    round: 1
+  }];
+  request.stage_execution = {
+    schema_version: '0.1.0',
+    staged_xhigh_execution_version: '1.0.0',
+    mode: 'staged_xhigh_provider_call',
+    stage_id: 'xhigh-round-1',
+    stage_kind: 'independent_review',
+    final_contract_stage: false,
+    required_roles: ['visual_reviewer', 'content_reviewer'],
+    required_round: 1,
+    previous_stage_summaries: [],
+    stage_outputs_are_final_evidence: false,
+    final_advisory_required: false,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+  const incompleteAdvisory = {
+    summary: 'The staged advisory includes one placeholder role output.',
+    role_opinions: [{
+      role: 'visual_reviewer',
+      display_name: 'Visual Reviewer',
+      effort: 'deep',
+      round: 1,
+      summary: 'The visual reviewer checked hierarchy and visible emphasis.',
+      findings: [],
+      uncertainties: []
+    }, {
+      role: 'content_reviewer',
+      display_name: 'Content Reviewer',
+      effort: 'deep',
+      round: 1,
+      summary: 'Content reviewer did not return usable output.',
+      findings: [],
+      uncertainties: []
+    }]
+  };
+  const repairedAdvisory = {
+    ...incompleteAdvisory,
+    summary: 'The staged advisory replaced the placeholder role output.',
+    role_opinions: [{
+      role: 'visual_reviewer',
+      display_name: 'Visual Reviewer',
+      effort: 'deep',
+      round: 1,
+      summary: 'The visual reviewer checked hierarchy and visible emphasis.',
+      findings: [],
+      uncertainties: []
+    }, {
+      role: 'content_reviewer',
+      display_name: 'Content Reviewer',
+      effort: 'deep',
+      round: 1,
+      summary: 'The content reviewer identified that the visible copy needs clearer evidence support.',
+      findings: [],
+      uncertainties: []
+    }]
+  };
+  const observedRequests = [];
+  const result = await handleAgenticHumanReviewResponsesAdapterRequest({
+    method: 'POST',
+    url: '/agentic-human-review',
+    headers: {
+      host: '127.0.0.1:8787',
+      authorization: 'Bearer adapter-secret-value',
+      'content-type': 'application/json'
+    },
+    remoteAddress: '127.0.0.1',
+    bodyText: JSON.stringify(request),
+    env: adapterEnv(),
+    config: { contractRepairAttempts: 1 },
+    fetchImpl: async (url, init) => {
+      observedRequests.push(JSON.parse(init.body));
+      return jsonResponse({
+        output_text: JSON.stringify(observedRequests.length === 1 ? incompleteAdvisory : repairedAdvisory)
+      });
+    },
+    now: fixedNow
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(observedRequests.length, 2);
+  const repairInput = JSON.parse(observedRequests[1].input);
+  assert.equal(repairInput.contract_repair_request.missing_roles.includes('content_reviewer'), true);
+  assert.equal(repairInput.contract_repair_request.placeholder_outputs[0].stage_id, 'xhigh-round-1');
+  assert.equal(repairInput.contract_repair_request.placeholder_outputs[0].role, 'content_reviewer');
+  assert.equal(repairInput.contract_repair_request.placeholder_outputs[0].round, 1);
+  assert.equal(repairInput.contract_repair_request.placeholder_outputs[0].reason, 'placeholder_summary');
+  assert.equal(repairInput.contract_repair_request.placeholder_outputs[0].planned_role_match, true);
+  assert.match(observedRequests[1].instructions, /Replace placeholder role_opinions/);
+  assert.equal(result.body.adapter_boundary.contract_repair_attempts_performed, 1);
+  assert.equal(result.body.role_opinions.length, 2);
+  assert.doesNotMatch(JSON.stringify(result.body.role_opinions), /did not return|not available|missing output/i);
+  assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value|output_text/);
+});
+
+test('agentic human review responses adapter keeps content not-available wording as reported role output', async () => {
+  const request = adapterTraceCueRequest();
+  request.plan.review_effort = { mode: 'standard' };
+  request.plan.sub_agents = [{
+    role: 'content_reviewer',
+    display_name: 'Content Reviewer',
+    effort: 'deep',
+    round: 1
+  }];
+  request.stage_execution = {
+    schema_version: '0.1.0',
+    staged_xhigh_execution_version: '1.0.0',
+    mode: 'staged_xhigh_provider_call',
+    stage_id: 'xhigh-round-1',
+    stage_kind: 'independent_review',
+    final_contract_stage: false,
+    required_roles: ['content_reviewer'],
+    required_round: 1,
+    previous_stage_summaries: [],
+    stage_outputs_are_final_evidence: false,
+    final_advisory_required: false,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+  const observedRequests = [];
+  const result = await handleAgenticHumanReviewResponsesAdapterRequest({
+    method: 'POST',
+    url: '/agentic-human-review',
+    headers: {
+      host: '127.0.0.1:8787',
+      authorization: 'Bearer adapter-secret-value',
+      'content-type': 'application/json'
+    },
+    remoteAddress: '127.0.0.1',
+    bodyText: JSON.stringify(request),
+    env: adapterEnv(),
+    config: { contractRepairAttempts: 1 },
+    fetchImpl: async (url, init) => {
+      observedRequests.push(JSON.parse(init.body));
+      return jsonResponse({
+        output_text: JSON.stringify({
+          summary: 'The staged advisory includes valid content availability analysis.',
+          role_opinions: [{
+            role: 'content_reviewer',
+            display_name: 'Content Reviewer',
+            effort: 'deep',
+            round: 1,
+            summary: 'The content reviewer found that pricing is not available on the visible page, which may reduce purchase confidence.',
+            findings: [],
+            uncertainties: []
+          }]
+        })
+      });
+    },
+    now: fixedNow
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(observedRequests.length, 1);
+  assert.equal(result.body.adapter_boundary.contract_repair_attempts_performed, 0);
+  assert.equal(result.body.role_opinions[0].role, 'content_reviewer');
+  assert.match(result.body.role_opinions[0].summary, /pricing is not available/);
+  assert.doesNotMatch(JSON.stringify(result.body), /placeholder_outputs|adapter-secret-value|provider-secret-value|output_text/);
+});
+
+test('agentic human review responses adapter rejects truthy placeholder-generated role flags', async () => {
+  const request = adapterTraceCueRequest();
+  request.plan.review_effort = { mode: 'standard' };
+  request.plan.sub_agents = [{
+    role: 'content_reviewer',
+    display_name: 'Content Reviewer',
+    effort: 'deep',
+    round: 1
+  }];
+  request.stage_execution = {
+    schema_version: '0.1.0',
+    staged_xhigh_execution_version: '1.0.0',
+    mode: 'staged_xhigh_provider_call',
+    stage_id: 'xhigh-round-1',
+    stage_kind: 'independent_review',
+    final_contract_stage: false,
+    required_roles: ['content_reviewer'],
+    required_round: 1,
+    previous_stage_summaries: [],
+    stage_outputs_are_final_evidence: false,
+    final_advisory_required: false,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+  const result = await handleAgenticHumanReviewResponsesAdapterRequest({
+    method: 'POST',
+    url: '/agentic-human-review',
+    headers: {
+      host: '127.0.0.1:8787',
+      authorization: 'Bearer adapter-secret-value',
+      'content-type': 'application/json'
+    },
+    remoteAddress: '127.0.0.1',
+    bodyText: JSON.stringify(request),
+    env: adapterEnv(),
+    config: { contractRepairAttempts: 0 },
+    fetchImpl: async () => jsonResponse({
+      output_text: JSON.stringify({
+        summary: 'The staged advisory includes an explicit placeholder flag.',
+        role_opinions: [{
+          role: 'content_reviewer',
+          display_name: 'Content Reviewer',
+          effort: 'deep',
+          round: 1,
+          placeholder_generated: 'true',
+          summary: 'Placeholder role output should not satisfy the staged contract.',
+          findings: [],
+          uncertainties: []
+        }]
+      })
+    }),
+    now: fixedNow
+  });
+
+  assert.equal(result.statusCode, 502);
+  assert.equal(result.body.error.code, 'AHR_RESPONSES_ADAPTER_XHIGH_CONTRACT_INCOMPLETE');
+  assert.equal(result.body.error.details.missing_roles.includes('content_reviewer'), true);
+  assert.equal(result.body.error.details.placeholder_outputs[0].reason, 'placeholder_generated');
+  assert.equal(result.body.error.details.placeholder_outputs[0].planned_role_match, true);
+  assert.doesNotMatch(JSON.stringify(result.body), /adapter-secret-value|provider-secret-value|output_text/);
+});
+
 test('agentic human review responses adapter rejects abstract request models before provider fetch', async () => {
   const request = adapterTraceCueRequest();
   let fetchCalls = 0;
