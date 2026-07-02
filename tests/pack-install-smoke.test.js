@@ -464,6 +464,7 @@ async function main() {
     assert.equal(api.schemaNames().includes('operation_admin_readiness'), true);
     assert.equal(api.schemaNames().includes('operation_provider_readiness'), true);
     assert.equal(api.schemaNames().includes('visual_evidence'), true);
+    assert.equal(api.schemaNames().includes('video_evidence'), true);
     assert.equal(api.schemaNames().includes('visual_review_provider_policy'), true);
     assert.equal(api.schemaNames().includes('visual_review_result_preparation'), true);
     assert.equal(api.schemaNames().includes('visual_review_dashboard'), true);
@@ -701,6 +702,7 @@ async function main() {
     assert.ok(schemaNames.includes('operation_admin_readiness'));
     assert.ok(schemaNames.includes('operation_provider_readiness'));
     assert.ok(schemaNames.includes('visual_evidence'));
+    assert.ok(schemaNames.includes('video_evidence'));
     assert.ok(schemaNames.includes('visual_review_provider_policy'));
     assert.ok(schemaNames.includes('visual_review_result_preparation'));
     assert.ok(schemaNames.includes('visual_review_dashboard'));

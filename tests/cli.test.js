@@ -45,6 +45,7 @@ import {
 import {
   buildLocalizationResources,
   buildReportTemplates,
+  resolveReportTemplateText,
   buildTranslationDryRun,
   buildTranslationReadiness,
   translationBoundary
@@ -309,6 +310,9 @@ test('localization resources and translation readiness stay provider-free', asyn
 
   const templates = buildReportTemplates({ locale: 'ja' }, { now: fixedNow });
   assert.equal(templates.locale_selection, 'ja');
+  assert.equal(templates.selected_templates.status, 'localized-partial-with-baseline-fallback');
+  assert.equal(resolveReportTemplateText('report.ahr.section.editorial_synthesis', 'ja', 'Editorial Synthesis'), '統括レビュー');
+  assert.equal(templates.selected_templates.templates.some((item) => item.key === 'report.ahr.section.editorial_synthesis' && item.text === '統括レビュー'), true);
   assert.equal(templates.rendering_contract.raw_evidence_interpolation_translatable, false);
   assert.equal(templates.selected_templates.templates.every((item) => item.raw_evidence === false), true);
 
@@ -2174,6 +2178,7 @@ test('schema commands expose machine-readable contracts', async () => {
     ['desktop_review_provider_preparation_plan', '../schemas/desktop-review-provider-preparation-plan.schema.json'],
     ['image_review', '../schemas/image-review.schema.json'],
     ['mcp_execution_gates', '../schemas/mcp-execution-gates.schema.json'],
+    ['video_evidence', '../schemas/video-evidence.schema.json'],
     ['visual_review_provider_policy', '../schemas/visual-review-provider-policy.schema.json'],
     ['visual_review_result_preparation', '../schemas/visual-review-result-preparation.schema.json'],
     ['visual_review_dashboard', '../schemas/visual-review-dashboard.schema.json'],
@@ -3428,6 +3433,37 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   const reviewIndexPath = '.browser-debug/review-artifacts/image-review-fixed.json';
   const originalReviewText = await readFile(path.join(cwd, '.browser-debug', 'reviews', 'image-review-fixed.json'), 'utf8');
   const originalIndexText = await readFile(path.join(cwd, reviewIndexPath), 'utf8');
+  const videoEvidencePath = 'video-evidence.json';
+  await writeFile(path.join(cwd, videoEvidencePath), JSON.stringify({
+    schema_version: '1.0.0',
+    evidence_kind: 'video_evidence',
+    id: 'video-evidence-fixed',
+    source: {
+      kind: 'external_video_analysis',
+      title: 'Sample motion review',
+      media_id: 'video-fixed',
+      duration_seconds: 42
+    },
+    provider: {
+      id: 'external-video-analyzer',
+      kind: 'metadata_summary',
+      version: '1.0.0'
+    },
+    timeline_summary: [{
+      time_range: '0:00-0:10',
+      summary: 'The opening sequence introduces the page subject and expected viewer focus.'
+    }],
+    transcript_summary: ['The narration frames the content as an explanatory review.'],
+    visible_text_summary: ['The title and channel metadata are visible enough to identify the source context.'],
+    content_summary: ['The video evidence suggests the page should be reviewed as page context plus moving-content context.'],
+    claims_observed: [{
+      id: 'video-claim-fixed',
+      claim: 'The video content emphasizes explanatory rather than purely decorative value.',
+      time_range: '0:00-0:20',
+      confidence: 'medium'
+    }],
+    limitations: ['Video evidence is a metadata summary; raw video, raw audio, frames, and full transcript are not supplied.']
+  }, null, 2), 'utf8');
 
   const parsedProposal = parseCliArgs([
     'agentic',
@@ -3672,6 +3708,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
     'critic_reviewer:xhigh,verification_reviewer:xhigh',
     '--benchmark-case',
     'blog-content-value',
+    '--video-evidence',
+    videoEvidencePath,
     '--json'
   ]);
   assert.equal(parsedPlan.ok, true);
@@ -3693,6 +3731,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
     'critic_reviewer:xhigh,verification_reviewer:xhigh',
     '--benchmark-case',
     'blog-content-value',
+    '--video-evidence',
+    videoEvidencePath,
     '--surface',
     'local-subscription-agent',
     '--provider',
@@ -3739,6 +3779,11 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(planBody.data.agentic_human_review_plan.evidence_plan.visual_reference_policy.raw_pixel_bytes_embedded_in_json, false);
   assert.equal(planBody.data.agentic_human_review_plan.evidence_plan.visual_evidence_package_version, '2.0.0');
   assert.equal(planBody.data.agentic_human_review_plan.evidence_plan.visible_text_reading_contract_version, '2.0.0');
+  assert.equal(planBody.data.agentic_human_review_plan.evidence_scope.scope, 'page_and_video_evidence');
+  assert.equal(planBody.data.agentic_human_review_plan.video_evidence.status, 'available');
+  assert.equal(planBody.data.agentic_human_review_plan.video_evidence.provenance.input_hash.length, 64);
+  assert.equal(planBody.data.agentic_human_review_plan.video_evidence.provenance.input_path, undefined);
+  assert.equal(planBody.data.agentic_human_review_plan.evidence_plan.video_evidence_policy.raw_media_embedded_in_json, false);
   assert.equal(planBody.data.agentic_human_review_plan.privacy_disclosure_audit.controls.raw_provider_response_stored, false);
   assert.equal(planBody.data.agentic_human_review_plan.orchestration_contract.orchestration_version, '2.0.0');
   assert.equal(planBody.data.agentic_human_review_plan.orchestration_contract.round_plan_version, '1.0.0');
@@ -3793,6 +3838,26 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(invalidBenchmarkPlan.exitCode, 1);
   assert.equal(JSON.parse(invalidBenchmarkPlan.stdout).errors[0].code, 'AGENTIC_REVIEW_BENCHMARK_CASE_NOT_FOUND');
 
+  await writeFile(path.join(cwd, 'raw-video-evidence.json'), JSON.stringify({
+    schema_version: '1.0.0',
+    evidence_kind: 'video_evidence',
+    raw_video_base64: 'AAAA'
+  }, null, 2), 'utf8');
+  const rawVideoEvidencePlan = await executeCli([
+    'agentic',
+    'review',
+    'plan',
+    '--review-index',
+    reviewIndexPath,
+    '--intent',
+    'Review with invalid raw video evidence.',
+    '--video-evidence',
+    'raw-video-evidence.json',
+    '--json'
+  ], { cwd, now: fixedNow });
+  assert.equal(rawVideoEvidencePlan.exitCode, 1);
+  assert.equal(JSON.parse(rawVideoEvidencePlan.stdout).errors[0].code, 'AGENTIC_REVIEW_VIDEO_EVIDENCE_RAW_CONTENT_REJECTED');
+
   const planPath = '.browser-debug/agentic-human-review-plans/agentic-plan-fixed/plan.json';
   const packagePath = '.browser-debug/agentic-human-review-packages/agentic-plan-fixed/package.json';
   const planFilePath = path.join(cwd, planPath);
@@ -3806,6 +3871,10 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(packageFile.human_review_input_contract.output_requirements.reader_feeling_required, true);
   assert.equal(packageFile.visual_evidence_package_v2.evidence_package_version, '2.0.0');
   assert.equal(packageFile.visual_evidence_package_v2.raw_pixel_policy.raw_pixel_bytes_embedded_in_json, false);
+  assert.equal(packageFile.video_evidence.status, 'available');
+  assert.equal(packageFile.video_evidence.metadata_only, true);
+  assert.equal(packageFile.video_evidence.provenance.input_path, undefined);
+  assert.equal(packageFile.source.video_evidence_path, videoEvidencePath);
   assert.equal(packageFile.visible_text_reading_contract.reading_contract_version, '2.0.0');
   assert.equal(packageFile.visible_text_provenance.provenance_version, '1.0.0');
   assert.equal(packageFile.visible_text_reading_contract.text_provenance_version, '1.0.0');
@@ -3927,6 +3996,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
     reviewIndexPath,
     '--intent',
     'Review page text, artifact references, accessibility summary, and likely viewer feeling with an API provider.',
+    '--video-evidence',
+    videoEvidencePath,
     '--provider',
     'generic-api-provider',
     '--model',
@@ -3951,6 +4022,8 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   const apiRequiredFlags = apiPlanBody.data.agentic_human_review_plan.transfer_permissions.required_flags.slice().sort();
   assert.deepEqual(apiRequiredFlags, ['allow-accessibility-summary', 'allow-artifact-refs', 'allow-page-text']);
   assert.equal(apiPlanBody.data.agentic_human_review_plan.transfer_permissions.default_external_transfer, true);
+  assert.equal(apiPlanBody.data.agentic_human_review_plan.evidence_scope.scope, 'page_and_video_evidence');
+  assert.equal(apiPlanBody.data.agentic_human_review_plan.video_evidence.status, 'available');
 
   let apiRequestPayload = null;
   let apiFetchCount = 0;
@@ -4239,6 +4312,10 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(apiRequestPayload.plan.provider_effort_binding.native_effort_request_field, 'reasoning.effort');
   assert.equal(apiRequestPayload.plan.strict_output_contract.tracecue_post_validation_required, true);
   assert.equal(apiRequestPayload.plan.evidence_plan.privacy_boundary.deterministic_review_mutation_allowed, false);
+  assert.equal(apiRequestPayload.plan.video_evidence.status, 'available');
+  assert.equal(apiRequestPayload.plan.video_evidence.local_path_included, false);
+  assert.equal(apiRequestPayload.plan.video_evidence.source_url_included, false);
+  assert.equal(apiRequestPayload.plan.video_evidence.summaries.content_summary.length, 1);
   assert.equal(apiRequestPayload.plan.visual_evidence_package_v2.raw_pixel_policy.raw_pixel_bytes_embedded_in_json, false);
   assert.equal(apiRequestPayload.plan.visible_text_reading_contract.reading_contract_version, '2.0.0');
   assert.equal(apiRequestPayload.plan.visible_text_provenance.provenance_version, '1.0.0');
@@ -4248,6 +4325,9 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(apiRequestPayload.execution.execution_path_included, false);
   assert.equal(apiRequestPayload.package.existing_review_state.deterministic_review_path_included, false);
   assert.equal(apiRequestPayload.package.disclosure.raw_pixel_bytes_included, false);
+  assert.equal(apiRequestPayload.package.video_evidence.status, 'available');
+  assert.equal(apiRequestPayload.package.video_evidence.transfer_policy, 'video_evidence_summary_included_under_page_text_boundary');
+  assert.equal(JSON.stringify(apiRequestPayload.package.video_evidence).includes(videoEvidencePath), false);
   assert.equal(apiRequestPayload.package.visual_evidence_package_v2.reference_count, 0);
   assert.equal(apiRequestPayload.package.visible_text_reading_contract.snippet_count > 0, true);
   assert.equal(apiRequestPayload.package.visible_text_provenance.source_count > 0, true);
@@ -4639,6 +4719,10 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(resultFile.language_settings.artifact_output.status, 'source-language-unresolved');
   assert.equal(resultFile.language_settings.artifact_output.translation_execution_enabled, false);
   assert.equal(resultFile.language_settings.boundary.gate_effect, 'none');
+  assert.equal(resultFile.evidence_scope.scope, 'page_and_video_evidence');
+  assert.equal(resultFile.video_evidence.status, 'available');
+  assert.equal(resultFile.video_evidence.metadata_only, true);
+  assert.equal(JSON.stringify(resultFile.video_evidence).includes(videoEvidencePath), false);
   assert.equal(resultFile.editorial_synthesis.synthesis_version, '1.0.0');
   assert.equal(resultFile.editorial_synthesis.status, 'completed');
   assert.equal(resultFile.editorial_synthesis.language, 'en');
@@ -4659,7 +4743,11 @@ test('agentic human review enforces plan approval, transfer flags, and advisory-
   assert.equal(resultFile.editorial_synthesis.boundary.metrics_finding_count_mutated, false);
   assert.equal(resultFile.editorial_synthesis.boundary.release_gate_mutated, false);
   assert.equal(resultFile.editorial_synthesis.boundary.mechanical_proof_contract_satisfied, false);
+  assert.equal(resultFile.editorial_synthesis.boundary.derived_from_video_evidence_summary, true);
+  assert.equal(resultFile.editorial_synthesis.evidence_scope.scope, 'page_and_video_evidence');
+  assert.equal(resultFile.editorial_synthesis.video_evidence.status, 'available');
   assert.equal(resultFile.editorial_synthesis.source_refs.length > 0, true);
+  assert.equal(resultFile.editorial_synthesis.source_refs.some((ref) => ref.startsWith('video_evidence:')), true);
   assert.equal(resultFile.editorial_synthesis.source_ref_details.every((ref) => typeof ref.source_field === 'string' && typeof ref.source_id === 'string'), true);
   assert.equal(resultFile.editorial_synthesis.source_ref_details.some((ref) => ref.source_field === 'agentic_human_review_findings'), true);
   assert.equal(resultFile.editorial_synthesis.source_ref_details.some((ref) => /provider|prompt|response|execution/.test(ref.source_field)), false);
@@ -6893,9 +6981,13 @@ test('agentic human review editorial synthesis uses artifact output language set
       assert.equal(resultFile.editorial_synthesis.language_resolution.text_direction, 'rtl');
     }
     const reportText = await readFile(path.join(cwd, '.browser-debug', 'reports', `agentic-execution-editorial-locale-${slug}-agentic-human-review.md`), 'utf8');
-    assert.match(reportText, new RegExp(`Editorial synthesis language: ${locale.replace('-', '\\-')}`));
-    assert.match(reportText, new RegExp(`Artifact output language: ${locale.replace('-', '\\-')}`));
-    assert.match(reportText, /Translation execution: false/);
+    assert.match(reportText, new RegExp(`${escapeRegExp(resolveReportTemplateText('report.ahr.label.editorial_synthesis_language', locale, 'Editorial synthesis language'))}: ${locale.replace('-', '\\-')}`));
+    assert.match(reportText, new RegExp(`${escapeRegExp(resolveReportTemplateText('report.ahr.label.artifact_output_language', locale, 'Artifact output language'))}: ${locale.replace('-', '\\-')}`));
+    assert.match(reportText, new RegExp(`${escapeRegExp(resolveReportTemplateText('report.ahr.label.translation_execution', locale, 'Translation execution'))}: false`));
+    if (locale === 'ja') {
+      assert.match(reportText, /## 統括レビュー/);
+      assert.match(reportText, /成果物出力言語/);
+    }
   }
 });
 
@@ -6903,6 +6995,15 @@ test('agentic human review injected runner redacts sensitive advisory text', asy
   const cwd = await mkdtemp(path.join(tmpdir(), 'trace-cue-agentic-review-injected-'));
   const png = minimalPngBuffer(120, 80);
   await writeFile(path.join(cwd, 'screen.png'), png);
+  await writeFile(path.join(cwd, 'injected-video-evidence.json'), JSON.stringify({
+    schema_version: '1.0.0',
+    evidence_kind: 'video_evidence',
+    id: 'injected-video-evidence',
+    source: { kind: 'external_video_analysis', title: 'Injected video summary', media_id: 'injected-video' },
+    content_summary: ['The subscription-style runner receives already summarized video evidence.'],
+    transcript_summary: ['The spoken content emphasizes comprehension and trust.'],
+    limitations: ['Metadata-only video evidence; no raw media or full transcript is included.']
+  }, null, 2), 'utf8');
 
   const imageReview = await executeCli(['review', '--image', 'screen.png', '--json'], {
     cwd,
@@ -6921,6 +7022,8 @@ test('agentic human review injected runner redacts sensitive advisory text', asy
     'Review text comprehension and likely emotional reaction.',
     '--effort',
     'xhigh',
+    '--video-evidence',
+    'injected-video-evidence.json',
     '--provider',
     'injected-runner',
     '--model',
@@ -6933,6 +7036,7 @@ test('agentic human review injected runner redacts sensitive advisory text', asy
   });
   assert.equal(planResult.exitCode, 0);
   const planBody = JSON.parse(planResult.stdout);
+  assert.equal(planBody.data.agentic_human_review_plan.evidence_scope.scope, 'page_and_video_evidence');
   const planPath = '.browser-debug/agentic-human-review-plans/agentic-plan-injected/plan.json';
   const planHash = planBody.data.plan_hash;
   const injectedRequiredFlags = planBody.data.agentic_human_review_plan.transfer_permissions.required_flags.slice().sort();
@@ -7004,6 +7108,8 @@ test('agentic human review injected runner redacts sensitive advisory text', asy
   assert.doesNotMatch(resultText, /sentinel/);
   const resultFile = JSON.parse(resultText);
   assert.equal(resultFile.agentic_human_review_findings.length, 1);
+  assert.equal(resultFile.evidence_scope.scope, 'page_and_video_evidence');
+  assert.equal(resultFile.editorial_synthesis.boundary.derived_from_video_evidence_summary, true);
   assert.equal(resultFile.agentic_human_review_findings[0].source, 'agentic_human_review_advisory');
   assert.equal(resultFile.boundary.raw_provider_response_stored, false);
   assert.equal(resultFile.xhigh_multi_round_review.status, 'incomplete');
@@ -12869,6 +12975,10 @@ function adapterEnv(extra = {}) {
     AGENTIC_HUMAN_REVIEW_OPENAI_MODEL: 'review-model-for-test',
     ...extra
   };
+}
+
+function escapeRegExp(value) {
+  return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 function jsonResponse(body, status = 200) {

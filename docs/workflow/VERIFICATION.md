@@ -428,6 +428,15 @@ Optional acceptance checks against local application servers may run only when t
 - Dogfood readiness and dogfood plan expose a standard/deep/xhigh maturity plan and benchmark-case matrix without executing providers, writing artifacts, reading credentials, or authorizing external transfer.
 - Provider readiness and dogfood readiness remain non-executing; real provider dogfood still runs only through `agentic review run` with matching plan hash, package hash validation, provider capability hash, exact transfer flags, explicit `--execute`, and manual live dogfood opt-in when benchmark/dogfood provider API execution is requested.
 
+## Agentic Human Review Video Evidence And Localized Report Checks
+
+- No-browser tests cover `agentic review propose` and `agentic review plan` with optional `--video-evidence`, normalized path-free video evidence summaries, `evidence_scope=page_and_video_evidence`, advisory-result video evidence propagation, and source-attributed editorial synthesis records.
+- No-browser tests reject video evidence artifacts that contain raw video, raw audio, frame, image, binary, base64, data URI, payload, or full-transcript fields.
+- Provider payload tests verify video summaries are included only through existing transfer approval, and local paths, source URLs, raw media, raw frames, full transcripts, provider credentials, and raw provider responses remain absent.
+- Report-template tests verify TraceCue-owned Agentic Human Review headings, labels, fallback text, and evidence-scope lines resolve through artifact output language settings while provider-authored advisory text and source evidence text remain preserved.
+- Schema and packed-install tests verify `video_evidence`, updated Agentic Human Review package, plan, and advisory schemas, and localization resources remain discoverable from the packaged layout without publication.
+- Product gates must keep this slice no-provider-call, no-video-download, no-FrameCue-change, no-MCP-expansion, advisory-only, and release-gate-neutral.
+
 ## Release Readiness Checks
 
 `CHANGELOG.md`, `.github/workflows/ci.yml`, `ops/CI_MANIFEST.tsv`, and `docs/workflow/RELEASE.md` are release-readiness files. They do not authorize publish actions. npm credentials, license changes, and `npm publish` remain approval-bound.

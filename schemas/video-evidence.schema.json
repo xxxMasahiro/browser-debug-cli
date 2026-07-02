@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://trace-cue.local/schemas/video-evidence.schema.json",
+  "title": "TraceCue Video Evidence",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "evidence_version",
+    "evidence_kind",
+    "status",
+    "metadata_only",
+    "boundary"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "evidence_version": { "type": "string" },
+    "evidence_kind": { "const": "video_evidence" },
+    "id": { "type": "string" },
+    "status": { "enum": ["available", "insufficient", "not_supplied"] },
+    "source": { "type": ["object", "null"] },
+    "provider": { "type": ["object", "null"] },
+    "summaries": { "type": "object" },
+    "claims_observed": { "type": "array" },
+    "limitations": { "type": "array" },
+    "summary_count": { "type": "number" },
+    "timeline_item_count": { "type": "number" },
+    "claim_count": { "type": "number" },
+    "provenance": { "type": ["object", "null"] },
+    "privacy": { "type": ["object", "null"] },
+    "metadata_only": { "const": true },
+    "boundary": { "type": "object" },
+    "advisory_only": { "const": true },
+    "gate_effect": { "const": "none" }
+  },
+  "additionalProperties": true
+}

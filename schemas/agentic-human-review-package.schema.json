@@ -36,6 +36,7 @@
     "human_review_input_contract": { "type": "object" },
     "source": { "type": "object" },
     "visual_evidence": { "type": "object" },
+    "video_evidence": { "type": "object" },
     "content_evidence": { "type": "object" },
     "semantic_evidence": { "type": "object" },
     "technical_evidence": { "type": "object" },

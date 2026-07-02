@@ -1158,6 +1158,8 @@ function buildAgenticApiPayload({ plan, planPath, reviewPackage, transferFlags, 
       rounds: plan.rounds,
       rubric: plan.rubric,
       rubric_profile: plan.rubric_profile ?? null,
+      evidence_scope: plan.evidence_scope ?? null,
+      video_evidence: filterVideoEvidenceForTransfer(plan.video_evidence ?? reviewPackage?.video_evidence, transferFlags),
       evidence_plan: plan.evidence_plan ?? reviewPackage?.evidence_plan ?? null,
       visual_evidence_package_v2: filteredPackage.visual_evidence_package_v2 ?? null,
       visible_text_reading_contract: filteredPackage.visible_text_reading_contract ?? null,
@@ -1250,6 +1252,7 @@ function filterReviewPackageForTransfer(reviewPackage, transferFlags) {
           advisory_only: true,
           gate_effect: 'none'
         },
+    video_evidence: filterVideoEvidenceForTransfer(reviewPackage?.video_evidence, transferFlags),
     content_evidence: flags.has('allow-page-text')
       ? reviewPackage?.content_evidence ?? null
       : { text_snippet_count: 0, text_snippets: [], page_text_included_as_bounded_summary: false },
@@ -1285,8 +1288,74 @@ function filterReviewPackageForTransfer(reviewPackage, transferFlags) {
       raw_pixels_embedded_in_json: false,
       raw_artifact_content_included: false,
       raw_pixel_bytes_included: false,
-      visual_references_included: flags.has('allow-raw-pixels')
+      visual_references_included: flags.has('allow-raw-pixels'),
+      video_evidence_summary_included: flags.has('allow-page-text') && reviewPackage?.video_evidence?.status === 'available',
+      raw_video_embedded_in_json: false,
+      raw_audio_embedded_in_json: false,
+      raw_frames_embedded_in_json: false,
+      full_transcript_embedded_in_json: false
     }
+  };
+}
+
+function filterVideoEvidenceForTransfer(videoEvidence, transferFlags) {
+  const flags = new Set(transferFlags?.supplied_flags ?? []);
+  const status = videoEvidence?.status ?? 'not_supplied';
+  const allowed = flags.has('allow-page-text') && status === 'available';
+  const base = {
+    schema_version: SCHEMA_VERSION,
+    evidence_version: videoEvidence?.evidence_version ?? null,
+    evidence_kind: 'video_evidence',
+    status,
+    metadata_only: true,
+    raw_video_embedded_in_json: false,
+    raw_audio_embedded_in_json: false,
+    raw_frames_embedded_in_json: false,
+    full_transcript_embedded_in_json: false,
+    local_path_included: false,
+    source_url_included: false,
+    advisory_only: true,
+    gate_effect: 'none'
+  };
+  if (!allowed) {
+    return {
+      ...base,
+      summaries: {
+        timeline: [],
+        transcript_summary: [],
+        visible_text_summary: [],
+        content_summary: []
+      },
+      claims_observed: [],
+      limitations: [],
+      summary_count: 0,
+      timeline_item_count: 0,
+      claim_count: 0,
+      transfer_policy: 'video_evidence_summary_requires_allow_page_text'
+    };
+  }
+  return {
+    ...base,
+    id: videoEvidence.id ?? null,
+    source: {
+      kind: videoEvidence.source?.kind ?? null,
+      title: videoEvidence.source?.title ?? null,
+      media_id: videoEvidence.source?.media_id ?? null,
+      duration_seconds: videoEvidence.source?.duration_seconds ?? null
+    },
+    provider: videoEvidence.provider ?? null,
+    summaries: {
+      timeline: Array.isArray(videoEvidence.summaries?.timeline) ? videoEvidence.summaries.timeline.slice(0, 20) : [],
+      transcript_summary: Array.isArray(videoEvidence.summaries?.transcript_summary) ? videoEvidence.summaries.transcript_summary.slice(0, 20) : [],
+      visible_text_summary: Array.isArray(videoEvidence.summaries?.visible_text_summary) ? videoEvidence.summaries.visible_text_summary.slice(0, 20) : [],
+      content_summary: Array.isArray(videoEvidence.summaries?.content_summary) ? videoEvidence.summaries.content_summary.slice(0, 20) : []
+    },
+    claims_observed: Array.isArray(videoEvidence.claims_observed) ? videoEvidence.claims_observed.slice(0, 20) : [],
+    limitations: Array.isArray(videoEvidence.limitations) ? videoEvidence.limitations.slice(0, 20) : [],
+    summary_count: Number(videoEvidence.summary_count ?? 0),
+    timeline_item_count: Number(videoEvidence.timeline_item_count ?? 0),
+    claim_count: Number(videoEvidence.claim_count ?? 0),
+    transfer_policy: 'video_evidence_summary_included_under_page_text_boundary'
   };
 }
 

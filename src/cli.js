@@ -934,8 +934,8 @@ function usageText(topic) {
     || topic === 'agentic review claim'
   ) {
     return [
-      `Usage: ${CLI_NAME} agentic review propose --brief <request> [--review-index <review-artifact-index>] [--human-baseline <owner-baseline-json>] [--effort quick|standard|deep|xhigh] [--json]`,
-      `       ${CLI_NAME} agentic review plan --proposal <proposal> [--review-index <review-artifact-index>] [--human-baseline <owner-baseline-json>] [--json]`,
+      `Usage: ${CLI_NAME} agentic review propose --brief <request> [--review-index <review-artifact-index>] [--human-baseline <owner-baseline-json>] [--video-evidence <video-evidence-json>] [--effort quick|standard|deep|xhigh] [--json]`,
+      `       ${CLI_NAME} agentic review plan --proposal <proposal> [--review-index <review-artifact-index>] [--human-baseline <owner-baseline-json>] [--video-evidence <video-evidence-json>] [--json]`,
       `       ${CLI_NAME} agentic review provider-readiness [--provider <id>|--proposal <proposal>|--plan <plan>] [--json]`,
       `       ${CLI_NAME} agentic review run --plan <plan> --plan-hash <sha256> [--allow-raw-pixels] [--allow-page-text] [--allow-url] [--allow-artifact-refs] [--allow-accessibility-summary] --execute [--json]`,
       `       ${CLI_NAME} agentic review report-quality --result <agentic-human-review-result> [--execution <agentic-human-review-execution>] [--json]`,

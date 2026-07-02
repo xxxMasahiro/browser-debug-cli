@@ -43,6 +43,8 @@
     "reader_experience_review": { "type": "object" },
     "mechanical_vs_human_review": { "type": "object" },
     "human_review_coverage": { "type": "object" },
+    "evidence_scope": { "type": "object" },
+    "video_evidence": { "type": "object" },
     "benchmark_requirement_coverage": { "type": "object" },
     "xhigh_multi_round_review": { "type": "object" },
     "xhigh_mechanical_enforcement": { "type": "object" },
